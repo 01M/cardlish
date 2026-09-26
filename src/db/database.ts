@@ -1,5 +1,14 @@
 import * as SQLite from "expo-sqlite";
-import initialDictionary from "../assets/dictionary.json";
+import initialDictionaryRaw from "../assets/dictionary.json";
+
+type DictionaryItem = {
+  term: string;
+  translation: string;
+  transcription?: string;
+  example?: string;
+};
+
+const initialDictionary = initialDictionaryRaw as DictionaryItem[];
 
 export interface Word {
   id: number;

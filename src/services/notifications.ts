@@ -10,6 +10,7 @@ const isExpoGoAndroid =
 // сборке или на iOS.
 let Notifications: typeof import("expo-notifications") | undefined;
 if (!isExpoGoAndroid) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- required lazy import to prevent Android Expo Go crash
   Notifications = require("expo-notifications");
 }
 

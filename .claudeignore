@@ -1,0 +1,62 @@
+# Do NOT read, index, or reference these files unless explicitly requested by the user.
+# This protects the context window from large, generated, or binary content.
+
+# Dependencies & package manager
+node_modules/
+package-lock.json
+
+# VCS internals
+.git/
+.github/
+
+# Expo / Metro caches and generated types
+.expo/
+.expo-shared/
+dist/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+.metro-health-check*
+
+# Generated native folders (Continuous Native Generation)
+ios/
+android/
+.kotlin/
+
+# Generated / vendored output
+repomix-output.xml
+
+# Large data assets — import via src/db/database.ts, never inline
+src/assets/dictionary.json
+assets/**/*.png
+assets/**/*.jpg
+assets/**/*.jpeg
+assets/**/*.gif
+assets/**/*.ttf
+assets/**/*.otf
+
+# Build artifacts & logs
+build/
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Secrets & local env
+.env
+.env*.local
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Agent / editor scratch space
+.kilo/
+.claude/settings.local.json

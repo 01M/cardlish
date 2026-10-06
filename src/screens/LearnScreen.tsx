@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useMemo } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -17,10 +17,14 @@ import {
   resetProgressOnly,
   Word,
 } from "../db/database";
+import { Theme } from "../theme/tokens";
+import { useTheme } from "../theme/useTheme";
 
 export const LearnScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [source, setSource] = useState<"custom" | "dictionary">("custom");
   const [sessionSize, setSessionSize] = useState<number>(10);
@@ -351,10 +355,11 @@ export const LearnScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7F7F2",
+    backgroundColor: theme.pageBackground,
   },
   scrollContent: {
     paddingHorizontal: 24,
@@ -362,7 +367,7 @@ const styles = StyleSheet.create({
   sessionContainer: {
     flex: 1,
     paddingHorizontal: 24,
-    backgroundColor: "#F7F7F2",
+    backgroundColor: theme.pageBackground,
     justifyContent: "space-between",
   },
   cardWrapper: {
@@ -371,15 +376,19 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   eyebrow: {
-    color: "#B45309",
+    color: theme.amberAccent,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.5,
     marginBottom: 7,
   },
-  title: { fontSize: 32, fontWeight: "900", color: "#17202A" },
+  title: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: theme.textPrimary,
+  },
   subtitle: {
-    color: "#68737D",
+    color: theme.textMuted,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 7,
@@ -388,13 +397,13 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#6B7280",
+    color: theme.textMutedAlt,
     textTransform: "uppercase",
     marginBottom: 10,
     marginTop: 15,
   },
   statsRow: {
-    backgroundColor: "#17202A",
+    backgroundColor: theme.inkCardBackground,
     borderRadius: 20,
     minHeight: 88,
     flexDirection: "row",
@@ -404,17 +413,25 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   statItem: { alignItems: "center", flex: 1 },
-  statValue: { color: "#FFFFFF", fontSize: 24, fontWeight: "900" },
+  statValue: {
+    color: theme.inkCardText,
+    fontSize: 24,
+    fontWeight: "900",
+  },
   statLabel: {
-    color: "#B9C2C8",
+    color: theme.inkCardSubtext,
     fontSize: 11,
     marginTop: 4,
     fontWeight: "600",
   },
-  statDivider: { width: 1, height: 34, backgroundColor: "#3B4852" },
+  statDivider: {
+    width: 1,
+    height: 34,
+    backgroundColor: theme.inkCardDivider,
+  },
   toggleRow: {
     flexDirection: "row",
-    backgroundColor: "#E6E7E1",
+    backgroundColor: theme.secondaryControlBackground,
     borderRadius: 15,
     padding: 4,
   },
@@ -424,9 +441,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 10,
   },
-  toggleBtnActive: { backgroundColor: "#D97706" },
-  toggleText: { fontWeight: "600", color: "#4B5563", fontSize: 14 },
-  toggleTextActive: { color: "#FFFFFF" },
+  toggleBtnActive: { backgroundColor: theme.orangeAccent },
+  toggleText: {
+    fontWeight: "600",
+    color: theme.textTertiary,
+    fontSize: 14,
+  },
+  toggleTextActive: { color: theme.textOnAccent },
   counterRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -436,27 +457,31 @@ const styles = StyleSheet.create({
   counterBtn: {
     width: 52,
     height: 52,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.surfaceElevated,
     borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E4E1D8",
+    borderColor: theme.borderSubtle,
   },
-  counterBtnText: { fontSize: 24, fontWeight: "bold", color: "#111827" },
+  counterBtnText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: theme.textEmphasis,
+  },
   counterValue: {
     fontSize: 28,
     fontWeight: "800",
     marginHorizontal: 30,
-    color: "#111827",
+    color: theme.textEmphasis,
   },
   infoCard: {
-    backgroundColor: "#FFFDF8",
+    backgroundColor: theme.surface,
     padding: 18,
     borderRadius: 20,
     marginVertical: 20,
     borderWidth: 1,
-    borderColor: "#E8E3D7",
+    borderColor: theme.border,
   },
   infoHeader: {
     flexDirection: "row",
@@ -464,19 +489,35 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  infoTitle: { color: "#17202A", fontSize: 15, fontWeight: "800" },
-  infoCount: { color: "#B45309", fontSize: 12, fontWeight: "800" },
-  infoText: { fontSize: 15, color: "#374151", marginBottom: 6 },
-  infoSubText: { fontSize: 13, color: "#9CA3AF", marginTop: 4 },
-  bold: { fontWeight: "700", color: "#111827" },
+  infoTitle: {
+    color: theme.textPrimary,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  infoCount: {
+    color: theme.statAmber,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  infoText: {
+    fontSize: 15,
+    color: theme.textSecondary,
+    marginBottom: 6,
+  },
+  infoSubText: {
+    fontSize: 13,
+    color: theme.textMutedSoft,
+    marginTop: 4,
+  },
+  bold: { fontWeight: "700", color: theme.textEmphasis },
   warningText: {
     fontSize: 13,
-    color: "#D97706",
+    color: theme.orangeAccent,
     marginVertical: 6,
     lineHeight: 18,
   },
   startButton: {
-    backgroundColor: "#D97706",
+    backgroundColor: theme.orangeAccent,
     minHeight: 54,
     width: "100%",
     paddingHorizontal: 18,
@@ -486,24 +527,32 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 10,
   },
-  startButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  startButtonText: {
+    color: theme.textOnAccent,
+    fontSize: 16,
+    fontWeight: "700",
+  },
   sessionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   progressPill: {
-    backgroundColor: "#17202A",
+    backgroundColor: theme.buttonInk,
     borderRadius: 14,
     paddingHorizontal: 13,
     paddingVertical: 8,
   },
-  progressText: { fontSize: 13, fontWeight: "800", color: "#FFFFFF" },
+  progressText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.textOnButtonInk,
+  },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#E8E7E0",
+    backgroundColor: theme.secondaryControlBackgroundAlt,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -511,10 +560,10 @@ const styles = StyleSheet.create({
     fontSize: 25,
     lineHeight: 27,
     fontWeight: "400",
-    color: "#4B5563",
+    color: theme.textTertiary,
   },
   nextButton: {
-    backgroundColor: "#17202A",
+    backgroundColor: theme.buttonInk,
     minHeight: 54,
     width: "100%",
     paddingHorizontal: 18,
@@ -524,23 +573,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 10,
   },
-  nextButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  nextButtonText: {
+    color: theme.textOnButtonInk,
+    fontSize: 16,
+    fontWeight: "700",
+  },
   emptyContainer: {
     flex: 1,
     paddingHorizontal: 30,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F7F7F2",
+    backgroundColor: theme.pageBackground,
   },
-  emptyIcon: { fontSize: 54, color: "#059669", marginBottom: 16 },
+  emptyIcon: {
+    fontSize: 54,
+    color: theme.successIcon,
+    marginBottom: 16,
+  },
   emptyTitle: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#111827",
+    color: theme.textEmphasis,
     textAlign: "center",
   },
   emptyText: {
-    color: "#6B7280",
+    color: theme.textMutedAlt,
     fontSize: 15,
     lineHeight: 22,
     textAlign: "center",
@@ -549,7 +606,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: "#9CA3AF",
+    borderColor: theme.secondaryButtonBorder,
     minHeight: 52,
     width: "100%",
     paddingHorizontal: 18,
@@ -559,5 +616,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 10,
   },
-  secondaryButtonText: { color: "#374151", fontSize: 16, fontWeight: "700" },
+  secondaryButtonText: {
+    color: theme.textSecondary,
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });

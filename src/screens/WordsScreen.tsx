@@ -186,7 +186,7 @@ export const WordsScreen = () => {
         renderItem={renderWord}
         contentContainerStyle={[
           filteredWords.length === 0 ? styles.emptyList : styles.list,
-          { paddingBottom: Math.max(insets.bottom + 16, 24) },
+          { paddingBottom: 16 },
         ]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={

@@ -117,7 +117,7 @@ export const ProfileScreen = () => {
         styles.content,
         {
           paddingTop: Math.max(insets.top + 12, 24),
-          paddingBottom: Math.max(insets.bottom + 24, 40),
+          paddingBottom: 16,
         },
       ]}
       showsVerticalScrollIndicator={false}

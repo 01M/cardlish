@@ -2,11 +2,29 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 
 ## Expo docs
 
-Expo APIs change between SDKs. Check the docs only when you are about to use an API you are not sure about, and:
+Expo APIs change between SDKs. Check the docs only when you are about to use an API you are not sure about.
+
+Rules:
+- Start from the index: https://docs.expo.dev/llms.txt — search titles/keywords, then open only those URLs.
+- **Never invent or guess documentation paths.** If a URL 404s, stop and use llms.txt or the verified list below.
 - Fetch each doc page at most once per session. Never re-fetch a page already fetched.
 - If the task prompt provides verified facts or exact API signatures, treat them as ground truth and do not re-fetch them.
 - Never re-read a file already read in this session unless you edited it.
-- Index of docs: https://docs.expo.dev/llms.txt
+
+Verified pages (prefer these over guessing):
+- Color themes / userInterfaceStyle / useColorScheme:
+  https://docs.expo.dev/develop/user-interface/color-themes/
+- Native tabs (ThemeProvider, white flash, tint, icons):
+  https://docs.expo.dev/router/advanced/native-tabs/
+- Stack + ThemeProvider:
+  https://docs.expo.dev/router/advanced/stack/
+- Expo UI overview:
+  https://docs.expo.dev/versions/latest/sdk/ui/
+- Expo UI Host (colorScheme, seedColor):
+  https://docs.expo.dev/versions/latest/sdk/ui/universal/host/
+- Index: https://docs.expo.dev/llms.txt
+
+Note: `useColorScheme` and `Appearance` are from `react-native`, not a separate Expo runtime doc page.
 
 ## Commands
 

@@ -114,3 +114,10 @@ We are migrating screens step by step to native primitives. For migrated screens
 asks: `node_modules/`, `.git/`, `.expo/`, generated `ios/`+`android/`, `dist/`, `web-build/`,
 `repomix-output.xml`, **`src/assets/dictionary.json`** (very large data file — access it only through
 `src/db/database.ts`), image/font binaries, logs, and secrets.
+
+## Theming (when implementing dark mode)
+
+- System theme via `userInterfaceStyle: "automatic"` in app.json and `useColorScheme()`.
+- Wrap NativeTabs with Expo Router `ThemeProvider` + `DarkTheme` / `DefaultTheme` to avoid white flashes (see native-tabs docs).
+- Screen colors are mostly hardcoded cream palette — dark mode needs explicit tokens; native @expo/ui follows system when used inside Host.
+- Do not invent Expo doc URLs; use AGENTS.md verified list + llms.txt.

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
 import { Word } from "../db/database";
 import * as Speech from "expo-speech";
 import * as Haptics from "expo-haptics";
+import { Theme } from "../theme/tokens";
+import { useTheme } from "../theme/useTheme";
 
 const FLIP_MS = 400;
 
@@ -20,6 +22,8 @@ interface FlipCardProps {
 }
 
 export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [isFlipped, setIsFlipped] = useState(false);
   const animatedValue = useRef(new Animated.Value(0)).current;
   const isSpeaking = useRef(false);
@@ -134,7 +138,8 @@ export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
   cardContainer: {
     width: "100%",
     height: 370,
@@ -143,14 +148,14 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     height: "100%",
-    backgroundColor: "#FFFDF8",
+    backgroundColor: theme.surface,
     borderRadius: 28,
     padding: 28,
     justifyContent: "center",
     alignItems: "center",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
+        shadowColor: theme.shadowColor,
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.1,
         shadowRadius: 18,
@@ -158,7 +163,7 @@ const styles = StyleSheet.create({
     }),
     backfaceVisibility: "hidden",
     borderWidth: 1,
-    borderColor: "#E8E3D7",
+    borderColor: theme.border,
   },
   cardBack: {
     position: "absolute",
@@ -171,8 +176,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 22,
     left: 22,
-    backgroundColor: "#FCE7C2",
-    color: "#B45309",
+    backgroundColor: theme.badgeAmberBackground,
+    color: theme.badgeAmberText,
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 1.4,
@@ -184,8 +189,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 22,
     left: 22,
-    backgroundColor: "#DDF4E8",
-    color: "#087443",
+    backgroundColor: theme.successBackground,
+    color: theme.successText,
     fontSize: 10,
     fontWeight: "700",
     letterSpacing: 1.4,
@@ -197,7 +202,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 22,
     right: 22,
-    backgroundColor: "#FFF4E6",
+    backgroundColor: theme.speakButtonAmberBackground,
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -208,7 +213,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 22,
     right: 22,
-    backgroundColor: "#E8F5E9",
+    backgroundColor: theme.speakButtonGreenBackground,
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -221,7 +226,7 @@ const styles = StyleSheet.create({
   term: {
     fontSize: 32,
     fontWeight: "800",
-    color: "#17202A",
+    color: theme.textPrimary,
     letterSpacing: 0,
     textAlign: "center",
   },
@@ -229,17 +234,17 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 25,
     fontSize: 13,
-    color: "#7A858D",
+    color: theme.textMutedHint,
   },
   translation: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#087443",
+    color: theme.greenAccent,
     textAlign: "center",
   },
   transcription: {
     fontSize: 16,
-    color: "#6B7280",
+    color: theme.textMutedAlt,
     marginTop: 12,
     fontStyle: "italic",
   },
@@ -247,20 +252,20 @@ const styles = StyleSheet.create({
     marginTop: 25,
     paddingHorizontal: 15,
     paddingVertical: 12,
-    backgroundColor: "#F1F7F2",
+    backgroundColor: theme.exampleBackground,
     borderRadius: 16,
     width: "100%",
   },
   exampleLabel: {
     fontSize: 11,
-    color: "#6E8376",
+    color: theme.exampleLabel,
     textTransform: "uppercase",
     fontWeight: "700",
     marginBottom: 4,
   },
   exampleText: {
     fontSize: 14,
-    color: "#31443A",
+    color: theme.exampleText,
     fontStyle: "italic",
     lineHeight: 20,
   },

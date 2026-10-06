@@ -86,6 +86,9 @@ export interface Theme {
   switchTrackFalse: string; // дорожка выключенного переключателя
   switchThumbOn: string; // ползунок включённого
   switchThumbOff: string; // ползунок выключенного
+
+  // Тени
+  shadowColor: string; // цвет тени карточки (iOS-only shadow)
 }
 
 // 2. Светлая тема — точные текущие значения из кода
@@ -157,6 +160,8 @@ export const lightTheme: Theme = {
   switchTrackFalse: "#D1D5DB",
   switchThumbOn: "#087443",
   switchThumbOff: "#F9FAFB",
+
+  shadowColor: "#000",
 };
 
 // 3. Тёмная тема: страница < карточка < приподнятая поверхность,
@@ -229,4 +234,6 @@ export const darkTheme: Theme = {
   switchTrackFalse: "#3B4852",
   switchThumbOn: "#56B77D",
   switchThumbOff: "#E8EDF0",
+
+  shadowColor: "#000000",
 };

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useMemo } from "react";
 import * as Haptics from "expo-haptics";
 import {
   Alert,
@@ -25,9 +25,13 @@ import {
   enableDailyReminder,
   getDailyReminderTime,
 } from "../services/notifications";
+import { Theme } from "../theme/tokens";
+import { useTheme } from "../theme/useTheme";
 
 export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [stats, setStats] = useState({
     newCustom: 0,
     newDict: 0,
@@ -94,7 +98,7 @@ export const ProfileScreen = () => {
 
   const handleReminderToggle = async (enabled: boolean) => {
   Haptics.selectionAsync();
-  if (enabled) {
+    if (enabled) {
       const scheduled = await enableDailyReminder();
       if (!scheduled) {
         Alert.alert(
@@ -141,25 +145,25 @@ export const ProfileScreen = () => {
       <Text style={styles.sectionLabel}>СТАТИСТИКА СЛОВ</Text>
       <View style={styles.statsGrid}>
         <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: "#087443" }]}>
+          <Text style={[styles.statValue, { color: theme.statGreen }]}>
             {stats.learned}
           </Text>
           <Text style={styles.statLabel}>Выучено</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: "#B45309" }]}>
+          <Text style={[styles.statValue, { color: theme.statAmber }]}>
             {stats.review}
           </Text>
           <Text style={styles.statLabel}>На повторе</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: "#2563EB" }]}>
+          <Text style={[styles.statValue, { color: theme.statBlue }]}>
             {stats.totalNew}
           </Text>
           <Text style={styles.statLabel}>Новые</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: "#17202A" }]}>
+          <Text style={[styles.statValue, { color: theme.statInk }]}>
             {totalCount}
           </Text>
           <Text style={styles.statLabel}>Всего в базе</Text>
@@ -177,8 +181,11 @@ export const ProfileScreen = () => {
         <Switch
           value={reminderEnabled}
           onValueChange={handleReminderToggle}
-          trackColor={{ false: "#D1D5DB", true: "#A7F3D0" }}
-          thumbColor={reminderEnabled ? "#087443" : "#F9FAFB"}
+          trackColor={{
+            false: theme.switchTrackFalse,
+            true: theme.switchTrackTrue,
+          }}
+          thumbColor={reminderEnabled ? theme.switchThumbOn : theme.switchThumbOff}
         />
       </View>
 
@@ -199,11 +206,12 @@ export const ProfileScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F7F7F2" },
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.pageBackground },
   content: { paddingHorizontal: 24 },
   eyebrow: {
-    color: "#087443",
+    color: theme.greenAccent,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.5,
@@ -212,43 +220,47 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "900",
-    color: "#17202A",
+    color: theme.textPrimary,
     marginBottom: 22,
   },
   progressCard: {
-    backgroundColor: "#17202A",
+    backgroundColor: theme.inkCardBackground,
     borderRadius: 24,
     padding: 24,
     marginBottom: 24,
   },
   progressTitle: {
     fontSize: 11,
-    color: "#AEB9C0",
+    color: theme.inkCardLabel,
     fontWeight: "800",
     letterSpacing: 1.2,
   },
   progressPercent: {
     fontSize: 52,
     fontWeight: "900",
-    color: "#FFFFFF",
+    color: theme.inkCardText,
     marginVertical: 4,
   },
-  progressSub: { fontSize: 13, color: "#C7D0D5", marginBottom: 16 },
+  progressSub: {
+    fontSize: 13,
+    color: theme.inkCardSubtextSoft,
+    marginBottom: 16,
+  },
   progressBarBg: {
     height: 9,
-    backgroundColor: "#3B4852",
+    backgroundColor: theme.inkCardDivider,
     borderRadius: 5,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: "#56B77D",
+    backgroundColor: theme.progressBarFill,
     borderRadius: 5,
   },
   sectionLabel: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#68737D",
+    color: theme.textMuted,
     letterSpacing: 1.2,
     marginBottom: 12,
   },
@@ -260,19 +272,23 @@ const styles = StyleSheet.create({
   },
   statBox: {
     width: "48%",
-    backgroundColor: "#FFFDF8",
+    backgroundColor: theme.surface,
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#E8E3D7",
+    borderColor: theme.border,
   },
   statValue: { fontSize: 24, fontWeight: "900", marginBottom: 4 },
-  statLabel: { fontSize: 13, color: "#68737D", fontWeight: "600" },
+  statLabel: {
+    fontSize: 13,
+    color: theme.textMuted,
+    fontWeight: "600",
+  },
   reminderRow: {
-    backgroundColor: "#FFFDF8",
+    backgroundColor: theme.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#E8E3D7",
+    borderColor: theme.border,
     padding: 16,
     marginBottom: 28,
     flexDirection: "row",
@@ -280,18 +296,37 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   reminderText: { flex: 1, paddingRight: 16 },
-  reminderTitle: { color: "#17202A", fontWeight: "800", fontSize: 15 },
-  reminderSubtitle: { color: "#68737D", fontSize: 13, marginTop: 4 },
+  reminderTitle: {
+    color: theme.textPrimary,
+    fontWeight: "800",
+    fontSize: 15,
+  },
+  reminderSubtitle: {
+    color: theme.textMuted,
+    fontSize: 13,
+    marginTop: 4,
+  },
   actionButton: {
-    backgroundColor: "#FFFDF8",
+    backgroundColor: theme.surface,
     paddingVertical: 15,
     borderRadius: 14,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E8E3D7",
+    borderColor: theme.border,
     marginBottom: 12,
   },
-  actionButtonText: { color: "#3F4A50", fontWeight: "700", fontSize: 14 },
-  dangerButton: { borderColor: "#F4B4AE", backgroundColor: "#FFF1F0" },
-  dangerButtonText: { color: "#B42318", fontWeight: "700", fontSize: 14 },
+  actionButtonText: {
+    color: theme.textButtonSecondary,
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  dangerButton: {
+    borderColor: theme.dangerBorder,
+    backgroundColor: theme.dangerBackground,
+  },
+  dangerButtonText: {
+    color: theme.dangerText,
+    fontWeight: "700",
+    fontSize: 14,
+  },
 });

@@ -83,9 +83,12 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    `useSafeAreaInsets()` from `react-native-safe-area-context` for headers, footers, and the tab bar
    (`height: 58 + insets.bottom`, `paddingBottom: Math.max(insets.bottom, 8)`). Avoid hardcoded
    device assumptions and verify both iOS and Android.
-6. **Styling conventions:** `StyleSheet.create` at the bottom of the file, warm neutral palette
-   (`#FAFAFA` background, `#D97706` accent, `#FFFDF8` surface, `#E8E3D7` borders, `#374151`/
-   `#8A938F` text). No inline style objects for anything non-trivial.
+6. **Styling conventions:** Keep styles in a `createStyles(theme)` factory at the bottom of the
+   file, called once per screen via `const styles = useMemo(() => createStyles(theme), [theme])`;
+   no inline style objects for anything non-trivial (dynamic values like progress-bar width are
+   exempt). Colors come from `src/theme/tokens.ts`, never hardcoded hex in screens. The warm
+   neutral palette values (`#FAFAFA` background, `#D97706` accent, `#FFFDF8` surface, `#E8E3D7`
+   borders, `#374151`/`#8A938F` text) now live in `tokens.ts` as `lightTheme`.
 7. **Navigation** via Expo Router only: `Link`, `router`, `useLocalSearchParams` from
    `expo-router`. Never pass non-serializable params (functions, DB handles).
 

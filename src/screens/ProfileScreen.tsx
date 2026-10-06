@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import * as Haptics from "expo-haptics";
 import {
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -116,7 +117,8 @@ export const ProfileScreen = () => {
       contentContainerStyle={[
         styles.content,
         {
-          paddingTop: Math.max(insets.top + 12, 24),
+          paddingTop:
+            Platform.OS === "ios" ? 12 : Math.max(insets.top + 12, 24),
           paddingBottom: 16,
         },
       ]}

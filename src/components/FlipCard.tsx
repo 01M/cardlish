@@ -6,10 +6,13 @@ import {
   TouchableWithoutFeedback,
   Animated,
   TouchableOpacity,
+  Platform,
 } from "react-native";
 import { Word } from "../db/database";
 import * as Speech from "expo-speech";
 import * as Haptics from "expo-haptics";
+
+const FLIP_MS = 400;
 
 interface FlipCardProps {
   word: Word;
@@ -54,7 +57,7 @@ export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
 
     Animated.timing(animatedValue, {
       toValue: nextState ? 180 : 0,
-      duration: 400,
+      duration: FLIP_MS,
       useNativeDriver: true,
     }).start();
   };
@@ -145,18 +148,24 @@ const styles = StyleSheet.create({
     padding: 28,
     justifyContent: "center",
     alignItems: "center",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 18,
+      },
+    }),
     backfaceVisibility: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    elevation: 7,
     borderWidth: 1,
     borderColor: "#E8E3D7",
   },
   cardBack: {
     position: "absolute",
     top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   badge: {
     position: "absolute",

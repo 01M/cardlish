@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,10 +10,14 @@ import {
   Word,
 } from "../db/database";
 import { FlipCard } from "../components/FlipCard";
+import { Theme } from "../theme/tokens";
+import { useTheme } from "../theme/useTheme";
 
 export const ReviewScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [reviewWords, setReviewWords] = useState<Word[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -73,7 +77,7 @@ export const ReviewScreen = () => {
     return (
       <SafeAreaView
         edges={{ bottom: true }}
-        style={{ flex: 1, backgroundColor: "#F7F7F2" }}
+        style={styles.safeArea}
       >
         <View
           style={[
@@ -110,10 +114,7 @@ export const ReviewScreen = () => {
   const currentWord = reviewWords[currentIndex];
 
   return (
-    <SafeAreaView
-      edges={{ bottom: true }}
-      style={{ flex: 1, backgroundColor: "#F7F7F2" }}
-    >
+    <SafeAreaView edges={{ bottom: true }} style={styles.safeArea}>
       <View
         style={[
           styles.container,
@@ -172,11 +173,13 @@ export const ReviewScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: theme.pageBackground },
   container: {
     flex: 1,
     paddingHorizontal: 24,
-    backgroundColor: "#F7F7F2",
+    backgroundColor: theme.pageBackground,
     justifyContent: "space-between",
   },
   header: {
@@ -185,20 +188,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   eyebrow: {
-    color: "#087443",
+    color: theme.greenAccent,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.5,
     marginBottom: 6,
   },
-  title: { fontSize: 32, fontWeight: "900", color: "#17202A" },
+  title: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: theme.textPrimary,
+  },
   badgeCount: {
-    backgroundColor: "#17202A",
+    backgroundColor: theme.buttonInk,
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 14,
   },
-  badgeText: { fontSize: 12, fontWeight: "800", color: "#FFFFFF" },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: theme.textOnButtonInk,
+  },
   cardContainer: {
     flex: 1,
     justifyContent: "center",
@@ -224,20 +235,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   forgotBtn: {
-    backgroundColor: "#FFF1F0",
+    backgroundColor: theme.dangerBackground,
     borderWidth: 1,
-    borderColor: "#F4B4AE",
+    borderColor: theme.dangerBorder,
   },
-  forgotBtnText: { color: "#B42318", fontWeight: "800", fontSize: 14 },
+  forgotBtnText: {
+    color: theme.dangerText,
+    fontWeight: "800",
+    fontSize: 14,
+  },
   rememberedBtn: {
-    backgroundColor: "#DDF4E8",
+    backgroundColor: theme.successBackground,
     borderWidth: 1,
-    borderColor: "#8CCDA7",
+    borderColor: theme.successBorder,
   },
-  rememberedBtnText: { color: "#087443", fontWeight: "800", fontSize: 14 },
+  rememberedBtnText: {
+    color: theme.successText,
+    fontWeight: "800",
+    fontSize: 14,
+  },
   flipHintText: {
     textAlign: "center",
-    color: "#7A858D",
+    color: theme.textMutedHint,
     fontSize: 14,
     fontWeight: "500",
   },
@@ -246,23 +265,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F7F7F2",
+    backgroundColor: theme.pageBackground,
   },
   emptyIcon: { fontSize: 64, marginBottom: 16 },
   emptyTitle: {
     fontSize: 24,
     fontWeight: "900",
-    color: "#17202A",
+    color: theme.textPrimary,
     marginBottom: 8,
   },
   emptySubText: {
     fontSize: 15,
-    color: "#68737D",
+    color: theme.textMuted,
     textAlign: "center",
     lineHeight: 22,
   },
   emptyButton: {
-    backgroundColor: "#D97706",
+    backgroundColor: theme.orangeAccent,
     minHeight: 54,
     paddingHorizontal: 18,
     paddingVertical: 15,
@@ -272,10 +291,14 @@ const styles = StyleSheet.create({
     width: "100%",
     marginTop: 22,
   },
-  emptyButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
+  emptyButtonText: {
+    color: theme.textOnAccent,
+    fontSize: 15,
+    fontWeight: "800",
+  },
   secondaryButton: {
     borderWidth: 1,
-    borderColor: "#A7AAA3",
+    borderColor: theme.secondaryButtonBorderAlt,
     minHeight: 54,
     paddingHorizontal: 18,
     paddingVertical: 15,
@@ -285,5 +308,9 @@ const styles = StyleSheet.create({
     width: "100%",
     marginTop: 10,
   },
-  secondaryButtonText: { color: "#3F4A50", fontSize: 15, fontWeight: "800" },
+  secondaryButtonText: {
+    color: theme.textButtonSecondary,
+    fontSize: 15,
+    fontWeight: "800",
+  },
 });

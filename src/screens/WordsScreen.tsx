@@ -12,6 +12,8 @@ import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteCustomWord, getCustomWords, Word } from "../db/database";
 import { WordFormModal } from "../components/WordFormModal";
+import { Theme } from "../theme/tokens";
+import { useTheme } from "../theme/useTheme";
 
 type Filter = Word["status"] | "all";
 
@@ -24,6 +26,8 @@ const filters: { label: string; value: Filter }[] = [
 
 export const WordsScreen = () => {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [words, setWords] = useState<Word[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -141,10 +145,11 @@ export const WordsScreen = () => {
         <TextInput
           style={styles.searchInput}
           placeholder="Поиск по слову или переводу..."
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={theme.placeholder}
           value={searchQuery}
           onChangeText={setSearchQuery}
           autoCorrect={false}
+          keyboardAppearance={theme.keyboardAppearance}
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity
@@ -224,11 +229,12 @@ export const WordsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20,
-    backgroundColor: "#F7F7F2",
+    backgroundColor: theme.pageBackground,
   },
   header: {
     flexDirection: "row",
@@ -237,28 +243,36 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   eyebrow: {
-    color: "#B45309",
+    color: theme.amberAccent,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.5,
     marginBottom: 6,
   },
-  title: { fontSize: 32, fontWeight: "900", color: "#17202A" },
-  subtitle: { color: "#68737D", fontSize: 13, marginTop: 5 },
+  title: {
+    fontSize: 32,
+    fontWeight: "900",
+    color: theme.textPrimary,
+  },
+  subtitle: {
+    color: theme.textMuted,
+    fontSize: 13,
+    marginTop: 5,
+  },
   addButton: {
-    backgroundColor: "#D97706",
+    backgroundColor: theme.orangeAccent,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  addButtonText: { color: "#FFFFFF", fontWeight: "700" },
+  addButtonText: { color: theme.textOnAccent, fontWeight: "700" },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFDF8",
+    backgroundColor: theme.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E8E3D7",
+    borderColor: theme.border,
     paddingHorizontal: 14,
     marginBottom: 12,
     height: 46,
@@ -266,60 +280,81 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: "#17202A",
+    color: theme.textPrimary,
   },
   clearSearchButton: {
     padding: 4,
   },
   clearSearchText: {
-    color: "#9CA3AF",
+    color: theme.textMutedSoft,
     fontSize: 14,
     fontWeight: "700",
   },
   filterRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
   filterButton: {
-    backgroundColor: "#E6E7E1",
+    backgroundColor: theme.secondaryControlBackground,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  filterButtonActive: { backgroundColor: "#17202A" },
-  filterText: { color: "#4B5563", fontSize: 12, fontWeight: "600" },
-  filterTextActive: { color: "#FFFFFF" },
+  filterButtonActive: { backgroundColor: theme.buttonInk },
+  filterText: { color: theme.textTertiary, fontSize: 12, fontWeight: "600" },
+  filterTextActive: { color: theme.textOnButtonInk },
   list: { paddingBottom: 24 },
   emptyList: { flexGrow: 1, justifyContent: "center" },
   wordCard: {
-    backgroundColor: "#FFFDF8",
+    backgroundColor: theme.surface,
     padding: 16,
     borderRadius: 18,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#E8E3D7",
+    borderColor: theme.border,
     flexDirection: "row",
     justifyContent: "space-between",
   },
   wordContent: { flex: 1, paddingRight: 10 },
-  term: { fontSize: 18, fontWeight: "800", color: "#17202A" },
-  translation: { fontSize: 16, color: "#374151", marginTop: 2 },
-  transcription: { fontSize: 14, color: "#6B7280", marginTop: 2 },
-  status: { fontSize: 12, color: "#B45309", marginTop: 8, fontWeight: "700" },
+  term: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: theme.textPrimary,
+  },
+  translation: {
+    fontSize: 16,
+    color: theme.textSecondary,
+    marginTop: 2,
+  },
+  transcription: {
+    fontSize: 14,
+    color: theme.textMutedAlt,
+    marginTop: 2,
+  },
+  status: {
+    fontSize: 12,
+    color: theme.amberAccent,
+    marginTop: 8,
+    fontWeight: "700",
+  },
   actions: { justifyContent: "center", alignItems: "flex-end", gap: 10 },
-  editAction: { color: "#2563EB", fontWeight: "600", fontSize: 12 },
-  deleteAction: { color: "#DC2626", fontWeight: "600", fontSize: 12 },
+  editAction: { color: theme.linkBlue, fontWeight: "600", fontSize: 12 },
+  deleteAction: { color: theme.dangerLink, fontWeight: "600", fontSize: 12 },
   emptyState: { alignItems: "center", padding: 24 },
-  emptyTitle: { fontSize: 22, fontWeight: "800", color: "#111827" },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: theme.textEmphasis,
+  },
   emptyText: {
-    color: "#6B7280",
+    color: theme.textMutedAlt,
     textAlign: "center",
     lineHeight: 21,
     marginTop: 8,
   },
   emptyButton: {
-    backgroundColor: "#D97706",
+    backgroundColor: theme.orangeAccent,
     borderRadius: 14,
     paddingHorizontal: 18,
     paddingVertical: 14,
     marginTop: 18,
   },
-  emptyButtonText: { color: "#FFFFFF", fontWeight: "700" },
+  emptyButtonText: { color: theme.textOnAccent, fontWeight: "700" },
 });

@@ -39,6 +39,7 @@ export interface Theme {
   textOnButtonInk: string; // текст на заливке buttonInk (nextButton, pill, активный фильтр)
   textButtonSecondary: string; // текст светлых вторичных кнопок (сброс в Profile/Review)
   placeholder: string; // placeholder поисковой строки
+  keyboardAppearance: "light" | "dark"; // внешний вид клавиатуры iOS (TextInput)
 
   // Акценты
   greenAccent: string; // зелёный акцент: бровки, перевод на карточке, success-текст
@@ -114,6 +115,7 @@ export const lightTheme: Theme = {
   textOnButtonInk: "#FFFFFF",
   textButtonSecondary: "#3F4A50",
   placeholder: "#9CA3AF",
+  keyboardAppearance: "light",
 
   greenAccent: "#087443",
   orangeAccent: "#D97706",
@@ -185,6 +187,7 @@ export const darkTheme: Theme = {
   textOnButtonInk: "#0F1519",
   textButtonSecondary: "#C3CCD2",
   placeholder: "#9AA5AD",
+  keyboardAppearance: "dark",
 
   greenAccent: "#56B77D",
   orangeAccent: "#D97706",

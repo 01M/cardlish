@@ -1,63 +1,39 @@
-import { Tabs } from "expo-router";
-import { Text } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { NativeTabs } from "expo-router/unstable-native-tabs";
 
 export default function TabsLayout() {
-  const insets = useSafeAreaInsets();
-
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: "#D97706",
-        tabBarInactiveTintColor: "#8A938F",
-        tabBarStyle: {
-          // Высчитываем высоту с учетом нижнего отступа устройства
-          height: 58 + insets.bottom,
-          paddingTop: 8,
-          paddingBottom: Math.max(insets.bottom, 8),
-          backgroundColor: "#FFFDF8",
-          borderTopColor: "#E8E3D7",
-        },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "700" },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Учить",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20, fontWeight: "800" }}>Aa</Text>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="review"
-        options={{
-          title: "Повторение",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20, fontWeight: "800" }}>↻</Text>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="words"
-        options={{
-          title: "Слова",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20, fontWeight: "800" }}>☰</Text>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Профиль",
-          tabBarIcon: ({ color }) => (
-            <Text style={{ color, fontSize: 20, fontWeight: "800" }}>●</Text>
-          ),
-        }}
-      />
-    </Tabs>
+    <NativeTabs tintColor="#D97706">
+      <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger.Label>Учить</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "rectangle.stack", selected: "rectangle.stack.fill" }}
+          md="school"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="review">
+        <NativeTabs.Trigger.Label>Повторение</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf="arrow.triangle.2.circlepath"
+          md="refresh"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="words">
+        <NativeTabs.Trigger.Label>Слова</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "text.book.closed", selected: "text.book.closed.fill" }}
+          md="menu_book"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="profile">
+        <NativeTabs.Trigger.Label>Профиль</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "person.crop.circle", selected: "person.crop.circle.fill" }}
+          md="account_circle"
+        />
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }

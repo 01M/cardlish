@@ -1,8 +1,11 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
+import { useTheme } from "@/theme/useTheme";
 
 export default function TabsLayout() {
+  const theme = useTheme();
+
   return (
-    <NativeTabs tintColor="#D97706">
+    <NativeTabs tintColor={theme.orangeAccent}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>Учить</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

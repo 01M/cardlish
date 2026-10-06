@@ -1,12 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { Stack } from "expo-router";
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { initDatabase } from "@/db/database";
+import { useColorSchemeName, useTheme } from "@/theme/useTheme";
+import { Theme } from "@/theme/tokens";
 
 export default function RootLayout() {
+  const scheme = useColorSchemeName();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [isReady, setIsReady] = useState(false);
+
+  // Тема навигации: фон совпадает с фоном экрана, чтобы не было белой вспышки
+  const navTheme = useMemo(
+    () => {
+      const base = scheme === "dark" ? DarkTheme : DefaultTheme;
+      return {
+        ...base,
+        colors: { ...base.colors, background: theme.pageBackground },
+      };
+    },
+    [scheme, theme],
+  );
 
   useEffect(() => {
     async function prepare() {
@@ -24,32 +41,37 @@ export default function RootLayout() {
 
   if (!isReady) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#111827" />
-        <Text style={styles.loadingText}>Загрузка базы данных...</Text>
-      </View>
+      <ThemeProvider value={navTheme}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={theme.textEmphasis} />
+          <Text style={styles.loadingText}>Загрузка базы данных...</Text>
+        </View>
+      </ThemeProvider>
     );
   }
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
+      <ThemeProvider value={navTheme}>
+        <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        </Stack>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FAFAFA",
+    backgroundColor: theme.backdrop,
   },
   loadingText: {
     marginTop: 10,
-    color: "#374151",
+    color: theme.textSecondary,
   },
 });

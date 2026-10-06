@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import * as Haptics from "expo-haptics";
 import {
   Alert,
   ScrollView,
@@ -91,7 +92,8 @@ export const ProfileScreen = () => {
   };
 
   const handleReminderToggle = async (enabled: boolean) => {
-    if (enabled) {
+  Haptics.selectionAsync();
+  if (enabled) {
       const scheduled = await enableDailyReminder();
       if (!scheduled) {
         Alert.alert(

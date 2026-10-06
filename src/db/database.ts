@@ -241,3 +241,32 @@ export const setReminderEnabled = async (enabled: boolean) => {
     [enabled ? "true" : "false"],
   );
 };
+
+// 11. Предпочтение темы оформления ("system" | "light" | "dark")
+export const getThemePreference = async (): Promise<
+  "system" | "light" | "dark"
+> => {
+  const db = await getDb();
+  const setting = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM app_settings WHERE key = 'theme_preference';",
+  );
+  if (
+    setting?.value === "light" ||
+    setting?.value === "dark" ||
+    setting?.value === "system"
+  ) {
+    return setting.value;
+  }
+  return "system";
+};
+
+export const setThemePreference = async (
+  pref: "system" | "light" | "dark",
+) => {
+  const db = await getDb();
+  await db.runAsync(
+    `INSERT INTO app_settings (key, value) VALUES ('theme_preference', ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
+    [pref],
+  );
+};

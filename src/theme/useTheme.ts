@@ -1,5 +1,7 @@
-import { useColorScheme } from "react-native";
+import { Appearance, useColorScheme } from "react-native";
 import { darkTheme, lightTheme, Theme } from "./tokens";
+
+export type ThemePreference = "system" | "light" | "dark";
 
 /**
  * Единственное место, где определяется цветовая схема приложения.
@@ -13,7 +15,16 @@ export function useColorSchemeName(): "light" | "dark" {
 }
 
 /**
- * Возвращает тему, соответствующую системной цветовой схеме.
+ * Применяет выбранное оформление: фиксированная тема или следование системе
+ * ("unspecified" возвращает системное поведение, включая нативные элементы —
+ * алерты, клавиатуру, переключатели).
+ */
+export function applyThemePreference(pref: ThemePreference): void {
+  Appearance.setColorScheme(pref === "system" ? "unspecified" : pref);
+}
+
+/**
+ * Возвращает тему, соответствующую текущей цветовой схеме.
  */
 export function useTheme(): Theme {
   return useColorSchemeName() === "dark" ? darkTheme : lightTheme;

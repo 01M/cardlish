@@ -35,7 +35,7 @@ src/app/          Expo Router routes — THIN wrappers only
   (tabs)/profile.tsx -> re-exports ProfileScreen
 src/screens/      Actual screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen)
 src/components/   Reusable UI (FlipCard, WordFormModal)
-src/theme/        Theme tokens (tokens.ts: Theme type, lightTheme, darkTheme) + useTheme/useColorSchemeName hooks
+src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts)
 src/services/     Side-effectful services (notifications.ts)
 src/assets/       dictionary.json (large, git-tracked, never read it)
@@ -87,26 +87,20 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 6. **Styling conventions:** Keep styles in a `createStyles(theme)` factory at the bottom of the
    file, called once per screen via `const styles = useMemo(() => createStyles(theme), [theme])`;
    no inline style objects for anything non-trivial (dynamic values like progress-bar width are
-   exempt). Colors come from `src/theme/tokens.ts`, never hardcoded hex in screens. The warm
-   neutral palette values (`#FAFAFA` background, `#D97706` accent, `#FFFDF8` surface, `#E8E3D7`
-   borders, `#374151`/`#8A938F` text) now live in `tokens.ts` as `lightTheme`.
-   All migrated files (every screen, FlipCard, WordFormModal, both `_layout.tsx`) follow this.
-   Special rules encoded in `tokens.ts`: an element with `buttonInk` background must use
-   `textOnButtonInk` for its text; orange as TEXT on an ink/elevated surface uses `amberAccent`,
-   while orange fills/tab tint/text on page/card backgrounds use `orangeAccent`; TextInputs use
-   `placeholder` + `keyboardAppearance` from the theme.
+   exempt). All colors come from `src/theme/tokens.ts` (see "Theming" below) — the former warm
+   neutral palette now lives there as `lightTheme`. TextInputs use the theme's `placeholder` +
+   `keyboardAppearance`.
 7. **Navigation** via Expo Router only: `Link`, `router`, `useLocalSearchParams` from
    `expo-router`. Never pass non-serializable params (functions, DB handles).
 
-## Migration in progress (native UI)
+## UI conventions
 
-We are migrating screens step by step to native primitives. For migrated screens and the tab layout, these rules override rules 4-6 above:
-- Allowed: @expo/ui (universal components inside Host), expo-symbols, expo-haptics, expo-router/unstable-native-tabs.
-- NativeTabs owns the tab bar and its safe-area insets: no manual tab bar height/padding.
-- Screen palettes are defined per-screen through the shared theme tokens (`src/theme/tokens.ts`,
-  light values match the original per-screen hexes: background #F7F7F2, green #087443, orange tab
-  tint); do not "normalize" one screen's semantic tokens to another's.
-- Rules 4-6 still apply to screens that are not migrated yet.
+- Tabs use NativeTabs (`expo-router/unstable-native-tabs`); it owns the tab bar and its safe-area
+  insets — no manual tab bar height/padding.
+- Tab screens without a ScrollView use `SafeAreaView` from `react-native-screens/experimental`
+  together with the trigger's `disableAutomaticContentInsets` (as ReviewScreen does).
+- Allowed native UI: @expo/ui (e.g. SegmentedControl on the Profile screen), expo-symbols,
+  expo-haptics. RN `Alert` and `Switch` stay as they are.
 
 ## Conventions observed in the codebase
 
@@ -126,18 +120,15 @@ asks: `node_modules/`, `.git/`, `.expo/`, generated `ios/`+`android/`, `dist/`, 
 `repomix-output.xml`, **`src/assets/dictionary.json`** (very large data file — access it only through
 `src/db/database.ts`), image/font binaries, logs, and secrets.
 
-## Theming (dark mode, migration in progress)
+## Theming
 
-- All colors live in `src/theme/tokens.ts` (`Theme` type, `lightTheme`, `darkTheme`); screens get
-  them via `useTheme()`. `useColorSchemeName()` is the single place the scheme is decided
-  (null/undefined → light; return "dark" there to preview dark mode).
-- `src/app/_layout.tsx` wraps the tree in `ThemeProvider` (from `expo-router`) with
-  `DarkTheme`/`DefaultTheme` whose `background` is `theme.pageBackground` — this prevents the
-  white flash on tab switch (iOS 26 Liquid Glass) and themes the Stack. StatusBar switches with
-  the scheme.
-- **Remaining step:** flip `app.json` `userInterfaceStyle` from `"light"` to `"automatic"` (LAST,
-  needs a new EAS build — OTA won't apply it) and run `npx expo install expo-system-ui`
-  (Android dev builds ignore `userInterfaceStyle` without it). Until then the app renders light
-  on device even if the token layer is dark-ready.
-- NativeTabs tint comes from `theme.orangeAccent`; native @expo/ui follows system inside Host.
-- Do not invent Expo doc URLs; use AGENTS.md verified list + llms.txt.
+- All colors come from `src/theme/tokens.ts` (`Theme` type, `lightTheme`, `darkTheme`) through
+  `useTheme()`. No hex/rgba/named color literals in screens or components. A new color role means
+  a new key in the `Theme` interface plus light and dark values (text must reach at least 4.5:1
+  contrast on the dark surfaces).
+- An element using `buttonInk` as its background uses `textOnButtonInk` for its text. Orange used
+  as TEXT on dark ink surfaces uses `amberAccent`.
+- The scheme is decided in one place: `useColorSchemeName()` (`src/theme/useTheme.ts`).
+- The user's appearance preference (System/Light/Dark, default System) is stored in `app_settings`
+  and applied via `applyThemePreference()` before the app is shown (in the DB init flow).
+  `userInterfaceStyle` in app.json is `"automatic"`.

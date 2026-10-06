@@ -3,8 +3,12 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { initDatabase } from "@/db/database";
-import { useColorSchemeName, useTheme } from "@/theme/useTheme";
+import { initDatabase, getThemePreference } from "@/db/database";
+import {
+  applyThemePreference,
+  useColorSchemeName,
+  useTheme,
+} from "@/theme/useTheme";
 import { Theme } from "@/theme/tokens";
 
 export default function RootLayout() {
@@ -29,6 +33,12 @@ export default function RootLayout() {
     async function prepare() {
       try {
         await initDatabase();
+        // Применяем сохранённое оформление до показа приложения
+        try {
+          applyThemePreference(await getThemePreference());
+        } catch {
+          applyThemePreference("system");
+        }
       } catch (e) {
         console.error("Ошибка инициализации БД:", e);
       } finally {

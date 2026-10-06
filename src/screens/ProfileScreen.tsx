@@ -15,22 +15,31 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getAllWords,
   getReminderEnabled,
+  getThemePreference,
   getWordsStats,
   resetDatabase,
   resetProgressOnly,
   setReminderEnabled,
+  setThemePreference,
 } from "../db/database";
 import {
   disableDailyReminder,
   enableDailyReminder,
   getDailyReminderTime,
 } from "../services/notifications";
+import { SegmentedControl } from "@expo/ui/community/segmented-control";
 import { Theme } from "../theme/tokens";
-import { useTheme } from "../theme/useTheme";
+import {
+  applyThemePreference,
+  useColorSchemeName,
+  useTheme,
+} from "../theme/useTheme";
+import type { ThemePreference } from "../theme/useTheme";
 
 export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const scheme = useColorSchemeName();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [stats, setStats] = useState({
     newCustom: 0,
@@ -41,14 +50,18 @@ export const ProfileScreen = () => {
   });
   const [totalCount, setTotalCount] = useState(0);
   const [reminderEnabled, setReminderEnabledState] = useState(false);
+  const [themePreference, setThemePreferenceState] =
+    useState<ThemePreference>("system");
 
   const loadProfileData = async () => {
     const currentStats = await getWordsStats();
     const allWords = await getAllWords();
     const isReminderEnabled = await getReminderEnabled();
+    const storedThemePreference = await getThemePreference();
     setStats(currentStats);
     setTotalCount(allWords.length);
     setReminderEnabledState(isReminderEnabled);
+    setThemePreferenceState(storedThemePreference);
   };
 
   useFocusEffect(
@@ -113,6 +126,13 @@ export const ProfileScreen = () => {
 
     await setReminderEnabled(enabled);
     setReminderEnabledState(enabled);
+  };
+
+  const handleThemePreferenceChange = (pref: ThemePreference) => {
+    setThemePreferenceState(pref);
+    applyThemePreference(pref);
+    void setThemePreference(pref);
+    void Haptics.selectionAsync().catch(() => {});
   };
 
   return (
@@ -186,6 +206,24 @@ export const ProfileScreen = () => {
             true: theme.switchTrackTrue,
           }}
           thumbColor={reminderEnabled ? theme.switchThumbOn : theme.switchThumbOff}
+        />
+      </View>
+
+      <Text style={styles.sectionLabel}>ОФОРМЛЕНИЕ</Text>
+      <View style={styles.themeRow}>
+        <SegmentedControl
+          values={["Системная", "Светлая", "Тёмная"]}
+          selectedIndex={
+            themePreference === "system" ? 0 : themePreference === "light" ? 1 : 2
+          }
+          onChange={(event) => {
+            const index = event.nativeEvent.selectedSegmentIndex;
+            handleThemePreferenceChange(
+              index === 0 ? "system" : index === 1 ? "light" : "dark",
+            );
+          }}
+          appearance={scheme}
+          style={styles.themeControl}
         />
       </View>
 
@@ -306,6 +344,15 @@ const createStyles = (theme: Theme) =>
     fontSize: 13,
     marginTop: 4,
   },
+  themeRow: {
+    backgroundColor: theme.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 16,
+    marginBottom: 28,
+  },
+  themeControl: { width: "100%" },
   actionButton: {
     backgroundColor: theme.surface,
     paddingVertical: 15,

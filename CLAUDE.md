@@ -89,26 +89,13 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 7. **Navigation** via Expo Router only: `Link`, `router`, `useLocalSearchParams` from
    `expo-router`. Never pass non-serializable params (functions, DB handles).
 
-## Inherited rules from AGENTS.md (must be preserved)
+## Migration in progress (native UI)
 
-- **Mobile-first**, performance- and cross-platform-conscious. Expo/React Native app; keep changes
-  safe on iOS and Android.
-- **Do not trust training data on Expo.** Before writing code that touches an Expo, EAS, or RN API:
-  1. read the `expo` major version in `package.json` (currently **57**),
-  2. fetch `https://docs.expo.dev/versions/v<major>.0.0/` (i.e. `v57.0.0`),
-  3. otherwise use `https://docs.expo.dev/llms.txt`, which indexes Expo docs and corrects common
-     LLM misconceptions, and follow its links. Never answer Expo API questions from memory.
-- **Prefer recommended Expo modules** over third-party libraries; check available skills before
-  adding dependencies.
-- **`ios/` and `android/` are generated** (Continuous Native Generation). Never create or edit them by
-  hand — configure native behavior in `app.json` and config plugins.
-- **Adding a native module requires a development build** (`npx expo run:ios|android` or
-  `eas build --profile development`); Expo Go will not include it.
-- **Run lint and typecheck before declaring any task done.**
-- EAS CLI is invoked as `npx eas-cli@latest <command>` in npm projects (this repo has no
-  `bun.lock`, so `bunx` does not apply).
-- Expo Router docs: https://docs.expo.dev/router/introduction.md · EAS docs:
-  https://docs.expo.dev/eas/index.md
+We are migrating screens step by step to native primitives. For migrated screens and the tab layout, these rules override rules 4-6 above:
+- Allowed: @expo/ui (universal components inside Host), expo-symbols, expo-haptics, expo-router/unstable-native-tabs.
+- NativeTabs owns the tab bar and its safe-area insets: no manual tab bar height/padding.
+- Keep the existing palette from each screen's own file (background #F7F7F2, green #087443, orange tab tint); do not "normalize" colors to the palette listed above.
+- Rules 4-6 still apply to screens that are not migrated yet.
 
 ## Conventions observed in the codebase
 
@@ -126,5 +113,4 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 `.claudeignore` marks files that must not be read, indexed, or quoted unless the user explicitly
 asks: `node_modules/`, `.git/`, `.expo/`, generated `ios/`+`android/`, `dist/`, `web-build/`,
 `repomix-output.xml`, **`src/assets/dictionary.json`** (very large data file — access it only through
-`src/db/database.ts`), image/font binaries, logs, and secrets. Run `npx repomix` into
-`repomix-output.xml` for whole-repo snapshots rather than reading files individually.
+`src/db/database.ts`), image/font binaries, logs, and secrets.

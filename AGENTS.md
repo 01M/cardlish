@@ -1,12 +1,12 @@
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
-## Expo has changed — do not trust your training data
+## Expo docs
 
-Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
-
-1. Read the major version of the `expo` package in `package.json`.
-2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
-3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
+Expo APIs change between SDKs. Check the docs only when you are about to use an API you are not sure about, and:
+- Fetch each doc page at most once per session. Never re-fetch a page already fetched.
+- If the task prompt provides verified facts or exact API signatures, treat them as ground truth and do not re-fetch them.
+- Never re-read a file already read in this session unless you edited it.
+- Index of docs: https://docs.expo.dev/llms.txt
 
 ## Commands
 

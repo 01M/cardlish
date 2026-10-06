@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 import { FlipCard } from "../components/FlipCard";
 import {
   getSessionWords,
@@ -69,6 +70,25 @@ export const LearnScreen = () => {
     setStats(data);
   };
 
+  const handleSourceChange = (nextSource: "custom" | "dictionary") => {
+    setSource(nextSource);
+    void Haptics.selectionAsync().catch(() => {});
+  };
+
+  const decreaseSessionSize = () => {
+    const nextSize = Math.max(5, sessionSize - 5);
+    if (nextSize === sessionSize) return;
+    setSessionSize(nextSize);
+    void Haptics.selectionAsync().catch(() => {});
+  };
+
+  const increaseSessionSize = () => {
+    const nextSize = Math.min(50, sessionSize + 5);
+    if (nextSize === sessionSize) return;
+    setSessionSize(nextSize);
+    void Haptics.selectionAsync().catch(() => {});
+  };
+
   const handleNextWord = async () => {
     if (!sessionWords || isProcessing) return;
 
@@ -80,6 +100,7 @@ export const LearnScreen = () => {
 
       if (currentIndex + 1 < sessionWords.length) {
         setCurrentIndex((prev) => prev + 1);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       } else {
         // Сессия завершена
         setSessionWords(null);
@@ -87,6 +108,9 @@ export const LearnScreen = () => {
         const data = await getWordsStats();
         setStats(data);
         setShowCompletion(true);
+        void Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        ).catch(() => {});
       }
     } finally {
       setIsProcessing(false);
@@ -252,7 +276,7 @@ export const LearnScreen = () => {
             styles.toggleBtn,
             source === "custom" && styles.toggleBtnActive,
           ]}
-          onPress={() => setSource("custom")}
+          onPress={() => handleSourceChange("custom")}
         >
           <Text
             style={[
@@ -269,7 +293,7 @@ export const LearnScreen = () => {
             styles.toggleBtn,
             source === "dictionary" && styles.toggleBtnActive,
           ]}
-          onPress={() => setSource("dictionary")}
+          onPress={() => handleSourceChange("dictionary")}
         >
           <Text
             style={[
@@ -286,7 +310,7 @@ export const LearnScreen = () => {
       <View style={styles.counterRow}>
         <TouchableOpacity
           style={styles.counterBtn}
-          onPress={() => setSessionSize(Math.max(5, sessionSize - 5))}
+          onPress={decreaseSessionSize}
         >
           <Text style={styles.counterBtnText}>-</Text>
         </TouchableOpacity>
@@ -295,7 +319,7 @@ export const LearnScreen = () => {
 
         <TouchableOpacity
           style={styles.counterBtn}
-          onPress={() => setSessionSize(sessionSize + 5)}
+          onPress={increaseSessionSize}
         >
           <Text style={styles.counterBtnText}>+</Text>
         </TouchableOpacity>

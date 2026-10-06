@@ -2,6 +2,7 @@ import React, { useState, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-screens/experimental";
 import {
   getReviewWords,
   markWordAsLearned,
@@ -70,94 +71,104 @@ export const ReviewScreen = () => {
   // ЕСЛИ СЛОВ НА ПОВТОРЕНИЕ НЕТ
   if (reviewWords.length === 0) {
     return (
-      <View
-        style={[
-          styles.emptyContainer,
-          {
-            paddingTop: Math.max(insets.top + 16, 24),
-            paddingBottom: 24,
-          },
-        ]}
+      <SafeAreaView
+        edges={{ bottom: true }}
+        style={{ flex: 1, backgroundColor: "#F7F7F2" }}
       >
-        <Text style={styles.emptyIcon}>🎉</Text>
-        <Text style={styles.emptyTitle}>Всё повторено!</Text>
-        <Text style={styles.emptySubText}>
-          На данный момент нет слов, требующих повторения. Изучите новые слова
-          во вкладке «Учить».
-        </Text>
-        <TouchableOpacity
-          style={styles.emptyButton}
-          onPress={handleResetProgress}
+        <View
+          style={[
+            styles.emptyContainer,
+            {
+              paddingTop: Math.max(insets.top + 16, 24),
+              paddingBottom: 24,
+            },
+          ]}
         >
-          <Text style={styles.emptyButtonText}>Сбросить прогресс</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => router.push("/")}
-        >
-          <Text style={styles.secondaryButtonText}>Учить новые слова</Text>
-        </TouchableOpacity>
-      </View>
+          <Text style={styles.emptyIcon}>🎉</Text>
+          <Text style={styles.emptyTitle}>Всё повторено!</Text>
+          <Text style={styles.emptySubText}>
+            На данный момент нет слов, требующих повторения. Изучите новые слова
+            во вкладке «Учить».
+          </Text>
+          <TouchableOpacity
+            style={styles.emptyButton}
+            onPress={handleResetProgress}
+          >
+            <Text style={styles.emptyButtonText}>Сбросить прогресс</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => router.push("/")}
+          >
+            <Text style={styles.secondaryButtonText}>Учить новые слова</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
   const currentWord = reviewWords[currentIndex];
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingTop: Math.max(insets.top + 10, 20),
-          paddingBottom: 16,
-        },
-      ]}
+    <SafeAreaView
+      edges={{ bottom: true }}
+      style={{ flex: 1, backgroundColor: "#F7F7F2" }}
     >
-      {/* Шапка с прогрессом */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.eyebrow}>ЦИКЛ ПОВТОРЕНИЯ</Text>
-          <Text style={styles.title}>Повторение</Text>
-        </View>
-        <View style={styles.badgeCount}>
-          <Text style={styles.badgeText}>
-            {currentIndex + 1} из {reviewWords.length}
-          </Text>
-        </View>
-      </View>
-
-      {/* Интерактивная карточка */}
-      <View style={styles.cardContainer}>
-        <FlipCard word={currentWord} onFlipChange={setIsFlipped} />
-      </View>
-
-      {/* Кнопки ответа */}
-      <View style={styles.actionsContainer}>
-        {isFlipped ? (
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.forgotBtn]}
-              onPress={handleForgot}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.forgotBtnText}>Не вспомнил</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.rememberedBtn]}
-              onPress={handleRemembered}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.rememberedBtnText}>Вспомнил</Text>
-            </TouchableOpacity>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top + 10, 20),
+            paddingBottom: 16,
+          },
+        ]}
+      >
+        {/* Шапка с прогрессом */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.eyebrow}>ЦИКЛ ПОВТОРЕНИЯ</Text>
+            <Text style={styles.title}>Повторение</Text>
           </View>
-        ) : (
-          <Text style={styles.flipHintText}>
-            Переверните карточку, чтобы оценить свой ответ
-          </Text>
-        )}
+          <View style={styles.badgeCount}>
+            <Text style={styles.badgeText}>
+              {currentIndex + 1} из {reviewWords.length}
+            </Text>
+          </View>
+        </View>
+
+        {/* Интерактивная карточка */}
+        <View style={styles.cardContainer}>
+          <FlipCard word={currentWord} onFlipChange={setIsFlipped} />
+        </View>
+
+        {/* Кнопки ответа */}
+        <View style={styles.actionsContainer}>
+          {isFlipped ? (
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.forgotBtn]}
+                onPress={handleForgot}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.forgotBtnText}>Не вспомнил</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.rememberedBtn]}
+                onPress={handleRemembered}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.rememberedBtnText}>Вспомнил</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={styles.flipHintText}>
+              Переверните карточку, чтобы оценить свой ответ
+            </Text>
+          )}
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 

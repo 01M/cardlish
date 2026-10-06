@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Word } from "../db/database";
 import * as Speech from "expo-speech";
+import * as Haptics from "expo-haptics";
 
 interface FlipCardProps {
   word: Word;
@@ -46,6 +47,7 @@ export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
   }, [animatedValue, onFlipChange, word]);
 
   const flipCard = () => {
+    void Haptics.selectionAsync().catch(() => {});
     const nextState = !isFlipped;
     setIsFlipped(nextState);
     if (onFlipChange) onFlipChange(nextState);

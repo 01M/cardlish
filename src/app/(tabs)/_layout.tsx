@@ -11,7 +11,7 @@ export default function TabsLayout() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="review">
+      <NativeTabs.Trigger name="review" disableAutomaticContentInsets>
         <NativeTabs.Trigger.Label>Повторение</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf="arrow.triangle.2.circlepath"

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -11,6 +11,8 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { addCustomWord, updateCustomWord, Word } from "../db/database";
+import { Theme } from "../theme/tokens";
+import { useTheme } from "../theme/useTheme";
 
 interface WordFormModalProps {
   visible: boolean;
@@ -25,6 +27,8 @@ export const WordFormModal = ({
   onClose,
   onSaved,
 }: WordFormModalProps) => {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [term, setTerm] = useState("");
   const [translation, setTranslation] = useState("");
   const [transcription, setTranscription] = useState("");
@@ -101,6 +105,8 @@ export const WordFormModal = ({
             value={term}
             onChangeText={setTerm}
             placeholder="apple"
+            placeholderTextColor={theme.placeholder}
+            keyboardAppearance={theme.keyboardAppearance}
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -111,6 +117,8 @@ export const WordFormModal = ({
             value={translation}
             onChangeText={setTranslation}
             placeholder="яблоко"
+            placeholderTextColor={theme.placeholder}
+            keyboardAppearance={theme.keyboardAppearance}
           />
 
           <Text style={styles.label}>Транскрипция</Text>
@@ -119,6 +127,8 @@ export const WordFormModal = ({
             value={transcription}
             onChangeText={setTranscription}
             placeholder="[ˈæpl]"
+            placeholderTextColor={theme.placeholder}
+            keyboardAppearance={theme.keyboardAppearance}
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -129,6 +139,8 @@ export const WordFormModal = ({
             value={example}
             onChangeText={setExample}
             placeholder="I eat an apple every morning."
+            placeholderTextColor={theme.placeholder}
+            keyboardAppearance={theme.keyboardAppearance}
             multiline
           />
 
@@ -149,43 +161,52 @@ export const WordFormModal = ({
   );
 };
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: "#FAFAFA" },
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
+  flex: { flex: 1, backgroundColor: theme.backdrop },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
   title: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#111827",
+    color: theme.textEmphasis,
     marginBottom: 24,
   },
   label: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#6B7280",
+    color: theme.textMutedAlt,
     textTransform: "uppercase",
     marginBottom: 8,
     marginTop: 12,
   },
   input: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.inputBackground,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: theme.inputBorder,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: "#111827",
+    color: theme.textEmphasis,
   },
   multiline: { minHeight: 90, textAlignVertical: "top" },
   saveButton: {
-    backgroundColor: "#4F46E5",
+    backgroundColor: theme.indigoAccent,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: "center",
     marginTop: 24,
   },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  saveButtonText: {
+    color: theme.textOnAccent,
+    fontSize: 16,
+    fontWeight: "700",
+  },
   cancelButton: { alignItems: "center", paddingVertical: 14 },
-  cancelButtonText: { color: "#6B7280", fontWeight: "600", fontSize: 15 },
+  cancelButtonText: {
+    color: theme.textMutedAlt,
+    fontWeight: "600",
+    fontSize: 15,
+  },
 });

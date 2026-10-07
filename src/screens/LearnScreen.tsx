@@ -1,5 +1,14 @@
-import React, { useCallback, useState, useMemo } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
+  AccessibilityInfo,
+  Animated,
+  LayoutChangeEvent,
   ScrollView,
   StyleSheet,
   Text,
@@ -78,6 +87,48 @@ export const LearnScreen = () => {
     setSource(nextSource);
     void Haptics.selectionAsync().catch(() => {});
   };
+
+  // 5. ПЕРЕКЛЮЧАТЕЛЬ ИСТОЧНИКА: скользящий "ползунок" между позициями
+  const TOGGLE_PADDING = 4; // должен совпадать с padding у toggleRow
+  const [trackWidth, setTrackWidth] = useState<number>(0);
+  const thumbWidth =
+    trackWidth > 0 ? (trackWidth - 2 * TOGGLE_PADDING) / 2 : 0;
+  const selectedIndex = source === "custom" ? 0 : 1;
+  const thumbTranslateX = useRef(new Animated.Value(0)).current;
+  const hasLaidOut = useRef(false);
+  const reduceMotion = useRef<boolean | null>(null);
+
+  // Первая укладка трека: ставим ползунок сразу, без анимации
+  const handleTrackLayout = (event: LayoutChangeEvent) => {
+    setTrackWidth(event.nativeEvent.layout.width);
+  };
+
+  useEffect(() => {
+    if (trackWidth === 0) return;
+    const targetX = selectedIndex * thumbWidth;
+    if (!hasLaidOut.current || reduceMotion.current) {
+      thumbTranslateX.setValue(targetX);
+    } else {
+      Animated.spring(thumbTranslateX, {
+        toValue: targetX,
+        speed: 18,
+        bounciness: 4,
+        useNativeDriver: true,
+      }).start();
+    }
+    hasLaidOut.current = true;
+  }, [trackWidth, thumbWidth, selectedIndex, thumbTranslateX]);
+
+  useEffect(() => {
+    // Ослабленная анимация по системной настройке — ставим позицию без пружины
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        reduceMotion.current = enabled;
+      })
+      .catch(() => {
+        reduceMotion.current = false;
+      });
+  }, []);
 
   const decreaseSessionSize = () => {
     const nextSize = Math.max(5, sessionSize - 5);
@@ -274,12 +325,21 @@ export const LearnScreen = () => {
       </View>
 
       <Text style={styles.label}>Источник слов</Text>
-      <View style={styles.toggleRow}>
+      <View style={styles.toggleRow} onLayout={handleTrackLayout}>
+        {thumbWidth > 0 && (
+          <Animated.View
+            style={[
+              styles.toggleThumb,
+              {
+                width: thumbWidth,
+                transform: [{ translateX: thumbTranslateX }],
+              },
+            ]}
+            pointerEvents="none"
+          />
+        )}
         <TouchableOpacity
-          style={[
-            styles.toggleBtn,
-            source === "custom" && styles.toggleBtnActive,
-          ]}
+          style={styles.toggleBtn}
           onPress={() => handleSourceChange("custom")}
         >
           <Text
@@ -293,10 +353,7 @@ export const LearnScreen = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[
-            styles.toggleBtn,
-            source === "dictionary" && styles.toggleBtnActive,
-          ]}
+          style={styles.toggleBtn}
           onPress={() => handleSourceChange("dictionary")}
         >
           <Text
@@ -435,13 +492,20 @@ const createStyles = (theme: Theme) =>
     borderRadius: 15,
     padding: 4,
   },
+  toggleThumb: {
+    position: "absolute",
+    top: 4,
+    bottom: 4,
+    left: 4,
+    borderRadius: 10,
+    backgroundColor: theme.orangeAccent,
+  },
   toggleBtn: {
     flex: 1,
     paddingVertical: 12,
     alignItems: "center",
     borderRadius: 10,
   },
-  toggleBtnActive: { backgroundColor: theme.orangeAccent },
   toggleText: {
     fontWeight: "600",
     color: theme.textTertiary,

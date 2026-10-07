@@ -91,6 +91,19 @@ export interface Theme {
   shadowColor: string; // цвет тени карточки (iOS-only shadow)
 }
 
+// 4. Утилита прозрачности: 6-значный "#RRGGBB" → "#RRGGBBAA" (alpha 0..1).
+//    Чужой формат возвращается без изменений.
+export function withAlpha(hex: string, alpha: number): string {
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+    return hex;
+  }
+  const clamped = Math.min(1, Math.max(0, alpha));
+  const alphaHex = Math.round(clamped * 255)
+    .toString(16)
+    .padStart(2, "0");
+  return `${hex}${alphaHex}`;
+}
+
 // 2. Светлая тема — точные текущие значения из кода
 export const lightTheme: Theme = {
   pageBackground: "#F7F7F2",

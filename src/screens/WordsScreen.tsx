@@ -12,6 +12,7 @@ import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteCustomWord, getCustomWords, Word } from "../db/database";
 import { WordFormModal } from "../components/WordFormModal";
+import ListTopFade from "../components/ListTopFade";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 
@@ -182,6 +183,8 @@ export const WordsScreen = () => {
             </Text>
           </TouchableOpacity>
         ))}
+        {/* Шторка у верхнего края списка */}
+        <ListTopFade />
       </View>
 
       {/* Список слов */}
@@ -191,8 +194,9 @@ export const WordsScreen = () => {
         renderItem={renderWord}
         contentContainerStyle={[
           filteredWords.length === 0 ? styles.emptyList : styles.list,
-          { paddingBottom: 16 },
+          { paddingTop: 16, paddingBottom: 16 },
         ]}
+        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           searchQuery.length > 0 ? (
@@ -290,7 +294,7 @@ const createStyles = (theme: Theme) =>
     fontSize: 14,
     fontWeight: "700",
   },
-  filterRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  filterRow: { flexDirection: "row", gap: 8, marginBottom: 0, zIndex: 1 },
   filterButton: {
     backgroundColor: theme.secondaryControlBackground,
     borderRadius: 16,

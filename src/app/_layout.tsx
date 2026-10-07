@@ -10,6 +10,7 @@ import {
   useTheme,
 } from "@/theme/useTheme";
 import { Theme } from "@/theme/tokens";
+import TopFade from "@/components/TopFade";
 
 export default function RootLayout() {
   const scheme = useColorSchemeName();
@@ -67,6 +68,7 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         </Stack>
+        <TopFade />
       </ThemeProvider>
     </SafeAreaProvider>
   );

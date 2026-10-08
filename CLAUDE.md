@@ -17,6 +17,8 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 - **expo-notifications** for the daily reminder, **expo-speech** for pronunciation,
   **expo-constants**, **expo-font**, **expo-linking**, **expo-status-bar**
 - **react-native-safe-area-context ~5.7** + **react-native-screens ~4.26**
+- **@expo/vector-icons ^15** (Ionicons) for icons; animations use the built-in
+  `Animated` API from react-native (react-native-reanimated is NOT installed)
 - **EAS Build/Submit/Update** — profiles `development`, `preview`, `production` (see `eas.json`);
   all Android builds are APKs, `appVersionSource: "remote"`
 - **Python helper** `scripts/convert-freedict.py` converts FreeDict TEI archives into
@@ -100,7 +102,12 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Tab screens without a ScrollView use `SafeAreaView` from `react-native-screens/experimental`
   together with the trigger's `disableAutomaticContentInsets` (as ReviewScreen does).
 - Allowed native UI: @expo/ui (e.g. SegmentedControl on the Profile screen), expo-symbols,
-  expo-haptics. RN `Alert` and `Switch` stay as they are.
+  expo-haptics, @expo/vector-icons (Ionicons). RN `Alert` and `Switch` stay as they are.
+- The LearnScreen setup state combines: a sliding-thumb source toggle (two labels over one
+  animated `Animated.View` thumb on `theme.orangeAccent`), and a single merged plan card
+  (stepper + composition bar + legend). The composition bar's own-words/dictionary split
+  mirrors what `getSessionWords()` will load — derive counts only from `sessionSize`,
+  `stats` and `source`, never new queries.
 
 ## Conventions observed in the codebase
 
@@ -112,6 +119,12 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   `words.status`. Progress resets go through `resetProgressOnly()` / `resetDatabase()`.
 - Comments in this repo are numbered section headers (`// 1. Инициализация базы данных`) — keep that
   style when adding functions to `src/db/database.ts`.
+- Screen-local subcomponents (e.g. `StepperButton` at the bottom of `LearnScreen.tsx`) may live in
+  the screen file; only components shared across screens go to `src/components/`.
+- Motion conventions: springs via `Animated.spring` (speed 18, bounciness 4), short timings
+  ~220 ms, `useNativeDriver: true` for transform/opacity and `false` for layout props (width).
+  Honor `AccessibilityInfo.isReduceMotionEnabled()` — one check per screen, shared state — and
+  set animated values directly (no animation) on first layout and when reduce motion is on.
 
 ## Context protection
 

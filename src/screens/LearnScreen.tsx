@@ -9,12 +9,14 @@ import {
   AccessibilityInfo,
   Animated,
   LayoutChangeEvent,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
@@ -28,6 +30,13 @@ import {
 } from "../db/database";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
+
+// Общая геометрия дорожек-переключателей (источник слов / размер сессии):
+// TRACK_PADDING — паддинг обеих дорожек, TRACK_INNER_HEIGHT — высота
+// внутренней части (кнопка 12+12 вертикального паддинга + строка текста),
+// используется до первого onLayout дорожки-переключателя
+const TRACK_PADDING = 4;
+const TRACK_INNER_HEIGHT = 44;
 
 export const LearnScreen = () => {
   const router = useRouter();
@@ -89,24 +98,30 @@ export const LearnScreen = () => {
   };
 
   // 5. ПЕРЕКЛЮЧАТЕЛЬ ИСТОЧНИКА: скользящий "ползунок" между позициями
-  const TOGGLE_PADDING = 4; // должен совпадать с padding у toggleRow
-  const [trackWidth, setTrackWidth] = useState<number>(0);
+  // (геометрия трека переиспользуется степпером размера сессии ниже)
+  const [trackSize, setTrackSize] = useState({ width: 0, height: 0 });
   const thumbWidth =
-    trackWidth > 0 ? (trackWidth - 2 * TOGGLE_PADDING) / 2 : 0;
+    trackSize.width > 0 ? (trackSize.width - 2 * TRACK_PADDING) / 2 : 0;
   const selectedIndex = source === "custom" ? 0 : 1;
   const thumbTranslateX = useRef(new Animated.Value(0)).current;
   const hasLaidOut = useRef(false);
-  const reduceMotion = useRef<boolean | null>(null);
+  // Одна на экран проверка "уменьшить движение" — ей пользуются и
+  // переключатель источника, и степпер, и его кнопки
+  const [reduceMotion, setReduceMotion] = useState(false);
 
-  // Первая укладка трека: ставим ползунок сразу, без анимации
+  // Укладка трека: запоминаем ширину (ползунок) и высоту (степпер),
+  // ползунок ставим сразу, без анимации
   const handleTrackLayout = (event: LayoutChangeEvent) => {
-    setTrackWidth(event.nativeEvent.layout.width);
+    setTrackSize({
+      width: event.nativeEvent.layout.width,
+      height: event.nativeEvent.layout.height,
+    });
   };
 
   useEffect(() => {
-    if (trackWidth === 0) return;
+    if (trackSize.width === 0) return;
     const targetX = selectedIndex * thumbWidth;
-    if (!hasLaidOut.current || reduceMotion.current) {
+    if (!hasLaidOut.current || reduceMotion) {
       thumbTranslateX.setValue(targetX);
     } else {
       Animated.spring(thumbTranslateX, {
@@ -117,18 +132,39 @@ export const LearnScreen = () => {
       }).start();
     }
     hasLaidOut.current = true;
-  }, [trackWidth, thumbWidth, selectedIndex, thumbTranslateX]);
+  }, [trackSize.width, thumbWidth, selectedIndex, thumbTranslateX, reduceMotion]);
 
   useEffect(() => {
     // Ослабленная анимация по системной настройке — ставим позицию без пружины
     AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => {
-        reduceMotion.current = enabled;
-      })
-      .catch(() => {
-        reduceMotion.current = false;
-      });
+      .then(setReduceMotion)
+      .catch(() => setReduceMotion(false));
   }, []);
+
+  // 6. СТЕППЕР РАЗМЕРА СЕССИИ: пульс числа при изменении (не на первом рендере)
+  const numberScale = useRef(new Animated.Value(1)).current;
+  const prevSessionSize = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevSessionSize.current === null) {
+      prevSessionSize.current = sessionSize;
+      return;
+    }
+    if (prevSessionSize.current === sessionSize) return;
+    prevSessionSize.current = sessionSize;
+    if (reduceMotion) return;
+    Animated.sequence([
+      Animated.timing(numberScale, {
+        toValue: 1.15,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(numberScale, {
+        toValue: 1,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [sessionSize, numberScale, reduceMotion]);
 
   const decreaseSessionSize = () => {
     const nextSize = Math.max(5, sessionSize - 5);
@@ -368,22 +404,38 @@ export const LearnScreen = () => {
       </View>
 
       <Text style={styles.label}>Слов за сессию</Text>
-      <View style={styles.counterRow}>
-        <TouchableOpacity
-          style={styles.counterBtn}
+      <View
+        style={[
+          styles.counterRow,
+          trackSize.height > 0 && { height: trackSize.height },
+        ]}
+      >
+        <StepperButton
           onPress={decreaseSessionSize}
-        >
-          <Text style={styles.counterBtnText}>-</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.counterValue}>{sessionSize}</Text>
-
-        <TouchableOpacity
-          style={styles.counterBtn}
+          disabled={sessionSize <= 5}
+          accessibilityLabel="Меньше слов"
+          icon="remove"
+          reduceMotion={reduceMotion}
+          styles={styles}
+        />
+        <View style={styles.counterValueWrap}>
+          <Animated.Text
+            style={[
+              styles.counterValue,
+              { transform: [{ scale: numberScale }] },
+            ]}
+          >
+            {sessionSize}
+          </Animated.Text>
+        </View>
+        <StepperButton
           onPress={increaseSessionSize}
-        >
-          <Text style={styles.counterBtnText}>+</Text>
-        </TouchableOpacity>
+          disabled={sessionSize >= 50}
+          accessibilityLabel="Больше слов"
+          icon="add"
+          reduceMotion={reduceMotion}
+          styles={styles}
+        />
       </View>
 
       <View style={styles.infoCard}>
@@ -490,13 +542,13 @@ const createStyles = (theme: Theme) =>
     flexDirection: "row",
     backgroundColor: theme.secondaryControlBackground,
     borderRadius: 15,
-    padding: 4,
+    padding: TRACK_PADDING,
   },
   toggleThumb: {
     position: "absolute",
-    top: 4,
-    bottom: 4,
-    left: 4,
+    top: TRACK_PADDING,
+    bottom: TRACK_PADDING,
+    left: TRACK_PADDING,
     borderRadius: 10,
     backgroundColor: theme.orangeAccent,
   },
@@ -515,29 +567,38 @@ const createStyles = (theme: Theme) =>
   counterRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 10,
+    backgroundColor: theme.secondaryControlBackground,
+    borderRadius: 15,
+    padding: TRACK_PADDING,
+    minHeight: TRACK_INNER_HEIGHT + 2 * TRACK_PADDING,
   },
   counterBtn: {
-    width: 52,
-    height: 52,
+    width: 56,
+    height: TRACK_INNER_HEIGHT,
     backgroundColor: theme.surfaceElevated,
     borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
     borderWidth: 1,
     borderColor: theme.borderSubtle,
   },
-  counterBtnText: {
-    fontSize: 24,
-    fontWeight: "bold",
+  stepperPressArea: {
+    flex: 1,
+    alignSelf: "stretch",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  counterBtnIcon: {
     color: theme.textEmphasis,
   },
+  counterValueWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   counterValue: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "800",
-    marginHorizontal: 30,
     color: theme.textEmphasis,
+    fontVariant: ["tabular-nums"],
   },
   infoCard: {
     backgroundColor: theme.surface,
@@ -686,3 +747,63 @@ const createStyles = (theme: Theme) =>
     fontWeight: "700",
   },
 });
+
+type StepperButtonProps = {
+  onPress: () => void;
+  disabled: boolean;
+  accessibilityLabel: string;
+  icon: "remove" | "add";
+  reduceMotion: boolean;
+  styles: ReturnType<typeof createStyles>;
+};
+
+// 7. КНОПКА СТЕППЕРА: нажатие сжимает её до 0.92, отпускание возвращает
+// пружиной; при системной настройке "уменьшить движение" анимации нет
+const StepperButton = ({
+  onPress,
+  disabled,
+  accessibilityLabel,
+  icon,
+  reduceMotion,
+  styles,
+}: StepperButtonProps) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const animateTo = (toValue: number) => {
+    if (reduceMotion) {
+      scale.setValue(toValue);
+      return;
+    }
+    Animated.spring(scale, {
+      toValue,
+      speed: 18,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Animated.View
+      style={[
+        styles.counterBtn,
+        {
+          transform: [{ scale }],
+          opacity: disabled ? 0.35 : 1,
+        },
+      ]}
+    >
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => animateTo(0.92)}
+        onPressOut={() => animateTo(1)}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ disabled }}
+        style={styles.stepperPressArea}
+      >
+        <Ionicons name={icon} size={22} style={styles.counterBtnIcon} />
+      </Pressable>
+    </Animated.View>
+  );
+};

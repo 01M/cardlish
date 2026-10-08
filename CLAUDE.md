@@ -103,6 +103,7 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   together with the trigger's `disableAutomaticContentInsets` (as ReviewScreen does).
 - Allowed native UI: @expo/ui (e.g. SegmentedControl on the Profile screen), expo-symbols,
   expo-haptics, @expo/vector-icons (Ionicons). RN `Alert` and `Switch` stay as they are.
+  Icons are Ionicons (e.g. `volume-high` in FlipCard's speak buttons), never emoji glyphs.
 - The LearnScreen setup state combines: a sliding-thumb source toggle (two labels over one
   animated `Animated.View` thumb on `theme.orangeAccent`), and a single merged plan card
   (stepper + composition bar + legend). The composition bar's own-words/dictionary split
@@ -114,7 +115,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - UI strings and comments are in Russian; code identifiers, function names, and log messages use
   English. Match the file you are editing.
 - Async data loading uses `try/catch/finally` + local `isLoading` state (see `src/app/_layout.tsx`
-  for the DB gate pattern).
+  for the DB gate pattern). ProfileScreen uses a variant: independent loads go through one
+  `Promise.all`, an `isLoaded` flag gates a ~180 ms content fade-in, and derived values are
+  computed from already-loaded stats (totalCount = totalNew + review + learned, not `getAllWords()`).
 - Word lifecycle is a 3-state machine: `new` → `review` → `learned`, stored in
   `words.status`. Progress resets go through `resetProgressOnly()` / `resetDatabase()`.
 - Comments in this repo are numbered section headers (`// 1. Инициализация базы данных`) — keep that
@@ -125,6 +128,10 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   ~220 ms, `useNativeDriver: true` for transform/opacity and `false` for layout props (width).
   Honor `AccessibilityInfo.isReduceMotionEnabled()` — one check per screen, shared state — and
   set animated values directly (no animation) on first layout and when reduce motion is on.
+  Layout jumps from conditional UI (e.g. the plan-card warning note in LearnScreen) are smoothed
+  with `LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)` called right
+  BEFORE the state update, gated on the screen's reduce-motion state — never call
+  `UIManager.setLayoutAnimationEnabledExperimental` (no-op under the New Architecture).
 
 ## Context protection
 

@@ -11,6 +11,7 @@ import {
 import { Word } from "../db/database";
 import * as Speech from "expo-speech";
 import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 
@@ -99,7 +100,11 @@ export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
             onPress={speakWord}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.speakIcon}>🔊</Text>
+            <Ionicons
+              name="volume-high"
+              size={20}
+              style={styles.speakIcon}
+            />
           </TouchableOpacity>
           <Text style={styles.term}>{word.term}</Text>
           {word.transcription && (
@@ -118,7 +123,11 @@ export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
             onPress={speakWord}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.speakIcon}>🔊</Text>
+            <Ionicons
+              name="volume-high"
+              size={20}
+              style={styles.speakIconBack}
+            />
           </TouchableOpacity>
           <Text style={styles.translation}>{word.translation}</Text>
 
@@ -202,7 +211,7 @@ const createStyles = (theme: Theme) =>
     position: "absolute",
     top: 22,
     right: 22,
-    backgroundColor: theme.speakButtonAmberBackground,
+    backgroundColor: theme.badgeAmberBackground,
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -213,7 +222,7 @@ const createStyles = (theme: Theme) =>
     position: "absolute",
     top: 22,
     right: 22,
-    backgroundColor: theme.speakButtonGreenBackground,
+    backgroundColor: theme.successBackground,
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -221,7 +230,10 @@ const createStyles = (theme: Theme) =>
     alignItems: "center",
   },
   speakIcon: {
-    fontSize: 18,
+    color: theme.badgeAmberText,
+  },
+  speakIconBack: {
+    color: theme.successText,
   },
   term: {
     fontSize: 32,

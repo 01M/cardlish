@@ -8,6 +8,7 @@ import React, {
 import {
   AccessibilityInfo,
   Animated,
+  LayoutAnimation,
   LayoutChangeEvent,
   Pressable,
   ScrollView,
@@ -88,7 +89,16 @@ export const LearnScreen = () => {
     setStats(data);
   };
 
+  // Плавная перестройка раскладки при появлении/исчезновении примечания
+  // в карточке плана (перед изменением состояния; не под New Architecture
+  // хаки, а штатный configureNext — вызываем до setState)
+  const animatePlanLayout = () => {
+    if (reduceMotion) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  };
+
   const handleSourceChange = (nextSource: "custom" | "dictionary") => {
+    animatePlanLayout();
     setSource(nextSource);
     void Haptics.selectionAsync().catch(() => {});
   };
@@ -198,6 +208,7 @@ export const LearnScreen = () => {
   const decreaseSessionSize = () => {
     const nextSize = Math.max(5, sessionSize - 5);
     if (nextSize === sessionSize) return;
+    animatePlanLayout();
     setSessionSize(nextSize);
     void Haptics.selectionAsync().catch(() => {});
   };
@@ -205,6 +216,7 @@ export const LearnScreen = () => {
   const increaseSessionSize = () => {
     const nextSize = Math.min(50, sessionSize + 5);
     if (nextSize === sessionSize) return;
+    animatePlanLayout();
     setSessionSize(nextSize);
     void Haptics.selectionAsync().catch(() => {});
   };

@@ -73,10 +73,8 @@ export interface Theme {
   progressBarFill: string; // заполнение прогресс-бара в панели
 
   // Бейджи и кнопки FlipCard
-  badgeAmberBackground: string; // бейдж «СЛОВО»
-  badgeAmberText: string; // текст бейджа «СЛОВО»
-  speakButtonAmberBackground: string; // кнопка озвучки на лицевой стороне
-  speakButtonGreenBackground: string; // кнопка озвучки на обороте
+  badgeAmberBackground: string; // бейдж «СЛОВО» и кнопка озвучки на лицевой стороне
+  badgeAmberText: string; // текст бейджа «СЛОВО» и иконка озвучки на лицевой стороне
   exampleBackground: string; // блок примера употребления
   exampleLabel: string; // подпись «ПРИМЕР»
   exampleText: string; // текст примера
@@ -163,8 +161,6 @@ export const lightTheme: Theme = {
 
   badgeAmberBackground: "#FCE7C2",
   badgeAmberText: "#B45309",
-  speakButtonAmberBackground: "#FFF4E6",
-  speakButtonGreenBackground: "#E8F5E9",
   exampleBackground: "#F1F7F2",
   exampleLabel: "#6E8376",
   exampleText: "#31443A",
@@ -237,8 +233,6 @@ export const darkTheme: Theme = {
 
   badgeAmberBackground: "#3A2E18",
   badgeAmberText: "#E8A34D",
-  speakButtonAmberBackground: "#2A2318",
-  speakButtonGreenBackground: "#1C3A2B",
   exampleBackground: "#1C2B24",
   exampleLabel: "#7FA38E",
   exampleText: "#C3D2C8",

@@ -1,7 +1,15 @@
-import React, { useCallback, useState, useMemo } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as Haptics from "expo-haptics";
 import {
+  AccessibilityInfo,
   Alert,
+  Animated,
   Platform,
   ScrollView,
   StyleSheet,
@@ -13,7 +21,6 @@ import {
 import { useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  getAllWords,
   getReminderEnabled,
   getThemePreference,
   getWordsStats,
@@ -53,15 +60,36 @@ export const ProfileScreen = () => {
   const [themePreference, setThemePreferenceState] =
     useState<ThemePreference>("system");
 
+  // Первая загрузка: до её завершения контент прозрачен, затем плавно
+  // появляется; прогресс-бар анимируется только при изменении после загрузки
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const progressBarWidth = useRef(new Animated.Value(0)).current;
+  const hasLoadedOnce = useRef(false);
+  const prevLearnedPercentage = useRef<number | null>(null);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(setReduceMotion)
+      .catch(() => setReduceMotion(false));
+  }, []);
+
   const loadProfileData = async () => {
-    const currentStats = await getWordsStats();
-    const allWords = await getAllWords();
-    const isReminderEnabled = await getReminderEnabled();
-    const storedThemePreference = await getThemePreference();
+    const [currentStats, isReminderEnabled, storedThemePreference] =
+      await Promise.all([
+        getWordsStats(),
+        getReminderEnabled(),
+        getThemePreference(),
+      ]);
     setStats(currentStats);
-    setTotalCount(allWords.length);
+    setTotalCount(currentStats.totalNew + currentStats.review + currentStats.learned);
     setReminderEnabledState(isReminderEnabled);
     setThemePreferenceState(storedThemePreference);
+    if (!hasLoadedOnce.current) {
+      hasLoadedOnce.current = true;
+      setIsLoaded(true);
+    }
   };
 
   useFocusEffect(
@@ -72,6 +100,47 @@ export const ProfileScreen = () => {
 
   const learnedPercentage =
     totalCount > 0 ? Math.round((stats.learned / totalCount) * 100) : 0;
+
+  // Появление контента: один раз после первой загрузки (180 мс); при
+  // включённой настройке «уменьшить движение» — без анимации
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (reduceMotion) {
+      contentOpacity.setValue(1);
+      return;
+    }
+    Animated.timing(contentOpacity, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [isLoaded, reduceMotion, contentOpacity]);
+
+  // Заполнение прогресс-бара: сразу при первой загрузке, дальше — только
+  // при изменении процента (width — layout-свойство, useNativeDriver: false)
+  useEffect(() => {
+    if (prevLearnedPercentage.current === null) {
+      prevLearnedPercentage.current = learnedPercentage;
+      progressBarWidth.setValue(learnedPercentage);
+      return;
+    }
+    if (prevLearnedPercentage.current === learnedPercentage) return;
+    prevLearnedPercentage.current = learnedPercentage;
+    if (reduceMotion) {
+      progressBarWidth.setValue(learnedPercentage);
+      return;
+    }
+    Animated.timing(progressBarWidth, {
+      toValue: learnedPercentage,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [learnedPercentage, reduceMotion, progressBarWidth]);
+
+  const progressBarPercent = progressBarWidth.interpolate({
+    inputRange: [0, 100],
+    outputRange: ["0%", "100%"],
+  });
 
   const handleResetProgress = () => {
     Alert.alert(
@@ -148,6 +217,9 @@ export const ProfileScreen = () => {
       ]}
       showsVerticalScrollIndicator={false}
     >
+      <Animated.View
+        style={[styles.contentInner, { opacity: contentOpacity }]}
+      >
       <Text style={styles.eyebrow}>ВАШ ПРОГРЕСС</Text>
       <Text style={styles.title}>Профиль</Text>
 
@@ -156,8 +228,8 @@ export const ProfileScreen = () => {
         <Text style={styles.progressPercent}>{learnedPercentage}%</Text>
         <Text style={styles.progressSub}>выучено из всех слов в базе</Text>
         <View style={styles.progressBarBg}>
-          <View
-            style={[styles.progressBarFill, { width: `${learnedPercentage}%` }]}
+          <Animated.View
+            style={[styles.progressBarFill, { width: progressBarPercent }]}
           />
         </View>
       </View>
@@ -240,6 +312,7 @@ export const ProfileScreen = () => {
       >
         <Text style={styles.dangerButtonText}>Сбросить всё до начала</Text>
       </TouchableOpacity>
+      </Animated.View>
     </ScrollView>
   );
 };
@@ -248,6 +321,7 @@ const createStyles = (theme: Theme) =>
   StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.pageBackground },
   content: { paddingHorizontal: 24 },
+  contentInner: { flex: 1 },
   eyebrow: {
     color: theme.greenAccent,
     fontSize: 11,

@@ -31,12 +31,8 @@ import {
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 
-// Общая геометрия дорожек-переключателей (источник слов / размер сессии):
-// TRACK_PADDING — паддинг обеих дорожек, TRACK_INNER_HEIGHT — высота
-// внутренней части (кнопка 12+12 вертикального паддинга + строка текста),
-// используется до первого onLayout дорожки-переключателя
+// Паддинг дорожки-переключателя источника слов (он же — отступ ползунка)
 const TRACK_PADDING = 4;
-const TRACK_INNER_HEIGHT = 44;
 
 export const LearnScreen = () => {
   const router = useRouter();
@@ -98,10 +94,9 @@ export const LearnScreen = () => {
   };
 
   // 5. ПЕРЕКЛЮЧАТЕЛЬ ИСТОЧНИКА: скользящий "ползунок" между позициями
-  // (геометрия трека переиспользуется степпером размера сессии ниже)
-  const [trackSize, setTrackSize] = useState({ width: 0, height: 0 });
+  const [trackWidth, setTrackWidth] = useState<number>(0);
   const thumbWidth =
-    trackSize.width > 0 ? (trackSize.width - 2 * TRACK_PADDING) / 2 : 0;
+    trackWidth > 0 ? (trackWidth - 2 * TRACK_PADDING) / 2 : 0;
   const selectedIndex = source === "custom" ? 0 : 1;
   const thumbTranslateX = useRef(new Animated.Value(0)).current;
   const hasLaidOut = useRef(false);
@@ -109,17 +104,14 @@ export const LearnScreen = () => {
   // переключатель источника, и степпер, и его кнопки
   const [reduceMotion, setReduceMotion] = useState(false);
 
-  // Укладка трека: запоминаем ширину (ползунок) и высоту (степпер),
-  // ползунок ставим сразу, без анимации
+  // Укладка трека: измеряем ширину для ползунка; ползунок ставим сразу,
+  // без анимации
   const handleTrackLayout = (event: LayoutChangeEvent) => {
-    setTrackSize({
-      width: event.nativeEvent.layout.width,
-      height: event.nativeEvent.layout.height,
-    });
+    setTrackWidth(event.nativeEvent.layout.width);
   };
 
   useEffect(() => {
-    if (trackSize.width === 0) return;
+    if (trackWidth === 0) return;
     const targetX = selectedIndex * thumbWidth;
     if (!hasLaidOut.current || reduceMotion) {
       thumbTranslateX.setValue(targetX);
@@ -132,7 +124,7 @@ export const LearnScreen = () => {
       }).start();
     }
     hasLaidOut.current = true;
-  }, [trackSize.width, thumbWidth, selectedIndex, thumbTranslateX, reduceMotion]);
+  }, [trackWidth, thumbWidth, selectedIndex, thumbTranslateX, reduceMotion]);
 
   useEffect(() => {
     // Ослабленная анимация по системной настройке — ставим позицию без пружины
@@ -165,6 +157,43 @@ export const LearnScreen = () => {
       }),
     ]).start();
   }, [sessionSize, numberScale, reduceMotion]);
+
+  // 7. СОСТАВ СЕССИИ: считаем так же, как getSessionWords загружает слова
+  // для выбранного источника и размера (не меняем сам запрос — только
+  // воспроизводим его план на экране)
+  const plannedOwn =
+    source === "custom"
+      ? Math.min(sessionSize, stats.newCustom)
+      : 0;
+  const plannedDict =
+    source === "custom"
+      ? Math.min(sessionSize - plannedOwn, stats.newDict)
+      : Math.min(sessionSize, stats.newDict);
+  const plannedTotal = plannedOwn + plannedDict;
+  const ownShare = plannedTotal > 0 ? plannedOwn / plannedTotal : 0;
+
+  // Полоса состава: ширина оранжевого сегмента анимируется (width —
+  // layout-свойство, поэтому useNativeDriver: false)
+  const ownShareWidth = useRef(new Animated.Value(0)).current;
+  const hasBarLaidOut = useRef(false);
+  useEffect(() => {
+    if (plannedTotal === 0) return;
+    const target = ownShare * 100;
+    if (!hasBarLaidOut.current || reduceMotion) {
+      ownShareWidth.setValue(target);
+    } else {
+      Animated.timing(ownShareWidth, {
+        toValue: target,
+        duration: 220,
+        useNativeDriver: false,
+      }).start();
+    }
+    hasBarLaidOut.current = true;
+  }, [ownShare, plannedTotal, ownShareWidth, reduceMotion]);
+  const ownSharePercent = ownShareWidth.interpolate({
+    inputRange: [0, 100],
+    outputRange: ["0%", "100%"],
+  });
 
   const decreaseSessionSize = () => {
     const nextSize = Math.max(5, sessionSize - 5);
@@ -403,58 +432,96 @@ export const LearnScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.label}>Слов за сессию</Text>
-      <View
-        style={[
-          styles.counterRow,
-          trackSize.height > 0 && { height: trackSize.height },
-        ]}
-      >
-        <StepperButton
-          onPress={decreaseSessionSize}
-          disabled={sessionSize <= 5}
-          accessibilityLabel="Меньше слов"
-          icon="remove"
-          reduceMotion={reduceMotion}
-          styles={styles}
-        />
-        <View style={styles.counterValueWrap}>
-          <Animated.Text
-            style={[
-              styles.counterValue,
-              { transform: [{ scale: numberScale }] },
-            ]}
-          >
-            {sessionSize}
-          </Animated.Text>
+      <View style={styles.planCard}>
+        <Text style={styles.planCardLabel}>Слов за сессию</Text>
+        <View style={styles.planStepperRow}>
+          <StepperButton
+            onPress={decreaseSessionSize}
+            disabled={sessionSize <= 5}
+            accessibilityLabel="Меньше слов"
+            icon="remove"
+            reduceMotion={reduceMotion}
+            styles={styles}
+          />
+          <View style={styles.counterValueWrap}>
+            <Animated.Text
+              style={[
+                styles.counterValue,
+                { transform: [{ scale: numberScale }] },
+              ]}
+            >
+              {sessionSize}
+            </Animated.Text>
+            <Text style={styles.counterUnit}>слов</Text>
+          </View>
+          <StepperButton
+            onPress={increaseSessionSize}
+            disabled={sessionSize >= 50}
+            accessibilityLabel="Больше слов"
+            icon="add"
+            reduceMotion={reduceMotion}
+            styles={styles}
+          />
         </View>
-        <StepperButton
-          onPress={increaseSessionSize}
-          disabled={sessionSize >= 50}
-          accessibilityLabel="Больше слов"
-          icon="add"
-          reduceMotion={reduceMotion}
-          styles={styles}
-        />
-      </View>
 
-      <View style={styles.infoCard}>
-        <View style={styles.infoHeader}>
-          <Text style={styles.infoTitle}>План на сессию</Text>
-          <Text style={styles.infoCount}>{sessionSize} слов</Text>
-        </View>
-        <Text style={styles.infoText}>
-          Доступно новых слов: <Text style={styles.bold}>{stats.totalNew}</Text>
-        </Text>
-        {missingCustomCount > 0 && (
-          <Text style={styles.warningText}>
-            💡 Своих слов не хватает ({stats.newCustom}), добавим{" "}
-            {missingCustomCount} из словаря
+        <View style={styles.planDivider} />
+        <View style={styles.planHeaderRow}>
+          <Text style={styles.planTitle}>План на сессию</Text>
+          <Text style={styles.planAvailable}>
+            Новых доступно: {stats.totalNew}
           </Text>
+        </View>
+
+        <View
+          style={[
+            styles.planBar,
+            plannedTotal === 0 && styles.planBarEmpty,
+          ]}
+          accessibilityLabel={`Свои слова ${plannedOwn}, из словаря ${plannedDict}`}
+        >
+          {plannedTotal > 0 && (
+            <Animated.View
+              style={[
+                styles.planBarSegment,
+                { width: ownSharePercent },
+              ]}
+            />
+          )}
+        </View>
+
+        <View style={styles.planLegendRow}>
+          <View style={styles.planLegendItem}>
+            <View
+              style={[styles.planDot, styles.planDotOwn]}
+            />
+            <Text style={styles.planLegendText}>Свои {plannedOwn}</Text>
+          </View>
+          <View style={styles.planLegendItem}>
+            <View
+              style={[styles.planDot, styles.planDotDict]}
+            />
+            <Text style={styles.planLegendText}>
+              Из словаря {plannedDict}
+            </Text>
+          </View>
+          <Text style={styles.planReviewText}>
+            Повтор: {stats.review}
+          </Text>
+        </View>
+
+        {missingCustomCount > 0 && (
+          <View style={styles.planNoteRow}>
+            <Ionicons
+              name="information-circle-outline"
+              size={16}
+              style={styles.planNoteIcon}
+            />
+            <Text style={styles.planNoteText}>
+              Своих слов не хватает ({stats.newCustom}), добавим{" "}
+              {missingCustomCount} из словаря
+            </Text>
+          </View>
         )}
-        <Text style={styles.infoSubText}>
-          На повторении ждет: {stats.review}
-        </Text>
       </View>
 
       <TouchableOpacity style={styles.startButton} onPress={handleStart}>
@@ -564,19 +631,11 @@ const createStyles = (theme: Theme) =>
     fontSize: 14,
   },
   toggleTextActive: { color: theme.textOnAccent },
-  counterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: theme.secondaryControlBackground,
-    borderRadius: 15,
-    padding: TRACK_PADDING,
-    minHeight: TRACK_INNER_HEIGHT + 2 * TRACK_PADDING,
-  },
   counterBtn: {
-    width: 56,
-    height: TRACK_INNER_HEIGHT,
+    width: 48,
+    height: 48,
     backgroundColor: theme.surfaceElevated,
-    borderRadius: 16,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: theme.borderSubtle,
   },
@@ -589,57 +648,120 @@ const createStyles = (theme: Theme) =>
   counterBtnIcon: {
     color: theme.textEmphasis,
   },
+  planCard: {
+    backgroundColor: theme.surface,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginTop: 15,
+  },
+  planCardLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.textMutedAlt,
+    textTransform: "uppercase",
+    marginBottom: 10,
+  },
+  planStepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   counterValueWrap: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   counterValue: {
-    fontSize: 30,
+    fontSize: 44,
     fontWeight: "800",
     color: theme.textEmphasis,
     fontVariant: ["tabular-nums"],
+    lineHeight: 48,
   },
-  infoCard: {
-    backgroundColor: theme.surface,
-    padding: 18,
-    borderRadius: 20,
-    marginVertical: 20,
-    borderWidth: 1,
-    borderColor: theme.border,
+  counterUnit: {
+    fontSize: 12,
+    color: theme.textMuted,
   },
-  infoHeader: {
+  planDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.border,
+    marginVertical: 12,
+  },
+  planHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  infoTitle: {
-    color: theme.textPrimary,
+  planTitle: {
+    color: theme.textEmphasis,
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "600",
   },
-  infoCount: {
-    color: theme.statAmber,
+  planAvailable: {
     fontSize: 12,
-    fontWeight: "800",
+    color: theme.textMuted,
   },
-  infoText: {
-    fontSize: 15,
+  planBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+    backgroundColor: theme.linkBlue,
+  },
+  planBarEmpty: {
+    backgroundColor: theme.borderSubtle,
+  },
+  planBarSegment: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: theme.orangeAccent,
+  },
+  planLegendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    flexWrap: "wrap",
+    columnGap: 14,
+    rowGap: 4,
+  },
+  planLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  planDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 5,
+  },
+  planDotOwn: { backgroundColor: theme.orangeAccent },
+  planDotDict: { backgroundColor: theme.linkBlue },
+  planLegendText: {
+    fontSize: 12,
     color: theme.textSecondary,
-    marginBottom: 6,
   },
-  infoSubText: {
-    fontSize: 13,
-    color: theme.textMutedSoft,
-    marginTop: 4,
+  planReviewText: {
+    fontSize: 12,
+    color: theme.textMuted,
+    marginLeft: "auto",
   },
-  bold: { fontWeight: "700", color: theme.textEmphasis },
-  warningText: {
-    fontSize: 13,
-    color: theme.orangeAccent,
-    marginVertical: 6,
-    lineHeight: 18,
+  planNoteRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: 10,
+    columnGap: 6,
+  },
+  planNoteIcon: {
+    color: theme.amberAccent,
+  },
+  planNoteText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    color: theme.amberAccent,
   },
   startButton: {
     backgroundColor: theme.orangeAccent,

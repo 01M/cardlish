@@ -28,7 +28,7 @@ import {
   setThemePreference,
   WordsStats,
 } from "../db/database";
-import { PressableScale } from "../components/PressableScale";
+import { Button } from "../components/Button";
 import { useReduceMotion } from "../hooks/useReduceMotion";
 import {
   disableDailyReminder,
@@ -344,18 +344,18 @@ export const ProfileScreen = () => {
       </View>
 
       <Text style={styles.sectionLabel}>УПРАВЛЕНИЕ ДАННЫМИ</Text>
-      <PressableScale
-        style={styles.actionButton}
+      <Button
+        label="Сбросить прогресс изучения"
+        variant="secondary"
         onPress={handleResetProgress}
-      >
-        <Text style={styles.actionButtonText}>Сбросить прогресс изучения</Text>
-      </PressableScale>
-      <PressableScale
-        style={[styles.actionButton, styles.dangerButton]}
+        style={styles.actionButtonGap}
+      />
+      <Button
+        label="Сбросить всё до начала"
+        variant="danger"
         onPress={handleFullReset}
-      >
-        <Text style={styles.dangerButtonText}>Сбросить всё до начала</Text>
-      </PressableScale>
+        style={styles.actionButtonGap}
+      />
       </Animated.View>
     </ScrollView>
   );
@@ -471,27 +471,5 @@ const createStyles = (theme: Theme) =>
     marginBottom: 28,
   },
   themeControl: { width: "100%" },
-  actionButton: {
-    backgroundColor: theme.surface,
-    paddingVertical: 15,
-    borderRadius: 14,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: theme.border,
-    marginBottom: 12,
-  },
-  actionButtonText: {
-    color: theme.textButtonSecondary,
-    fontWeight: "700",
-    fontSize: 14,
-  },
-  dangerButton: {
-    borderColor: theme.dangerBorder,
-    backgroundColor: theme.dangerBackground,
-  },
-  dangerButtonText: {
-    color: theme.dangerText,
-    fontWeight: "700",
-    fontSize: 14,
-  },
+  actionButtonGap: { marginBottom: 12 },
 });

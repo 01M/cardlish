@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import { Button } from "../components/Button";
 import { Confetti } from "../components/Confetti";
 import { FlipCard } from "../components/FlipCard";
 import { PressableScale } from "../components/PressableScale";
@@ -368,12 +369,11 @@ export const LearnScreen = () => {
           style={styles.errorIcon}
         />
         <Text style={styles.emptyTitle}>Не удалось загрузить данные</Text>
-        <PressableScale
-          style={[styles.startButton, styles.retryButton]}
+        <Button
+          label="Повторить"
           onPress={loadStats}
-        >
-          <Text style={styles.startButtonText}>Повторить</Text>
-        </PressableScale>
+          style={styles.retryButtonGap}
+        />
       </View>
     );
   }
@@ -417,13 +417,12 @@ export const LearnScreen = () => {
         </View>
 
         {/* Кнопка "Далее" */}
-        <PressableScale
-          style={styles.nextButton}
+        <Button
+          label="Далее"
+          variant="ink"
           onPress={handleNextWord}
-          disabled={isProcessing}
-        >
-          <Text style={styles.nextButtonText}>Далее</Text>
-        </PressableScale>
+          style={styles.nextButtonGap}
+        />
       </View>
     );
   }
@@ -473,18 +472,17 @@ export const LearnScreen = () => {
           Можно сбросить прогресс и начать обучение заново или добавить
           собственные слова.
         </Text>
-        <PressableScale
-          style={styles.startButton}
+        <Button
+          label="Добавить слова"
           onPress={() => router.push("/words")}
-        >
-          <Text style={styles.startButtonText}>Добавить слова</Text>
-        </PressableScale>
-        <PressableScale
-          style={styles.secondaryButton}
+          style={styles.buttonGap}
+        />
+        <Button
+          label="Сбросить прогресс"
+          variant="secondary"
           onPress={handleResetProgress}
-        >
-          <Text style={styles.secondaryButtonText}>Сбросить прогресс</Text>
-        </PressableScale>
+          style={styles.buttonGap}
+        />
       </View>
     );
   }
@@ -687,9 +685,11 @@ export const LearnScreen = () => {
         </Animated.View>
       </View>
 
-      <PressableScale style={styles.startButton} onPress={handleStart}>
-        <Text style={styles.startButtonText}>Начать сессию</Text>
-      </PressableScale>
+      <Button
+        label="Начать сессию"
+        onPress={handleStart}
+        style={styles.buttonGap}
+      />
     </ScrollView>
   );
 };
@@ -931,21 +931,8 @@ const createStyles = (theme: Theme) =>
     lineHeight: 16,
     color: theme.amberAccent,
   },
-  startButton: {
-    backgroundColor: theme.orangeAccent,
-    minHeight: 54,
-    width: "100%",
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
+  buttonGap: {
     marginTop: 10,
-  },
-  startButtonText: {
-    color: theme.textOnAccent,
-    fontSize: 16,
-    fontWeight: "700",
   },
   sessionHeader: {
     flexDirection: "row",
@@ -974,21 +961,8 @@ const createStyles = (theme: Theme) =>
   closeIcon: {
     color: theme.textTertiary,
   },
-  nextButton: {
-    backgroundColor: theme.buttonInk,
-    minHeight: 54,
-    width: "100%",
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
+  nextButtonGap: {
     marginBottom: 10,
-  },
-  nextButtonText: {
-    color: theme.textOnButtonInk,
-    fontSize: 16,
-    fontWeight: "700",
   },
   emptyContainer: {
     flex: 1,
@@ -1005,7 +979,7 @@ const createStyles = (theme: Theme) =>
     color: theme.textMuted,
     marginBottom: 16,
   },
-  retryButton: {
+  retryButtonGap: {
     marginTop: 24,
   },
   completionContent: {
@@ -1060,23 +1034,6 @@ const createStyles = (theme: Theme) =>
     textAlign: "center",
     marginTop: 10,
     marginBottom: 20,
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: theme.secondaryButtonBorder,
-    minHeight: 52,
-    width: "100%",
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 10,
-  },
-  secondaryButtonText: {
-    color: theme.textSecondary,
-    fontSize: 16,
-    fontWeight: "700",
   },
 });
 
@@ -1285,12 +1242,17 @@ const SessionComplete = ({
           </Text>
         </Animated.View>
         <Animated.View style={[styles.completionGroup, groupStyles[3]]}>
-          <PressableScale style={styles.startButton} onPress={onReview}>
-            <Text style={styles.startButtonText}>Перейти к повторению</Text>
-          </PressableScale>
-          <PressableScale style={styles.secondaryButton} onPress={onContinue}>
-            <Text style={styles.secondaryButtonText}>Продолжить обучение</Text>
-          </PressableScale>
+          <Button
+            label="Перейти к повторению"
+            onPress={onReview}
+            style={styles.buttonGap}
+          />
+          <Button
+            label="Продолжить обучение"
+            variant="secondary"
+            onPress={onContinue}
+            style={styles.buttonGap}
+          />
         </Animated.View>
       </View>
       {!isStatic && hasWords && confettiOriginY !== null && (

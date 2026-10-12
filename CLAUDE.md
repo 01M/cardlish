@@ -38,7 +38,7 @@ src/app/          Expo Router routes — THIN wrappers only
   (tabs)/words.tsx   -> re-exports WordsScreen
   (tabs)/profile.tsx -> re-exports ProfileScreen
 src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen)
-src/components/   Shared UI (PressableScale, FlipCard, WordFormModal, Confetti, TopFade, ListTopFade)
+src/components/   Shared UI (Button, PressableScale, FlipCard, WordFormModal, Confetti, TopFade, ListTopFade)
 src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts)
@@ -137,13 +137,38 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   `insets.bottom` (`useSafeAreaInsets()`). Checked on iPhone; Android unverified.
 
 **Buttons**
-- Main buttons use `PressableScale` (`src/components/PressableScale.tsx`, press-scale feedback)
-  instead of `TouchableOpacity`. Its `style` is split: placement/size props (`alignSelf`, `flex*`,
-  width/height/min/max, margins, `position`, `display`) go to the outer `Pressable`, everything
-  else to the inner `Animated.View`.
-- Not yet migrated (`TouchableOpacity`): WordsScreen per-card "Изменить"/"Удалить" links (intentional),
-  search clear button and empty-state "Добавить слово"; LearnScreen session close button;
-  FlipCard speak buttons; WordFormModal "Сохранить"/"Отмена".
+- Full-width text buttons use `Button` (`src/components/Button.tsx`): `label`, `onPress`,
+  `variant` (`"primary"` default, `"secondary"`, `"ink"`, `"danger"`), `disabled` (opacity 0.6)
+  and `style` for placement only (margins). One size for all: `minHeight` 54, padding 18×15,
+  radius 16, stretches to full width, label 16/700 centered. Tokens: primary `orangeAccent` /
+  `textOnAccent`; secondary transparent + 1px `secondaryButtonBorder` / `textButtonSecondary`;
+  ink `buttonInk` / `textOnButtonInk`; danger `dangerBackground` / `dangerBorder` /
+  `dangerText`. No icon, loading or haptics props — haptics stay in the press handlers.
+  Do not add variants or sizes for one call site.
+- Uses `Button`: all LearnScreen CTAs ("Начать сессию", "Далее" (ink), "Повторить", empty-state
+  and completion buttons), the ReviewScreen empty state, the Words empty-state "Добавить слово",
+  the root DB-error "Повторить" (`src/app/_layout.tsx`) and the Profile reset buttons
+  ("Сбросить прогресс изучения" secondary, "Сбросить всё до начала" danger). Learn "Далее" does
+  NOT pass `disabled`: the `isProcessing` guard in `handleNextWord` blocks double taps, and
+  dimming would flash on every tap.
+- Not migrated — deliberate exceptions, keep them as they are:
+  - WordFormModal "Сохранить" (`TouchableOpacity`): the only indigo button (`indigoAccent`,
+    dims to 0.6 while saving); its color is a separate design decision.
+  - WordFormModal "Отмена" (`TouchableOpacity`): a text button with no fill or border.
+  - Review "Не вспомнил"/"Вспомнил" (`PressableScale`): a matched grading pair laid out two
+    across (flex 1, padding 10, 14/800); the success look has no other user.
+  - Words header "Добавить" (`PressableScale`): compact with an icon — would need size and icon
+    props for one call site.
+  - Icon buttons — Learn session close, Words search clear, FlipCard speak (`TouchableOpacity`;
+    speak is tied to FlipCard's `isSpeaking` flip guard) and `StepperButton` (`PressableScale`,
+    0.92 scale, 0.35 dimming): icon-only, own sizes, labelled via `accessibilityLabel`.
+  - Learn source toggle and Words filter chips (`PressableScale`): selectable controls with
+    `accessibilityState={{ selected }}`; the toggle shares a sliding thumb.
+  - Words per-card "Изменить"/"Удалить" (`TouchableOpacity`): inline links with tuned `hitSlop`.
+- Other pressables use `PressableScale` (`src/components/PressableScale.tsx`, press-scale
+  feedback; `Button` is built on it). Its `style` is split: placement/size props (`alignSelf`,
+  `flex*`, width/height/min/max, margins, `position`, `display`) go to the outer `Pressable`,
+  everything else to the inner `Animated.View`.
 
 **Edge fades**
 - `TopFade` — status-bar scrim, rendered once in `src/app/_layout.tsx`.
@@ -169,8 +194,8 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - The composition split mirrors what `getSessionWords()` will load — derive counts only from
   `sessionSize`, `stats` and `source`, never new queries.
 - Completion (`SessionComplete`): badge pop, `Confetti`, word count-up, success haptic.
-- Empty state ("Новые слова закончились"): "Добавить слова" is the orange primary, "Сбросить
-  прогресс" the outlined secondary below it (goes through `confirmResetProgress()`).
+- Empty state ("Новые слова закончились"): "Добавить слова" is a primary `Button`, "Сбросить
+  прогресс" a secondary `Button` below it (goes through `confirmResetProgress()`).
 
 **Review screen**
 - On focus the queue is merged with the DB via `mergeReviewQueue()`: words still due keep their

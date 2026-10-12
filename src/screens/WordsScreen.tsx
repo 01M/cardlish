@@ -12,6 +12,7 @@ import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteCustomWord, getCustomWords, Word } from "../db/database";
+import { Button } from "../components/Button";
 import { PressableScale } from "../components/PressableScale";
 import { WordFormModal } from "../components/WordFormModal";
 import ListTopFade from "../components/ListTopFade";
@@ -254,13 +255,11 @@ export const WordsScreen = () => {
               <Text style={styles.emptyText}>
                 Добавьте собственные слова, чтобы учить их в приложении.
               </Text>
-              <TouchableOpacity
-                style={styles.emptyButton}
+              <Button
+                label="Добавить слово"
                 onPress={openAddForm}
-                accessibilityRole="button"
-              >
-                <Text style={styles.emptyButtonText}>Добавить слово</Text>
-              </TouchableOpacity>
+                style={styles.emptyButtonGap}
+              />
             </View>
           )
         }
@@ -399,12 +398,5 @@ const createStyles = (theme: Theme) =>
     lineHeight: 21,
     marginTop: 8,
   },
-  emptyButton: {
-    backgroundColor: theme.orangeAccent,
-    borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    marginTop: 18,
-  },
-  emptyButtonText: { color: theme.textOnAccent, fontWeight: "700" },
+  emptyButtonGap: { marginTop: 18 },
 });

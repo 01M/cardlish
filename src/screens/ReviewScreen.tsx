@@ -11,6 +11,7 @@ import {
   resetProgressOnly,
   Word,
 } from "../db/database";
+import { Button } from "../components/Button";
 import { FlipCard } from "../components/FlipCard";
 import { PressableScale } from "../components/PressableScale";
 import { Theme } from "../theme/tokens";
@@ -128,18 +129,17 @@ export const ReviewScreen = () => {
             На данный момент нет слов, требующих повторения. Изучите новые слова
             во вкладке «Учить».
           </Text>
-          <PressableScale
-            style={styles.emptyButton}
+          <Button
+            label="Учить новые слова"
             onPress={() => router.push("/")}
-          >
-            <Text style={styles.emptyButtonText}>Учить новые слова</Text>
-          </PressableScale>
-          <PressableScale
-            style={styles.secondaryButton}
+            style={styles.emptyButtonGap}
+          />
+          <Button
+            label="Сбросить прогресс"
+            variant="secondary"
             onPress={handleResetProgress}
-          >
-            <Text style={styles.secondaryButtonText}>Сбросить прогресс</Text>
-          </PressableScale>
+            style={styles.secondaryButtonGap}
+          />
         </View>
       </SafeAreaView>
     );
@@ -316,37 +316,10 @@ const createStyles = (theme: Theme) =>
     textAlign: "center",
     lineHeight: 22,
   },
-  emptyButton: {
-    backgroundColor: theme.orangeAccent,
-    minHeight: 54,
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
+  emptyButtonGap: {
     marginTop: 22,
   },
-  emptyButtonText: {
-    color: theme.textOnAccent,
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: theme.secondaryButtonBorderAlt,
-    minHeight: 54,
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
+  secondaryButtonGap: {
     marginTop: 10,
-  },
-  secondaryButtonText: {
-    color: theme.textButtonSecondary,
-    fontSize: 15,
-    fontWeight: "800",
   },
 });

@@ -11,7 +11,7 @@ import {
 } from "@/theme/useTheme";
 import { Theme } from "@/theme/tokens";
 import TopFade from "@/components/TopFade";
-import { PressableScale } from "@/components/PressableScale";
+import { Button } from "@/components/Button";
 
 export default function RootLayout() {
   const scheme = useColorSchemeName();
@@ -63,9 +63,11 @@ export default function RootLayout() {
       <ThemeProvider value={navTheme}>
         <View style={styles.center}>
           <Text style={styles.errorText}>Не удалось открыть базу данных</Text>
-          <PressableScale style={styles.retryButton} onPress={handleRetry}>
-            <Text style={styles.retryButtonText}>Повторить</Text>
-          </PressableScale>
+          <Button
+            label="Повторить"
+            onPress={handleRetry}
+            style={styles.retryButtonGap}
+          />
         </View>
       </ThemeProvider>
     );
@@ -101,6 +103,7 @@ const createStyles = (theme: Theme) =>
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 30,
     backgroundColor: theme.backdrop,
   },
   loadingText: {
@@ -112,21 +115,8 @@ const createStyles = (theme: Theme) =>
     fontSize: 17,
     fontWeight: "700",
     textAlign: "center",
-    paddingHorizontal: 30,
   },
-  retryButton: {
-    backgroundColor: theme.orangeAccent,
-    minHeight: 54,
-    paddingHorizontal: 32,
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
+  retryButtonGap: {
     marginTop: 20,
-  },
-  retryButtonText: {
-    color: theme.textOnAccent,
-    fontSize: 16,
-    fontWeight: "700",
   },
 });

@@ -22,8 +22,7 @@ export interface Theme {
   inputBorder: string; // рамка полей ввода
   secondaryControlBackground: string; // сегмент-переключатель, ряд фильтров
   secondaryControlBackgroundAlt: string; // кнопка закрытия сессии
-  secondaryButtonBorder: string; // рамка вторичной кнопки (LearnScreen)
-  secondaryButtonBorderAlt: string; // рамка вторичной кнопки (ReviewScreen)
+  secondaryButtonBorder: string; // рамка вторичной кнопки (Button, variant "secondary")
 
   // Текст
   textPrimary: string; // основной текст (заголовки, термины)
@@ -34,8 +33,8 @@ export interface Theme {
   textMutedAlt: string; // альтернативный приглушённый (транскрипции, label в форме)
   textMutedSoft: string; // самый слабый: подсказки, placeholder
   textOnAccent: string; // текст на оранжевых и индиго-заливках (на buttonInk — textOnButtonInk)
-  textOnButtonInk: string; // текст на заливке buttonInk (nextButton, pill, активный фильтр)
-  textButtonSecondary: string; // текст светлых вторичных кнопок (сброс в Profile/Review)
+  textOnButtonInk: string; // текст на заливке buttonInk (Button "ink", pill, активный фильтр)
+  textButtonSecondary: string; // текст вторичных кнопок (Button "secondary")
   placeholder: string; // placeholder поисковой строки
   keyboardAppearance: "light" | "dark"; // внешний вид клавиатуры iOS (TextInput)
 
@@ -66,7 +65,7 @@ export interface Theme {
   inkCardSubtext: string; // подписи статистики внутри панели
   inkCardSubtextSoft: string; // самый слабый текст панели
   inkCardText: string; // основной текст панели (проценты, числа)
-  buttonInk: string; // чернильная заливка: nextButton, progressPill, badgeCount, активный фильтр
+  buttonInk: string; // чернильная заливка: Button "ink", progressPill, badgeCount, активный фильтр
   progressBarFill: string; // заполнение прогресс-бара в панели
 
   // Бейджи и кнопки FlipCard
@@ -112,7 +111,6 @@ export const lightTheme: Theme = {
   secondaryControlBackground: "#E6E7E1",
   secondaryControlBackgroundAlt: "#E8E7E0",
   secondaryButtonBorder: "#9CA3AF",
-  secondaryButtonBorderAlt: "#A7AAA3",
 
   textPrimary: "#17202A",
   textEmphasis: "#111827",
@@ -182,7 +180,6 @@ export const darkTheme: Theme = {
   secondaryControlBackground: "#252E36",
   secondaryControlBackgroundAlt: "#252E36",
   secondaryButtonBorder: "#5A6570",
-  secondaryButtonBorderAlt: "#5A6570",
 
   textPrimary: "#E8EDF0",
   textEmphasis: "#E8EDF0",
@@ -221,7 +218,7 @@ export const darkTheme: Theme = {
   inkCardSubtext: "#B9C2C8",
   inkCardSubtextSoft: "#C7D0D5",
   inkCardText: "#FFFFFF",
-  buttonInk: "#E8EDF0", // светлая заливка: nextButton, progressPill, badgeCount, активный фильтр
+  buttonInk: "#E8EDF0", // светлая заливка: Button "ink", progressPill, badgeCount, активный фильтр
   progressBarFill: "#56B77D",
 
   badgeAmberBackground: "#3A2E18",

@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
 import {
   Alert,
   Animated,
@@ -16,7 +17,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getReminderEnabled,
@@ -30,6 +31,7 @@ import {
 } from "../db/database";
 import { Button } from "../components/Button";
 import { FadeInView } from "../components/FadeInView";
+import { PressableScale } from "../components/PressableScale";
 import { useReduceMotion } from "../hooks/useReduceMotion";
 import {
   disableDailyReminder,
@@ -53,6 +55,7 @@ const BIG_DIGITS_MAX_FONT_SCALE = 1.2;
 
 export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const theme = useTheme();
   const scheme = useColorSchemeName();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -293,7 +296,7 @@ export const ProfileScreen = () => {
       <Text style={styles.sectionLabel}>НАПОМИНАНИЯ</Text>
       <View style={styles.reminderRow}>
         <View style={styles.reminderText}>
-          <Text style={styles.reminderTitle}>Ежедневные напоминания</Text>
+          <Text style={styles.rowTitle}>Ежедневные напоминания</Text>
           <Text style={styles.reminderSubtitle}>
             Каждый день в {getDailyReminderTime()}
           </Text>
@@ -327,6 +330,18 @@ export const ProfileScreen = () => {
           style={styles.themeControl}
         />
       </View>
+
+      {/* Раздел перед управлением данными: опасные кнопки остаются последними */}
+      <Text style={styles.sectionLabel}>О ПРИЛОЖЕНИИ</Text>
+      <PressableScale
+        accessibilityLabel="Источники и лицензии"
+        accessibilityHint="Открывает список источников данных и их лицензий"
+        onPress={() => router.push("/sources")}
+        style={styles.navRow}
+      >
+        <Text style={styles.rowTitle}>Источники и лицензии</Text>
+        <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
+      </PressableScale>
 
       <Text style={styles.sectionLabel}>УПРАВЛЕНИЕ ДАННЫМИ</Text>
       <Button
@@ -438,7 +453,7 @@ const createStyles = (theme: Theme) =>
     justifyContent: "space-between",
   },
   reminderText: { flex: 1, paddingRight: 16 },
-  reminderTitle: {
+  rowTitle: {
     color: theme.textPrimary,
     fontWeight: "800",
     fontSize: 15,
@@ -457,5 +472,16 @@ const createStyles = (theme: Theme) =>
     marginBottom: 28,
   },
   themeControl: { width: "100%" },
+  navRow: {
+    backgroundColor: theme.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 16,
+    marginBottom: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   actionButtonGap: { marginBottom: 12 },
 });

@@ -103,6 +103,18 @@ export default function RootLayout() {
         <StatusBar style={scheme === "dark" ? "light" : "dark"} />
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          {/* Единственный экран с нативным заголовком: открывается из Профиля,
+              кнопка «назад» и свайп возвращают обратно */}
+          <Stack.Screen
+            name="sources"
+            options={{
+              title: "Источники и лицензии",
+              headerBackTitle: "Профиль",
+              headerStyle: { backgroundColor: theme.pageBackground },
+              headerTintColor: theme.textPrimary,
+              headerShadowVisible: false,
+            }}
+          />
         </Stack>
         <TopFade />
       </ThemeProvider>

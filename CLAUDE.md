@@ -39,14 +39,17 @@ src/app/          Expo Router routes — THIN wrappers only
   (tabs)/review.tsx  -> re-exports ReviewScreen
   (tabs)/words.tsx   -> re-exports WordsScreen
   (tabs)/profile.tsx -> re-exports ProfileScreen
-src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen)
+  sources.tsx        -> re-exports SourcesScreen (root Stack, pushed from Profile)
+src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen, SourcesScreen)
+src/data/         sources.json — attribution/licences of every shipped data source
 src/components/   Shared UI (Button, PressableScale, FlipCard, FadeInView, WordFormModal, Confetti, TopFade, ListTopFade)
 src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts), schema/migration SQL + planMigration (schema.ts)
 src/services/     Side-effectful services (notifications.ts)
 src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); pure, no React/DB:
-                  reviewQueue.ts (mergeReviewQueue(prev, fresh)), sessionPlan.ts (getSessionPlan)
+                  reviewQueue.ts (mergeReviewQueue(prev, fresh)), sessionPlan.ts (getSessionPlan),
+                  sources.ts (DataSource, parseSources, formatUrlForDisplay)
 *.test.ts         Unit tests live next to the code they test (never under src/app/)
 src/assets/       dictionary.json (large, git-tracked, never read it)
 scripts/          Python tooling
@@ -84,6 +87,10 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 
 - Keep edits scoped to the files named in the task.
 - No dead code or leftover legacy after a migration — remove the old path in the same change.
+- **Every new data source must be added to `src/data/sources.json` before its data ships**
+  (title, author, version, https URLs, licence, what is used, what was changed; `noticeText` when
+  the licence requires a full notice). `parseSources()` validates it and a test checks the real
+  file; the "Источники и лицензии" screen shows it with no UI changes.
 - Run `npx tsc --noEmit`, `npm run lint` and `npm test` before finishing.
 
 ## Testing
@@ -173,6 +180,12 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   `disableAutomaticContentInsets` on its trigger.
 - Non-scrolling Learn states (session, completion, empty) set their own bottom padding from
   `insets.bottom` (`useSafeAreaInsets()`). Checked on iPhone; Android unverified.
+- `/sources` (SourcesScreen) is the only screen with a native Stack header (configured in
+  `src/app/_layout.tsx`: title, back title "Профиль", `pageBackground`/`textPrimary`, no shadow).
+  It is opened from Profile's "О ПРИЛОЖЕНИИ" row (placed above "УПРАВЛЕНИЕ ДАННЫМИ" so the
+  destructive buttons stay last); its ScrollView sets bottom padding from `insets.bottom`.
+  Links there use `PressableScale` with `accessibilityRole="link"` and `Linking.openURL`
+  (`showErrorAlert()` on failure).
 
 **Buttons**
 - Full-width text buttons use `Button` (`src/components/Button.tsx`): `label`, `onPress`,

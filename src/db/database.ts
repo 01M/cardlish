@@ -72,13 +72,7 @@ export const initDatabase = async () => {
   }
 };
 
-// 2. Получение всех слов
-export const getAllWords = async (): Promise<Word[]> => {
-  const db = await getDb();
-  return await db.getAllAsync<Word>("SELECT * FROM words;");
-};
-
-// 3. Добавление пользовательского слова
+// 2. Добавление пользовательского слова
 export const addCustomWord = async (
   term: string,
   translation: string,

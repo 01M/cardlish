@@ -8,7 +8,7 @@ import React, {
 import {
   AccessibilityInfo,
   Animated,
-  LayoutAnimation,
+  Easing,
   LayoutChangeEvent,
   Pressable,
   ScrollView,
@@ -34,6 +34,9 @@ import { useTheme } from "../theme/useTheme";
 
 // Паддинг дорожки-переключателя источника слов (он же — отступ ползунка)
 const TRACK_PADDING = 4;
+
+// Диапазон высоты, за который прозрачность примечания доходит до 1
+const NOTE_OPACITY_RANGE = 16;
 
 export const LearnScreen = () => {
   const router = useRouter();
@@ -72,6 +75,68 @@ export const LearnScreen = () => {
       ? sessionSize - stats.newCustom
       : 0;
 
+  // Одна на экран проверка "уменьшить движение" — ей пользуются и
+  // переключатель источника, и степпер, и его кнопки, и примечание в плане
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  // 8. ПРИМЕЧАНИЕ В КАРТОЧКЕ ПЛАНА: своя анимация высоты и прозрачности
+  // (системная анимация раскладки надёжно работает только на iOS; высота +
+  // interpolated opacity работают одинаково на обеих платформах). Текст
+  // выводим синхронно в рендере (useMemo) и держим последний непустой в ref,
+  // чтобы контент был полным уже на первом замере и не исчезал при сворачивании
+  const noteText = useMemo(
+    () =>
+      missingCustomCount > 0
+        ? `Своих слов не хватает (${stats.newCustom}), добавим ${missingCustomCount} из словаря`
+        : "",
+    [missingCustomCount, stats.newCustom],
+  );
+  const lastNoteTextRef = useRef("");
+  if (noteText) {
+    lastNoteTextRef.current = noteText;
+  }
+  const noteContentText = noteText || lastNoteTextRef.current;
+
+  const [noteContentHeight, setNoteContentHeight] = useState(0);
+  const noteHeight = useRef(new Animated.Value(0)).current;
+  const noteOpacity = noteHeight.interpolate({
+    inputRange: [0, NOTE_OPACITY_RANGE],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
+  const isNoteVisible = missingCustomCount > 0;
+  const isFirstNoteRender = useRef(true);
+
+  useEffect(() => {
+    const targetHeight = isNoteVisible ? noteContentHeight : 0;
+    // Без анимации — только если примечание видно сразу при монтировании
+    // (до первого замера) и при «уменьшить движение»; появление после
+    // скрытого состояния раскрывается от 0 до замеренной высоты
+    if (reduceMotion || (isFirstNoteRender.current && isNoteVisible)) {
+      noteHeight.setValue(targetHeight);
+    } else {
+      Animated.timing(noteHeight, {
+        toValue: targetHeight,
+        duration: 220,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: false,
+      }).start();
+    }
+    if (!isNoteVisible || noteContentHeight > 0) {
+      isFirstNoteRender.current = false;
+    }
+  }, [isNoteVisible, noteContentHeight, noteHeight, reduceMotion]);
+
+  const handleNoteLayout = (event: LayoutChangeEvent) => {
+    // Скрытое примечание не меряем: строка с паддингом и иконкой имеет
+    // ненулевую высоту даже без текста, и такой замер был бы устаревшим
+    if (!isNoteVisible) return;
+    const height = event.nativeEvent.layout.height;
+    if (height > 0) {
+      setNoteContentHeight(height);
+    }
+  };
+
   const handleStart = async () => {
     const words = await getSessionWords(source, sessionSize);
     if (words.length === 0) {
@@ -89,16 +154,7 @@ export const LearnScreen = () => {
     setStats(data);
   };
 
-  // Плавная перестройка раскладки при появлении/исчезновении примечания
-  // в карточке плана (перед изменением состояния; не под New Architecture
-  // хаки, а штатный configureNext — вызываем до setState)
-  const animatePlanLayout = () => {
-    if (reduceMotion) return;
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-  };
-
   const handleSourceChange = (nextSource: "custom" | "dictionary") => {
-    animatePlanLayout();
     setSource(nextSource);
     void Haptics.selectionAsync().catch(() => {});
   };
@@ -110,9 +166,6 @@ export const LearnScreen = () => {
   const selectedIndex = source === "custom" ? 0 : 1;
   const thumbTranslateX = useRef(new Animated.Value(0)).current;
   const hasLaidOut = useRef(false);
-  // Одна на экран проверка "уменьшить движение" — ей пользуются и
-  // переключатель источника, и степпер, и его кнопки
-  const [reduceMotion, setReduceMotion] = useState(false);
 
   // Укладка трека: измеряем ширину для ползунка; ползунок ставим сразу,
   // без анимации
@@ -208,7 +261,6 @@ export const LearnScreen = () => {
   const decreaseSessionSize = () => {
     const nextSize = Math.max(5, sessionSize - 5);
     if (nextSize === sessionSize) return;
-    animatePlanLayout();
     setSessionSize(nextSize);
     void Haptics.selectionAsync().catch(() => {});
   };
@@ -216,7 +268,6 @@ export const LearnScreen = () => {
   const increaseSessionSize = () => {
     const nextSize = Math.min(50, sessionSize + 5);
     if (nextSize === sessionSize) return;
-    animatePlanLayout();
     setSessionSize(nextSize);
     void Haptics.selectionAsync().catch(() => {});
   };
@@ -521,19 +572,28 @@ export const LearnScreen = () => {
           </Text>
         </View>
 
-        {missingCustomCount > 0 && (
-          <View style={styles.planNoteRow}>
+        <Animated.View
+          style={[styles.planNoteWrap, { height: noteHeight, opacity: noteOpacity }]}
+          accessibilityElementsHidden={missingCustomCount === 0}
+          importantForAccessibility={
+            missingCustomCount === 0 ? "no-hide-descendants" : "auto"
+          }
+        >
+          {/* key по видимости: при появлении строка монтируется заново,
+              и onLayout гарантированно даёт свежий замер */}
+          <View
+            key={isNoteVisible ? "visible" : "hidden"}
+            style={styles.planNoteRow}
+            onLayout={handleNoteLayout}
+          >
             <Ionicons
               name="information-circle-outline"
               size={16}
               style={styles.planNoteIcon}
             />
-            <Text style={styles.planNoteText}>
-              Своих слов не хватает ({stats.newCustom}), добавим{" "}
-              {missingCustomCount} из словаря
-            </Text>
+            <Text style={styles.planNoteText}>{noteContentText}</Text>
           </View>
-        )}
+        </Animated.View>
       </View>
 
       <TouchableOpacity style={styles.startButton} onPress={handleStart}>
@@ -760,10 +820,19 @@ const createStyles = (theme: Theme) =>
     color: theme.textMuted,
     marginLeft: "auto",
   },
+  planNoteWrap: {
+    overflow: "hidden",
+  },
   planNoteRow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     alignItems: "flex-start",
-    marginTop: 10,
+    // Отступ сверху — паддингом, а не marginTop: onLayout не включает
+    // margin в высоту, и обёртка получалась ниже контента (текст обрезался)
+    paddingTop: 10,
     columnGap: 6,
   },
   planNoteIcon: {

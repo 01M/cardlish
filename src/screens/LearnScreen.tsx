@@ -21,6 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import { Confetti } from "../components/Confetti";
 import { FlipCard } from "../components/FlipCard";
 import {
   getSessionWords,
@@ -37,6 +38,12 @@ const TRACK_PADDING = 4;
 
 // Диапазон высоты, за который прозрачность примечания доходит до 1
 const NOTE_OPACITY_RANGE = 16;
+
+// Экран завершения: диаметр бейджа, число групп появления
+// (бейдж, заголовок, текст, кнопки) и интервал обновления счётчика (~30/с)
+const BADGE_SIZE = 88;
+const COMPLETION_GROUP_COUNT = 4;
+const COUNT_UPDATE_INTERVAL_MS = 33;
 
 export const LearnScreen = () => {
   const router = useRouter();
@@ -59,6 +66,13 @@ export const LearnScreen = () => {
   const [sessionWords, setSessionWords] = useState<Word[] | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showCompletion, setShowCompletion] = useState(false);
+
+  // Размер последней сессии держим в ref: к экрану завершения sessionWords
+  // уже сброшен в null
+  const lastSessionLengthRef = useRef(0);
+  if (sessionWords) {
+    lastSessionLengthRef.current = sessionWords.length;
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -325,8 +339,11 @@ export const LearnScreen = () => {
             style={styles.closeButton}
             onPress={() => setSessionWords(null)}
             activeOpacity={0.7}
+            hitSlop={4}
+            accessibilityRole="button"
+            accessibilityLabel="Закрыть сессию"
           >
-            <Text style={styles.closeBtn}>×</Text>
+            <Ionicons name="close" size={22} style={styles.closeIcon} />
           </TouchableOpacity>
         </View>
 
@@ -360,24 +377,13 @@ export const LearnScreen = () => {
           },
         ]}
       >
-        <Text style={styles.emptyIcon}>✓</Text>
-        <Text style={styles.emptyTitle}>Сессия завершена</Text>
-        <Text style={styles.emptyText}>
-          Слова отправлены на повторение. Можно закрепить их прямо сейчас или
-          продолжить обучение.
-        </Text>
-        <TouchableOpacity
-          style={styles.startButton}
-          onPress={() => router.push("/review")}
-        >
-          <Text style={styles.startButtonText}>Перейти к повторению</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => setShowCompletion(false)}
-        >
-          <Text style={styles.secondaryButtonText}>Продолжить обучение</Text>
-        </TouchableOpacity>
+        <SessionComplete
+          wordCount={lastSessionLengthRef.current}
+          reduceMotion={reduceMotion}
+          styles={styles}
+          onReview={() => router.push("/review")}
+          onContinue={() => setShowCompletion(false)}
+        />
       </View>
     );
   }
@@ -394,7 +400,11 @@ export const LearnScreen = () => {
           },
         ]}
       >
-        <Text style={styles.emptyIcon}>✓</Text>
+        <Ionicons
+          name="checkmark-circle"
+          size={64}
+          style={styles.emptyIcon}
+        />
         <Text style={styles.emptyTitle}>Новые слова закончились</Text>
         <Text style={styles.emptyText}>
           Можно сбросить прогресс и начать обучение заново или добавить
@@ -884,10 +894,7 @@ const createStyles = (theme: Theme) =>
     alignItems: "center",
     justifyContent: "center",
   },
-  closeBtn: {
-    fontSize: 25,
-    lineHeight: 27,
-    fontWeight: "400",
+  closeIcon: {
     color: theme.textTertiary,
   },
   nextButton: {
@@ -914,9 +921,47 @@ const createStyles = (theme: Theme) =>
     backgroundColor: theme.pageBackground,
   },
   emptyIcon: {
-    fontSize: 54,
     color: theme.successIcon,
     marginBottom: 16,
+  },
+  completionContent: {
+    width: "100%",
+    alignItems: "center",
+  },
+  completionGroup: {
+    width: "100%",
+    alignItems: "center",
+  },
+  badgeWrap: {
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+    marginBottom: 20,
+  },
+  badgePulse: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: BADGE_SIZE / 2,
+    borderWidth: 2,
+    borderColor: theme.successBorder,
+  },
+  badge: {
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
+    borderRadius: BADGE_SIZE / 2,
+    backgroundColor: theme.successBackground,
+    borderWidth: 2,
+    borderColor: theme.successBorder,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeIcon: {
+    color: theme.successText,
+  },
+  completionCount: {
+    color: theme.textMuted,
+    fontSize: 14,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+    marginTop: 6,
   },
   emptyTitle: {
     fontSize: 24,
@@ -1008,5 +1053,182 @@ const StepperButton = ({
         <Ionicons name={icon} size={22} style={styles.counterBtnIcon} />
       </Pressable>
     </Animated.View>
+  );
+};
+
+type SessionCompleteProps = {
+  wordCount: number;
+  reduceMotion: boolean;
+  styles: ReturnType<typeof createStyles>;
+  onReview: () => void;
+  onContinue: () => void;
+};
+
+// 8. ЭКРАН ЗАВЕРШЕНИЯ: группы появляются с подъёмом по очереди, бейдж
+// «выпрыгивает» пружиной с одним пульсом кольца, над ним — конфетти,
+// счётчик слов набирается от 0. Монтируется заново при каждом показе, поэтому
+// анимации проигрываются каждый раз; при "уменьшить движение" — всё сразу
+const SessionComplete = ({
+  wordCount,
+  reduceMotion,
+  styles,
+  onReview,
+  onContinue,
+}: SessionCompleteProps) => {
+  const [groups] = useState(() =>
+    Array.from(
+      { length: COMPLETION_GROUP_COUNT },
+      () => new Animated.Value(reduceMotion ? 1 : 0),
+    ),
+  );
+  const [badgeScale] = useState(
+    () => new Animated.Value(reduceMotion ? 1 : 0.6),
+  );
+  const [pulse] = useState(() => new Animated.Value(0));
+  const [countValue] = useState(() => new Animated.Value(0));
+  const [displayCount, setDisplayCount] = useState(
+    reduceMotion ? wordCount : 0,
+  );
+  const [confettiOriginY, setConfettiOriginY] = useState<number | null>(null);
+
+  const groupStyles = useMemo(
+    () =>
+      groups.map((value) => ({
+        opacity: value,
+        transform: [
+          {
+            translateY: value.interpolate({
+              inputRange: [0, 1],
+              outputRange: [16, 0],
+            }),
+          },
+        ],
+      })),
+    [groups],
+  );
+  const pulseStyle = useMemo(
+    () => ({
+      opacity: pulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.4, 0],
+      }),
+      transform: [
+        {
+          scale: pulse.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 1.5],
+          }),
+        },
+      ],
+    }),
+    [pulse],
+  );
+
+  useEffect(() => {
+    if (reduceMotion) return;
+
+    const entrance = Animated.parallel([
+      Animated.stagger(
+        80,
+        groups.map((value) =>
+          Animated.timing(value, {
+            toValue: 1,
+            duration: 280,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ),
+      ),
+      Animated.sequence([
+        Animated.delay(120),
+        Animated.parallel([
+          Animated.spring(badgeScale, {
+            toValue: 1,
+            friction: 5,
+            tension: 120,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulse, {
+            toValue: 1,
+            duration: 700,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    ]);
+
+    // Счётчик живёт в JS (значение читает слушатель), поэтому без нативного
+    // драйвера; состояние обновляем не чаще ~30 раз в секунду
+    let lastUpdate = 0;
+    const listenerId = countValue.addListener(({ value }) => {
+      const now = Date.now();
+      if (now - lastUpdate < COUNT_UPDATE_INTERVAL_MS) return;
+      lastUpdate = now;
+      setDisplayCount(Math.round(value));
+    });
+    const countUp = Animated.timing(countValue, {
+      toValue: wordCount,
+      duration: 700,
+      delay: 160,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    });
+
+    entrance.start();
+    countUp.start(({ finished }) => {
+      if (finished) setDisplayCount(wordCount);
+    });
+    return () => {
+      entrance.stop();
+      countUp.stop();
+      countValue.removeListener(listenerId);
+    };
+  }, [reduceMotion, wordCount, groups, badgeScale, pulse, countValue]);
+
+  // Точка старта конфетти — верх блока (над бейджем); замеряем один раз
+  const handleContentLayout = (event: LayoutChangeEvent) => {
+    const { y } = event.nativeEvent.layout;
+    setConfettiOriginY((prev) => prev ?? y);
+  };
+
+  return (
+    <>
+      <View style={styles.completionContent} onLayout={handleContentLayout}>
+        <Animated.View style={[styles.badgeWrap, groupStyles[0]]}>
+          {!reduceMotion && (
+            <Animated.View style={[styles.badgePulse, pulseStyle]} />
+          )}
+          <Animated.View
+            style={[styles.badge, { transform: [{ scale: badgeScale }] }]}
+          >
+            <Ionicons name="checkmark" size={44} style={styles.badgeIcon} />
+          </Animated.View>
+        </Animated.View>
+        <Animated.View style={[styles.completionGroup, groupStyles[1]]}>
+          <Text style={styles.emptyTitle}>Сессия завершена</Text>
+          <Text style={styles.completionCount}>
+            Слов в сессии: {displayCount}
+          </Text>
+        </Animated.View>
+        <Animated.View style={[styles.completionGroup, groupStyles[2]]}>
+          <Text style={styles.emptyText}>
+            Слова отправлены на повторение. Можно закрепить их прямо сейчас
+            или продолжить обучение.
+          </Text>
+        </Animated.View>
+        <Animated.View style={[styles.completionGroup, groupStyles[3]]}>
+          <TouchableOpacity style={styles.startButton} onPress={onReview}>
+            <Text style={styles.startButtonText}>Перейти к повторению</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryButton} onPress={onContinue}>
+            <Text style={styles.secondaryButtonText}>Продолжить обучение</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+      {!reduceMotion && confettiOriginY !== null && (
+        <Confetti originY={confettiOriginY} />
+      )}
+    </>
   );
 };

@@ -87,7 +87,8 @@ const splitStyle = (style: StyleProp<ViewStyle>) => {
 
 // Кнопка с откликом сжатием: при нажатии содержимое уменьшается до
 // pressedScale, при отпускании возвращается пружиной; без анимации, когда
-// кнопка выключена или включено "уменьшить движение"
+// кнопка выключена или включено "уменьшить движение". Роль по умолчанию —
+// "button"; accessibility-пропсы и hitSlop уходят на внешний Pressable
 export const PressableScale = ({
   style,
   children,
@@ -95,6 +96,7 @@ export const PressableScale = ({
   disabled,
   onPressIn,
   onPressOut,
+  accessibilityRole = "button",
   ...rest
 }: PressableScaleProps) => {
   const reduceMotion = useReduceMotion();
@@ -127,6 +129,7 @@ export const PressableScale = ({
   return (
     <Pressable
       {...rest}
+      accessibilityRole={accessibilityRole}
       disabled={disabled}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}

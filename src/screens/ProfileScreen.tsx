@@ -281,6 +281,7 @@ export const ProfileScreen = () => {
           </Text>
         </View>
         <Switch
+          accessibilityLabel="Ежедневные напоминания"
           value={reminderEnabled}
           onValueChange={handleReminderToggle}
           trackColor={{

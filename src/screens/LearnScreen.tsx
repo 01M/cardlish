@@ -545,6 +545,7 @@ export const LearnScreen = () => {
           style={styles.toggleBtn}
           onPress={() => handleSourceChange("custom")}
           pressedScale={0.98}
+          accessibilityState={{ selected: source === "custom" }}
         >
           <Text
             style={[
@@ -560,6 +561,7 @@ export const LearnScreen = () => {
           style={styles.toggleBtn}
           onPress={() => handleSourceChange("dictionary")}
           pressedScale={0.98}
+          accessibilityState={{ selected: source === "dictionary" }}
         >
           <Text
             style={[
@@ -578,7 +580,7 @@ export const LearnScreen = () => {
           <StepperButton
             onPress={decreaseSessionSize}
             disabled={sessionSize <= 5}
-            accessibilityLabel="Меньше слов"
+            accessibilityLabel="Уменьшить количество"
             icon="remove"
             styles={styles}
           />
@@ -596,7 +598,7 @@ export const LearnScreen = () => {
           <StepperButton
             onPress={increaseSessionSize}
             disabled={sessionSize >= 50}
-            accessibilityLabel="Больше слов"
+            accessibilityLabel="Увеличить количество"
             icon="add"
             styles={styles}
           />
@@ -1084,7 +1086,6 @@ const StepperButton = ({
     onPress={onPress}
     disabled={disabled}
     pressedScale={0.92}
-    accessibilityRole="button"
     accessibilityLabel={accessibilityLabel}
     accessibilityState={{ disabled }}
     style={[styles.counterBtn, { opacity: disabled ? 0.35 : 1 }]}

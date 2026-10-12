@@ -103,6 +103,7 @@ export const WordFormModal = ({
           <TextInput
             style={styles.input}
             value={term}
+            accessibilityLabel="Слово"
             onChangeText={setTerm}
             placeholder="apple"
             placeholderTextColor={theme.placeholder}
@@ -115,6 +116,7 @@ export const WordFormModal = ({
           <TextInput
             style={styles.input}
             value={translation}
+            accessibilityLabel="Перевод"
             onChangeText={setTranslation}
             placeholder="яблоко"
             placeholderTextColor={theme.placeholder}
@@ -125,6 +127,7 @@ export const WordFormModal = ({
           <TextInput
             style={styles.input}
             value={transcription}
+            accessibilityLabel="Транскрипция"
             onChangeText={setTranscription}
             placeholder="[ˈæpl]"
             placeholderTextColor={theme.placeholder}
@@ -137,6 +140,7 @@ export const WordFormModal = ({
           <TextInput
             style={[styles.input, styles.multiline]}
             value={example}
+            accessibilityLabel="Пример употребления"
             onChangeText={setExample}
             placeholder="I eat an apple every morning."
             placeholderTextColor={theme.placeholder}
@@ -148,11 +152,16 @@ export const WordFormModal = ({
             style={[styles.saveButton, saving && styles.saveButtonDisabled]}
             onPress={handleSave}
             disabled={saving}
+            accessibilityRole="button"
           >
             <Text style={styles.saveButtonText}>Сохранить</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={onClose}
+            accessibilityRole="button"
+          >
             <Text style={styles.cancelButtonText}>Отмена</Text>
           </TouchableOpacity>
         </ScrollView>

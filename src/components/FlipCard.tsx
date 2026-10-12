@@ -17,6 +17,16 @@ import { useTheme } from "../theme/useTheme";
 
 const FLIP_MS = 400;
 
+// Видимый текст стороны уже входит в подпись кнопки-карточки — скрываем
+// его от VoiceOver (iOS) и TalkBack (Android), чтобы не читался дважды
+const HIDDEN_FROM_A11Y = {
+  accessibilityElementsHidden: true,
+  importantForAccessibility: "no-hide-descendants",
+} as const;
+
+// Двойное касание в VoiceOver/TalkBack приходит как действие "activate"
+const ACTIVATE_ACTIONS = [{ name: "activate" as const }];
+
 interface FlipCardProps {
   word: Word;
   onFlipChange?: (isFlipped: boolean) => void;
@@ -81,18 +91,43 @@ export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
     transform: [{ perspective: 1200 }, { rotateY: backInterpolate }],
   };
 
+  // Скринридер видит только открытую сторону; её текст озвучивается одной
+  // невидимой кнопкой во всю карточку, кнопка озвучки остаётся отдельной
+  const frontLabel = `Слово: ${word.term}. Нажмите, чтобы открыть перевод`;
+  const backLabel = word.example
+    ? `Перевод: ${word.translation}. Пример: ${word.example}. Нажмите, чтобы вернуться`
+    : `Перевод: ${word.translation}. Нажмите, чтобы вернуться`;
+
   return (
-    <TouchableWithoutFeedback onPress={handleCardPress}>
+    <TouchableWithoutFeedback
+      onPress={handleCardPress}
+      accessible={false}
+      focusable={false}
+    >
       <View style={styles.cardContainer}>
         <Animated.View
           style={[styles.card, frontAnimatedStyle]}
           pointerEvents={isFlipped ? "none" : "auto"}
+          accessibilityElementsHidden={isFlipped}
+          importantForAccessibility={isFlipped ? "no-hide-descendants" : "auto"}
         >
-          <Text style={styles.badge}>СЛОВО</Text>
+          <View
+            style={StyleSheet.absoluteFill}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel={frontLabel}
+            accessibilityActions={ACTIVATE_ACTIONS}
+            onAccessibilityAction={handleCardPress}
+          />
+          <Text style={styles.badge} {...HIDDEN_FROM_A11Y}>
+            СЛОВО
+          </Text>
           <TouchableOpacity
             style={styles.speakButton}
             onPress={speakWord}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Произнести слово"
           >
             <Ionicons
               name="volume-high"
@@ -100,22 +135,42 @@ export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
               style={styles.speakIcon}
             />
           </TouchableOpacity>
-          <Text style={styles.term}>{word.term}</Text>
+          <Text style={styles.term} {...HIDDEN_FROM_A11Y}>
+            {word.term}
+          </Text>
           {word.transcription && (
-            <Text style={styles.transcription}>{word.transcription}</Text>
+            <Text style={styles.transcription} {...HIDDEN_FROM_A11Y}>
+              {word.transcription}
+            </Text>
           )}
-          <Text style={styles.hint}>Нажмите, чтобы открыть перевод</Text>
+          <Text style={styles.hint} {...HIDDEN_FROM_A11Y}>
+            Нажмите, чтобы открыть перевод
+          </Text>
         </Animated.View>
 
         <Animated.View
           style={[styles.card, styles.cardBack, backAnimatedStyle]}
           pointerEvents={isFlipped ? "auto" : "none"}
+          accessibilityElementsHidden={!isFlipped}
+          importantForAccessibility={isFlipped ? "auto" : "no-hide-descendants"}
         >
-          <Text style={styles.badgeBack}>ПЕРЕВОД</Text>
+          <View
+            style={StyleSheet.absoluteFill}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel={backLabel}
+            accessibilityActions={ACTIVATE_ACTIONS}
+            onAccessibilityAction={handleCardPress}
+          />
+          <Text style={styles.badgeBack} {...HIDDEN_FROM_A11Y}>
+            ПЕРЕВОД
+          </Text>
           <TouchableOpacity
             style={styles.speakButtonBack}
             onPress={speakWord}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Произнести слово"
           >
             <Ionicons
               name="volume-high"
@@ -123,10 +178,12 @@ export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
               style={styles.speakIconBack}
             />
           </TouchableOpacity>
-          <Text style={styles.translation}>{word.translation}</Text>
+          <Text style={styles.translation} {...HIDDEN_FROM_A11Y}>
+            {word.translation}
+          </Text>
 
           {word.example && (
-            <View style={styles.exampleContainer}>
+            <View style={styles.exampleContainer} {...HIDDEN_FROM_A11Y}>
               <Text style={styles.exampleLabel}>Пример:</Text>
               <Text style={styles.exampleText}>
                 {'"'}

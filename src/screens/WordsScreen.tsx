@@ -28,6 +28,14 @@ const filters: { label: string; value: Filter }[] = [
   { label: "Выучено", value: "learned" },
 ];
 
+// Зоны касания до 44pt без изменения вёрстки. Ссылки «Изменить»/«Удалить»
+// стоят в колонке с зазором 10: к соседу каждая расширяется лишь на половину
+// зазора, остальное добирает наружу, чтобы зоны не перекрывались
+const EDIT_HIT_SLOP = { top: 25, bottom: 5, left: 12, right: 12 };
+const DELETE_HIT_SLOP = { top: 5, bottom: 25, left: 12, right: 12 };
+// Фильтр-чипы высотой ~31: добираем по вертикали, по бокам — зазор 8
+const FILTER_HIT_SLOP = { top: 7, bottom: 7 };
+
 export const WordsScreen = () => {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
@@ -118,10 +126,20 @@ export const WordsScreen = () => {
         <Text style={styles.status}>{getStatusLabel(item.status)}</Text>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity onPress={() => openEditForm(item)}>
+        <TouchableOpacity
+          onPress={() => openEditForm(item)}
+          hitSlop={EDIT_HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel={`Изменить слово ${item.term}`}
+        >
           <Text style={styles.editAction}>Изменить</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDelete(item)}>
+        <TouchableOpacity
+          onPress={() => handleDelete(item)}
+          hitSlop={DELETE_HIT_SLOP}
+          accessibilityRole="button"
+          accessibilityLabel={`Удалить слово ${item.term}`}
+        >
           <Text style={styles.deleteAction}>Удалить</Text>
         </TouchableOpacity>
       </View>
@@ -144,8 +162,14 @@ export const WordsScreen = () => {
           <Text style={styles.title}>Мои слова</Text>
           <Text style={styles.subtitle}>Только слова, добавленные вами</Text>
         </View>
-        <PressableScale style={styles.addButton} onPress={openAddForm}>
-          <Text style={styles.addButtonText}>+ Добавить</Text>
+        <PressableScale
+          style={styles.addButton}
+          onPress={openAddForm}
+          hitSlop={4}
+          accessibilityLabel="Добавить слово"
+        >
+          <Ionicons name="add" size={14} style={styles.addButtonIcon} />
+          <Text style={styles.addButtonText}>Добавить</Text>
         </PressableScale>
       </View>
 
@@ -159,12 +183,15 @@ export const WordsScreen = () => {
           onChangeText={setSearchQuery}
           autoCorrect={false}
           keyboardAppearance={theme.keyboardAppearance}
+          accessibilityLabel="Поиск слов"
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity
             style={styles.clearSearchButton}
             onPress={() => setSearchQuery("")}
             hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Очистить поиск"
           >
             <Ionicons
               name="close-circle"
@@ -185,6 +212,8 @@ export const WordsScreen = () => {
               filter === item.value && styles.filterButtonActive,
             ]}
             onPress={() => setFilter(item.value)}
+            hitSlop={FILTER_HIT_SLOP}
+            accessibilityState={{ selected: filter === item.value }}
           >
             <Text
               style={[
@@ -228,6 +257,7 @@ export const WordsScreen = () => {
               <TouchableOpacity
                 style={styles.emptyButton}
                 onPress={openAddForm}
+                accessibilityRole="button"
               >
                 <Text style={styles.emptyButtonText}>Добавить слово</Text>
               </TouchableOpacity>
@@ -281,7 +311,11 @@ const createStyles = (theme: Theme) =>
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
+  addButtonIcon: { color: theme.textOnAccent },
   addButtonText: { color: theme.textOnAccent, fontWeight: "700" },
   searchContainer: {
     flexDirection: "row",

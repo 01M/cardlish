@@ -35,6 +35,7 @@ import { useReduceMotion } from "../hooks/useReduceMotion";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 import { confirmResetProgress, showErrorAlert } from "../utils/alerts";
+import { getPlanNoteText, getSessionPlan } from "../utils/sessionPlan";
 
 // Паддинг дорожки-переключателя источника слов (он же — отступ ползунка)
 const TRACK_PADDING = 4;
@@ -109,10 +110,15 @@ export const LearnScreen = () => {
     }, [loadStats]),
   );
 
-  const missingCustomCount =
-    source === "custom" && stats.newCustom < sessionSize
-      ? sessionSize - stats.newCustom
-      : 0;
+  // 7. СОСТАВ СЕССИИ: план считается так же, как getSessionWords загружает
+  // слова (см. getSessionPlan)
+  const {
+    own: plannedOwn,
+    dictionary: plannedDict,
+    total: plannedTotal,
+    ownShare,
+    isOwnShort: isNoteVisible,
+  } = getSessionPlan(source, sessionSize, stats);
 
   // Одна на экран подписка на "уменьшить движение" — ей пользуются и
   // переключатель источника, и степпер, и его кнопки, и примечание в плане
@@ -125,10 +131,11 @@ export const LearnScreen = () => {
   // чтобы контент был полным уже на первом замере и не исчезал при сворачивании
   const noteText = useMemo(
     () =>
-      missingCustomCount > 0
-        ? `Своих слов не хватает (${stats.newCustom}), добавим ${missingCustomCount} из словаря`
-        : "",
-    [missingCustomCount, stats.newCustom],
+      getPlanNoteText(
+        { isOwnShort: isNoteVisible, dictionary: plannedDict },
+        stats.newCustom,
+      ),
+    [isNoteVisible, plannedDict, stats.newCustom],
   );
   const lastNoteTextRef = useRef("");
   if (noteText) {
@@ -143,7 +150,6 @@ export const LearnScreen = () => {
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
-  const isNoteVisible = missingCustomCount > 0;
   const isFirstNoteRender = useRef(true);
 
   useEffect(() => {
@@ -263,20 +269,6 @@ export const LearnScreen = () => {
       }),
     ]).start();
   }, [sessionSize, numberScale, reduceMotion]);
-
-  // 7. СОСТАВ СЕССИИ: считаем так же, как getSessionWords загружает слова
-  // для выбранного источника и размера (не меняем сам запрос — только
-  // воспроизводим его план на экране)
-  const plannedOwn =
-    source === "custom"
-      ? Math.min(sessionSize, stats.newCustom)
-      : 0;
-  const plannedDict =
-    source === "custom"
-      ? Math.min(sessionSize - plannedOwn, stats.newDict)
-      : Math.min(sessionSize, stats.newDict);
-  const plannedTotal = plannedOwn + plannedDict;
-  const ownShare = plannedTotal > 0 ? plannedOwn / plannedTotal : 0;
 
   // Полоса состава: ширина оранжевого сегмента анимируется (width —
   // layout-свойство, поэтому useNativeDriver: false)
@@ -663,9 +655,9 @@ export const LearnScreen = () => {
 
         <Animated.View
           style={[styles.planNoteWrap, { height: noteHeight, opacity: noteOpacity }]}
-          accessibilityElementsHidden={missingCustomCount === 0}
+          accessibilityElementsHidden={!isNoteVisible}
           importantForAccessibility={
-            missingCustomCount === 0 ? "no-hide-descendants" : "auto"
+            !isNoteVisible ? "no-hide-descendants" : "auto"
           }
         >
           {/* key по видимости: при появлении строка монтируется заново,

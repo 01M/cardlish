@@ -26,6 +26,8 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 - **Python helper** `scripts/convert-freedict.py` converts FreeDict TEI archives into
   `src/assets/dictionary.json` (build-time only, not part of the app runtime)
 - Lint: `eslint` 9 + `eslint-config-expo` (`eslint.config.js`)
+- Tests: `jest` 29 + `jest-expo` preset (`"jest"` key in `package.json`); jest types come from
+  `"types": ["jest"]` in `tsconfig.json` (TS 6 no longer auto-includes `@types/*`)
 
 ## Layout
 
@@ -43,8 +45,9 @@ src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts)
 src/services/     Side-effectful services (notifications.ts)
-src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); reviewQueue.ts (pure
-                  mergeReviewQueue(prev, fresh), no React/DB — first candidate for unit tests)
+src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); pure, no React/DB:
+                  reviewQueue.ts (mergeReviewQueue(prev, fresh)), sessionPlan.ts (getSessionPlan)
+*.test.ts         Unit tests live next to the code they test (never under src/app/)
 src/assets/       dictionary.json (large, git-tracked, never read it)
 scripts/          Python tooling
 assets/           App icons / splash
@@ -57,6 +60,7 @@ npm start                  # or: npx expo start   — dev server
 npm run ios / android / web
 npm run lint               # or: npx expo lint
 npx tsc --noEmit           # typecheck
+npm test                   # or: npx jest — unit tests (npx jest path/to/file for one file)
 npx expo-doctor            # diagnose dependency/config issues
 npx expo install <pkg>     # ALWAYS use for adding deps (SDK-compatible versions), never npm install
 npx expo install --fix     # fix incompatible versions
@@ -80,7 +84,19 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 
 - Keep edits scoped to the files named in the task.
 - No dead code or leftover legacy after a migration — remove the old path in the same change.
-- Run `npx tsc --noEmit` and `npm run lint` before finishing.
+- Run `npx tsc --noEmit`, `npm run lint` and `npm test` before finishing.
+
+## Testing
+
+- Tests are `*.test.ts` files next to the code (e.g. `src/utils/reviewQueue.test.ts`). Never put
+  them in `src/app/` — Expo Router would treat them as routes. Nothing imports them, so Metro does
+  not bundle them.
+- Tests only for pure logic (no React rendering, no snapshots, no component tests, no hand-written
+  mocks of expo-sqlite or React Native internals). To make logic testable, extract it into a pure
+  function (`src/utils/`, or an exported helper such as `splitStyle` in `PressableScale.tsx`).
+- DB code (`src/db/database.ts`) is verified by hand on a device.
+- New scheduling logic (SRS: intervals, due dates, grading) must be written as pure functions with
+  tests in the same change.
 
 ## Architectural rules
 
@@ -168,7 +184,7 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Other pressables use `PressableScale` (`src/components/PressableScale.tsx`, press-scale
   feedback; `Button` is built on it). Its `style` is split: placement/size props (`alignSelf`,
   `flex*`, width/height/min/max, margins, `position`, `display`) go to the outer `Pressable`,
-  everything else to the inner `Animated.View`.
+  everything else to the inner `Animated.View` (exported `splitStyle`, tested).
 
 **Edge fades**
 - `TopFade` — status-bar scrim, rendered once in `src/app/_layout.tsx`.
@@ -190,9 +206,12 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 **Learn screen**
 - Setup: sliding-thumb source toggle (two labels over one `Animated.View` thumb on
   `theme.orangeAccent`) + one merged plan card: stepper (`StepperButton`) + composition bar +
-  legend + inline note ("Своих слов не хватает…", shown when `missingCustomCount > 0`).
-- The composition split mirrors what `getSessionWords()` will load — derive counts only from
-  `sessionSize`, `stats` and `source`, never new queries.
+  legend + inline note ("Своих слов не хватает…", shown when the plan's `isOwnShort`; its
+  "добавим N из словаря" is the plan's `dictionary`, same as the bar and legend, and is omitted
+  when it is 0; text from `getPlanNoteText()`).
+- The composition split mirrors what `getSessionWords()` will load — computed by the pure
+  `getSessionPlan(source, sessionSize, stats)` (`src/utils/sessionPlan.ts`, tested), never new
+  queries.
 - Completion (`SessionComplete`): badge pop, `Confetti`, word count-up, success haptic.
 - Empty state ("Новые слова закончились"): "Добавить слова" is a primary `Button`, "Сбросить
   прогресс" a secondary `Button` below it (goes through `confirmResetProgress()`).

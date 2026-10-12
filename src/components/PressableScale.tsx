@@ -52,7 +52,7 @@ const OUTER_LAYOUT_KEYS = [
   "zIndex",
 ] as const;
 
-const splitStyle = (style: StyleProp<ViewStyle>) => {
+export const splitStyle = (style: StyleProp<ViewStyle>) => {
   const flat = StyleSheet.flatten(style) ?? {};
   const outer: ViewStyle = {};
   const inner: ViewStyle = { ...flat };

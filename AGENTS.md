@@ -54,10 +54,18 @@ scripts/.venv/Scripts/python.exe scripts/convert_freedict.py <path>/freedict-eng
 scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python tests
 ```
 
-JSON shape: array of `{ term, translation, transcription, example, rank }` in source order
-(never reorder — fresh-install ids depend on it); `rank` is 1..N by wordfreq frequency.
-`src/assets/dictionary.test.ts` guards the shape. Every data source must be listed in
-`src/data/sources.json` before its data ships.
+Converter rules (details in CLAUDE.md): single-word headwords; content parts of speech plus
+closed-class function words (pronoun, preposition, postposition, conjunction, determiner,
+numeral, interjection, particle); entries grouped by lowercase headword, lowercase spelling
+wins over capitalised; translations merged round-robin across a group's entries, deduped
+ignoring the U+0301 stress mark (stressed variant kept), capped at 5.
+
+JSON shape: array of `{ term, translation, transcription, example, rank }`, one per lowercase
+`term` (= `dict_key`), in the order of each group's first source entry. Fresh-install ids
+therefore differ from upgraded installs — match dictionary rows by `dict_key`, never by id.
+`rank` is 1..N: plain lowercase words known to wordfreq first, then everything else; within each
+group by frequency, then term. `src/assets/dictionary.test.ts` guards the shape. Every data
+source must be listed in `src/data/sources.json` before its data ships.
 
 ## Navigation & Routing
 

@@ -51,6 +51,18 @@ describe("src/assets/dictionary.json", () => {
     ).toEqual([]);
   });
 
+  // Не больше 5 переводов и отсутствие повторов проверяют Python-тесты
+  // конвертера: здесь переводы уже склеены через ", ", а сам перевод может
+  // содержать ", " («по́сле того́, как»), поэтому число частей — лишь грубая
+  // проверка (5 переводов, в каждом не больше одной запятой)
+  it("has at most 10 comma-separated parts in a translation", () => {
+    expect(
+      violations(
+        (entry) => String(entry.translation).split(", ").length <= 10,
+      ),
+    ).toEqual([]);
+  });
+
   it("has unique lowercase terms", () => {
     const seen = new Set<string>();
     const duplicates = entries

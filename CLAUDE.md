@@ -89,12 +89,23 @@ scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python
 - Source archive: `freedict-eng-rus-2025.11.23.src.tar.xz` from https://freedict.org/downloads/
   (not in the repo). The output is deterministic (LF line endings) — regenerating must not change
   the file unless the converter or its inputs changed.
+- Converter rules: eligible entries have a single-word headword (`^[A-Za-z][A-Za-z'-]*$`), a
+  TEI part of speech among `n v adj adv pronoun preposition postposition conjunction determiner
+  numeral interjection particle` (excluded: `pn`, `prefix`, `suffix`, `phraseologicalunit`,
+  `proverb`, `symbol`, none) and at least one Russian translation after wiki-link cleanup.
+  Entries are grouped by lowercase headword; if a group has a lowercase-spelled entry, its
+  capitalised entries are dropped. One card per group: translations round-robin across the
+  group's entries, deduped (NFC, stress mark U+0301 ignored, stressed variant kept), capped at
+  5; transcription = first non-empty one (cut at `<`).
 - JSON shape: array of `{ term, translation, transcription, example, rank }`, one entry per
-  lowercase `term`, entry order = source order (fresh-install ids depend on it — never reorder).
-  `translation`: up to 5 Russian translations joined with ", " (wiki links resolved);
-  `transcription`: first IPA or ""; `example`: always ""; `rank`: 1..N unique, by wordfreq
-  frequency (`large` list) descending, ties by lowercase term, unknown words last.
-  `src/assets/dictionary.test.ts` guards this shape.
+  lowercase `term` (= `dict_key`), in the order of each group's first eligible source entry.
+  This order no longer matches pre-M3b files, so fresh-install ids differ from upgraded ones —
+  match dictionary rows only by `dict_key`, never by id. `translation`: items joined with ", "
+  (an item may itself contain ", "); `transcription`: IPA or ""; `example`: always "";
+  `rank`: 1..N unique — group 1 (`^[a-z]+$` with non-zero wordfreq `large` frequency) before
+  group 2 (everything else); within a group frequency descending, then lowercase term.
+  `src/assets/dictionary.test.ts` guards the shape; the item cap and dedupe are covered by the
+  Python tests (they work on real item lists).
 
 `expo-notifications` needs a **development build** — Expo Go on Android crashes on import
 (Since SDK 53 push notifications are stripped from Expo Go). `src/services/notifications.ts`
@@ -172,8 +183,8 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
      `resetProgressOnly()` sets every word to `'new'` and keeps custom words.
    - Known limitation: the schema is versioned and dictionary words have a stable `dict_key`, but
      dictionary *content* updates (upsert by `dict_key` for existing installs) are not implemented
-     yet — changing `dictionary.json` only affects fresh installs (existing installs still show
-     the old translations with `[[…]]` markup until that sync lands).
+     yet — changing `dictionary.json` only affects fresh installs (existing installs keep the v1
+     content — `[[…]]` markup, no merged entries, no function words — until that sync lands).
 4. **React Native primitives only.** No HTML tags (`div`, `span`, `p`, `button`), no DOM APIs, no
    `tailwindcss`/`react-native-web` shortcuts. Use `View`/`Text`/`Pressable`/`FlatList`/
    `ScrollView`/`Modal` + `StyleSheet.create`. Keep list rendering virtualized (`FlatList`).

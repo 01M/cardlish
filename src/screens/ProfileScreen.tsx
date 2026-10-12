@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import * as Haptics from "expo-haptics";
 import {
-  AccessibilityInfo,
   Alert,
   Animated,
   Platform,
@@ -29,6 +28,7 @@ import {
   setThemePreference,
 } from "../db/database";
 import { PressableScale } from "../components/PressableScale";
+import { useReduceMotion } from "../hooks/useReduceMotion";
 import {
   disableDailyReminder,
   enableDailyReminder,
@@ -43,6 +43,10 @@ import {
 } from "../theme/useTheme";
 import type { ThemePreference } from "../theme/useTheme";
 import { confirmResetProgress, showErrorAlert } from "../utils/alerts";
+
+// Крупные цифры (процент прогресса, значения статистики) растут с системным
+// размером шрифта не больше чем в 1.2 раза — иначе ломают раскладку
+const BIG_DIGITS_MAX_FONT_SCALE = 1.2;
 
 export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
@@ -64,17 +68,11 @@ export const ProfileScreen = () => {
   // Первая загрузка: до её завершения контент прозрачен, затем плавно
   // появляется; прогресс-бар анимируется только при изменении после загрузки
   const [isLoaded, setIsLoaded] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState(false);
+  const reduceMotion = useReduceMotion();
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const progressBarWidth = useRef(new Animated.Value(0)).current;
   const hasLoadedOnce = useRef(false);
   const prevLearnedPercentage = useRef<number | null>(null);
-
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then(setReduceMotion)
-      .catch(() => setReduceMotion(false));
-  }, []);
 
   const loadProfileData = async () => {
     try {
@@ -235,7 +233,12 @@ export const ProfileScreen = () => {
 
       <View style={styles.progressCard}>
         <Text style={styles.progressTitle}>ОБЩИЙ ПРОГРЕСС</Text>
-        <Text style={styles.progressPercent}>{learnedPercentage}%</Text>
+        <Text
+          style={styles.progressPercent}
+          maxFontSizeMultiplier={BIG_DIGITS_MAX_FONT_SCALE}
+        >
+          {learnedPercentage}%
+        </Text>
         <Text style={styles.progressSub}>выучено из всех слов в базе</Text>
         <View style={styles.progressBarBg}>
           <Animated.View
@@ -247,25 +250,37 @@ export const ProfileScreen = () => {
       <Text style={styles.sectionLabel}>СТАТИСТИКА СЛОВ</Text>
       <View style={styles.statsGrid}>
         <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: theme.statGreen }]}>
+          <Text
+            style={[styles.statValue, { color: theme.statGreen }]}
+            maxFontSizeMultiplier={BIG_DIGITS_MAX_FONT_SCALE}
+          >
             {stats.learned}
           </Text>
           <Text style={styles.statLabel}>Выучено</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: theme.amberAccent }]}>
+          <Text
+            style={[styles.statValue, { color: theme.amberAccent }]}
+            maxFontSizeMultiplier={BIG_DIGITS_MAX_FONT_SCALE}
+          >
             {stats.review}
           </Text>
           <Text style={styles.statLabel}>На повторе</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: theme.statBlue }]}>
+          <Text
+            style={[styles.statValue, { color: theme.statBlue }]}
+            maxFontSizeMultiplier={BIG_DIGITS_MAX_FONT_SCALE}
+          >
             {stats.totalNew}
           </Text>
           <Text style={styles.statLabel}>Новые</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: theme.statInk }]}>
+          <Text
+            style={[styles.statValue, { color: theme.statInk }]}
+            maxFontSizeMultiplier={BIG_DIGITS_MAX_FONT_SCALE}
+          >
             {totalCount}
           </Text>
           <Text style={styles.statLabel}>Всего в базе</Text>

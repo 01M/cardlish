@@ -6,7 +6,6 @@ import React, {
   useState,
 } from "react";
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   LayoutChangeEvent,
@@ -30,6 +29,7 @@ import {
   resetProgressOnly,
   Word,
 } from "../db/database";
+import { useReduceMotion } from "../hooks/useReduceMotion";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 import { confirmResetProgress, showErrorAlert } from "../utils/alerts";
@@ -45,6 +45,10 @@ const NOTE_OPACITY_RANGE = 16;
 const BADGE_SIZE = 88;
 const COMPLETION_GROUP_COUNT = 4;
 const COUNT_UPDATE_INTERVAL_MS = 33;
+
+// Крупные цифры (счётчик степпера, полоса статистики) растут с системным
+// размером шрифта не больше чем в 1.2 раза — иначе ломают раскладку
+const BIG_DIGITS_MAX_FONT_SCALE = 1.2;
 
 export const LearnScreen = () => {
   const router = useRouter();
@@ -108,9 +112,9 @@ export const LearnScreen = () => {
       ? sessionSize - stats.newCustom
       : 0;
 
-  // Одна на экран проверка "уменьшить движение" — ей пользуются и
+  // Одна на экран подписка на "уменьшить движение" — ей пользуются и
   // переключатель источника, и степпер, и его кнопки, и примечание в плане
-  const [reduceMotion, setReduceMotion] = useState(false);
+  const reduceMotion = useReduceMotion();
 
   // 8. ПРИМЕЧАНИЕ В КАРТОЧКЕ ПЛАНА: своя анимация высоты и прозрачности
   // (системная анимация раскладки надёжно работает только на iOS; высота +
@@ -232,13 +236,6 @@ export const LearnScreen = () => {
     }
     hasLaidOut.current = true;
   }, [trackWidth, thumbWidth, selectedIndex, thumbTranslateX, reduceMotion]);
-
-  useEffect(() => {
-    // Ослабленная анимация по системной настройке — ставим позицию без пружины
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then(setReduceMotion)
-      .catch(() => setReduceMotion(false));
-  }, []);
 
   // 6. СТЕППЕР РАЗМЕРА СЕССИИ: пульс числа при изменении (не на первом рендере)
   const numberScale = useRef(new Animated.Value(1)).current;
@@ -512,17 +509,32 @@ export const LearnScreen = () => {
 
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.totalNew}</Text>
+          <Text
+            style={styles.statValue}
+            maxFontSizeMultiplier={BIG_DIGITS_MAX_FONT_SCALE}
+          >
+            {stats.totalNew}
+          </Text>
           <Text style={styles.statLabel}>Новые</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.review}</Text>
+          <Text
+            style={styles.statValue}
+            maxFontSizeMultiplier={BIG_DIGITS_MAX_FONT_SCALE}
+          >
+            {stats.review}
+          </Text>
           <Text style={styles.statLabel}>Повторить</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{stats.learned}</Text>
+          <Text
+            style={styles.statValue}
+            maxFontSizeMultiplier={BIG_DIGITS_MAX_FONT_SCALE}
+          >
+            {stats.learned}
+          </Text>
           <Text style={styles.statLabel}>Выучено</Text>
         </View>
       </View>
@@ -590,6 +602,7 @@ export const LearnScreen = () => {
                 styles.counterValue,
                 { transform: [{ scale: numberScale }] },
               ]}
+              maxFontSizeMultiplier={BIG_DIGITS_MAX_FONT_SCALE}
             >
               {sessionSize}
             </Animated.Text>
@@ -1105,7 +1118,9 @@ type SessionCompleteProps = {
 // 8. ЭКРАН ЗАВЕРШЕНИЯ: группы появляются с подъёмом по очереди, бейдж
 // «выпрыгивает» пружиной с одним пульсом кольца, над ним — конфетти,
 // счётчик слов набирается от 0. Монтируется заново при каждом показе, поэтому
-// анимации проигрываются каждый раз; при "уменьшить движение" — всё сразу
+// анимации проигрываются каждый раз; при "уменьшить движение" — всё сразу.
+// Если настройку включили посреди появления, оно обрывается на финальном
+// состоянии и больше не проигрывается (в том числе после её выключения)
 const SessionComplete = ({
   wordCount,
   reduceMotion,
@@ -1113,6 +1128,7 @@ const SessionComplete = ({
   onReview,
   onContinue,
 }: SessionCompleteProps) => {
+  const [isStatic, setIsStatic] = useState(reduceMotion);
   const [groups] = useState(() =>
     Array.from(
       { length: COMPLETION_GROUP_COUNT },
@@ -1165,7 +1181,15 @@ const SessionComplete = ({
   );
 
   useEffect(() => {
-    if (reduceMotion) return;
+    if (isStatic) return;
+    if (reduceMotion) {
+      // Очистка прошлого запуска уже остановила анимации — ставим финал
+      groups.forEach((value) => value.setValue(1));
+      badgeScale.setValue(1);
+      setDisplayCount(wordCount);
+      setIsStatic(true);
+      return;
+    }
 
     const entrance = Animated.parallel([
       Animated.stagger(
@@ -1224,7 +1248,7 @@ const SessionComplete = ({
       countUp.stop();
       countValue.removeListener(listenerId);
     };
-  }, [reduceMotion, wordCount, groups, badgeScale, pulse, countValue]);
+  }, [isStatic, reduceMotion, wordCount, groups, badgeScale, pulse, countValue]);
 
   // Точка старта конфетти — верх блока (над бейджем); замеряем один раз
   const handleContentLayout = (event: LayoutChangeEvent) => {
@@ -1236,7 +1260,7 @@ const SessionComplete = ({
     <>
       <View style={styles.completionContent} onLayout={handleContentLayout}>
         <Animated.View style={[styles.badgeWrap, groupStyles[0]]}>
-          {!reduceMotion && hasWords && (
+          {!isStatic && hasWords && (
             <Animated.View style={[styles.badgePulse, pulseStyle]} />
           )}
           <Animated.View
@@ -1268,7 +1292,7 @@ const SessionComplete = ({
           </PressableScale>
         </Animated.View>
       </View>
-      {!reduceMotion && hasWords && confettiOriginY !== null && (
+      {!isStatic && hasWords && confettiOriginY !== null && (
         <Confetti originY={confettiOriginY} />
       )}
     </>

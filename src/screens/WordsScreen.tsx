@@ -326,11 +326,13 @@ const createStyles = (theme: Theme) =>
     borderColor: theme.border,
     paddingHorizontal: 14,
     marginBottom: 12,
-    height: 46,
+    // minHeight, а не height: при крупном системном шрифте поле растёт
+    minHeight: 46,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
+    paddingVertical: 10,
     color: theme.textPrimary,
   },
   clearSearchButton: {

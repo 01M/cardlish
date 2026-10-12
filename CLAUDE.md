@@ -159,8 +159,11 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 
 - Built-in `Animated` only (no reanimated); springs via `Animated.spring` (speed 18, bounciness 4),
   timings ~220 ms. `useNativeDriver: true` for transform/opacity, `false` for layout props.
-- Respect reduce motion via `useReduceMotion()` (`src/hooks/useReduceMotion.ts`) or the screen's
-  existing `reduceMotion` state; when on, set values directly instead of animating.
+- Respect reduce motion via the shared `useReduceMotion()` hook (`src/hooks/useReduceMotion.ts`,
+  live: follows changes while the app is open) — LearnScreen, ProfileScreen, FlipCard and
+  PressableScale all use it; no local one-shot `isReduceMotionEnabled()` checks. When on, set final
+  values directly instead of animating — except FlipCard, which replaces the 3D rotation with a
+  200 ms opacity crossfade between the faces.
 - `LayoutAnimation` is NOT used. Conditional UI animates its own height: the plan-card note uses an
   `overflow: "hidden"` wrapper, measured absolutely-positioned content, opacity interpolated from
   the height, and its row is remounted via `key` on visibility change so `onLayout` re-measures.

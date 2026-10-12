@@ -10,9 +10,16 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { addCustomWord, updateCustomWord, Word } from "../db/database";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
+import { showErrorAlert } from "../utils/alerts";
+
+// Полноэкранная модалка рисуется под статус-баром: заголовок начинается
+// сразу под верхним безопасным отступом (на iPhone с Dynamic Island это
+// ~59–62, как прежние 60), но не ближе 24 к краю, если отступ нулевой
+const MIN_TOP_PADDING = 24;
 
 interface WordFormModalProps {
   visible: boolean;
@@ -27,6 +34,7 @@ export const WordFormModal = ({
   onClose,
   onSaved,
 }: WordFormModalProps) => {
+  const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [term, setTerm] = useState("");
@@ -79,7 +87,7 @@ export const WordFormModal = ({
       onClose();
     } catch (e) {
       console.error("Ошибка сохранения слова:", e);
-      Alert.alert("Ошибка", "Не удалось сохранить слово.");
+      showErrorAlert("Не удалось сохранить слово. Попробуйте ещё раз.");
     } finally {
       setSaving(false);
     }
@@ -92,7 +100,10 @@ export const WordFormModal = ({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingTop: Math.max(insets.top, MIN_TOP_PADDING) },
+          ]}
           keyboardShouldPersistTaps="handled"
         >
           <Text style={styles.title}>
@@ -173,7 +184,7 @@ export const WordFormModal = ({
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
   flex: { flex: 1, backgroundColor: theme.backdrop },
-  content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
+  content: { padding: 24, paddingBottom: 40 },
   title: {
     fontSize: 28,
     fontWeight: "800",

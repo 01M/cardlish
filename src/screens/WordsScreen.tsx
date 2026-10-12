@@ -17,6 +17,7 @@ import { WordFormModal } from "../components/WordFormModal";
 import ListTopFade from "../components/ListTopFade";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
+import { showErrorAlert } from "../utils/alerts";
 
 type Filter = Word["status"] | "all";
 
@@ -42,6 +43,7 @@ export const WordsScreen = () => {
       setWords(await getCustomWords(filter));
     } catch (error) {
       console.error("Ошибка загрузки слов:", error);
+      showErrorAlert();
     }
   }, [filter]);
 
@@ -87,8 +89,12 @@ export const WordsScreen = () => {
           text: "Удалить",
           style: "destructive",
           onPress: async () => {
-            await deleteCustomWord(word.id);
-            await loadWords();
+            try {
+              await deleteCustomWord(word.id);
+              await loadWords();
+            } catch {
+              showErrorAlert();
+            }
           },
         },
       ],

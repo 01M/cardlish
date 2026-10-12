@@ -24,7 +24,11 @@ let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export const getDb = (): Promise<SQLite.SQLiteDatabase> => {
   if (!dbPromise) {
-    dbPromise = SQLite.openDatabaseAsync("english_cards.db");
+    dbPromise = SQLite.openDatabaseAsync("english_cards.db").catch((error) => {
+      // Сбрасываем мемоизацию, чтобы следующий вызов мог повторить открытие
+      dbPromise = null;
+      throw error;
+    });
   }
   return dbPromise;
 };

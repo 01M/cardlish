@@ -42,6 +42,7 @@ import {
   useTheme,
 } from "../theme/useTheme";
 import type { ThemePreference } from "../theme/useTheme";
+import { confirmResetProgress, showErrorAlert } from "../utils/alerts";
 
 export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
@@ -76,19 +77,25 @@ export const ProfileScreen = () => {
   }, []);
 
   const loadProfileData = async () => {
-    const [currentStats, isReminderEnabled, storedThemePreference] =
-      await Promise.all([
-        getWordsStats(),
-        getReminderEnabled(),
-        getThemePreference(),
-      ]);
-    setStats(currentStats);
-    setTotalCount(currentStats.totalNew + currentStats.review + currentStats.learned);
-    setReminderEnabledState(isReminderEnabled);
-    setThemePreferenceState(storedThemePreference);
-    if (!hasLoadedOnce.current) {
-      hasLoadedOnce.current = true;
-      setIsLoaded(true);
+    try {
+      const [currentStats, isReminderEnabled, storedThemePreference] =
+        await Promise.all([
+          getWordsStats(),
+          getReminderEnabled(),
+          getThemePreference(),
+        ]);
+      setStats(currentStats);
+      setTotalCount(currentStats.totalNew + currentStats.review + currentStats.learned);
+      setReminderEnabledState(isReminderEnabled);
+      setThemePreferenceState(storedThemePreference);
+    } catch {
+      showErrorAlert();
+    } finally {
+      // Контент показываем и при ошибке, чтобы экран не оставался прозрачным
+      if (!hasLoadedOnce.current) {
+        hasLoadedOnce.current = true;
+        setIsLoaded(true);
+      }
     }
   };
 
@@ -143,21 +150,14 @@ export const ProfileScreen = () => {
   });
 
   const handleResetProgress = () => {
-    Alert.alert(
-      "Сброс прогресса",
-      'Вы уверены, что хотите перевести все слова обратно в статус "Новые"?',
-      [
-        { text: "Отмена", style: "cancel" },
-        {
-          text: "Сбросить",
-          style: "destructive",
-          onPress: async () => {
-            await resetProgressOnly();
-            await loadProfileData();
-          },
-        },
-      ],
-    );
+    confirmResetProgress(async () => {
+      try {
+        await resetProgressOnly();
+        await loadProfileData();
+      } catch {
+        showErrorAlert();
+      }
+    });
   };
 
   const handleFullReset = () => {
@@ -170,8 +170,12 @@ export const ProfileScreen = () => {
           text: "Удалить всё",
           style: "destructive",
           onPress: async () => {
-            await resetDatabase();
-            await loadProfileData();
+            try {
+              await resetDatabase();
+              await loadProfileData();
+            } catch {
+              showErrorAlert();
+            }
           },
         },
       ],
@@ -180,27 +184,33 @@ export const ProfileScreen = () => {
 
   const handleReminderToggle = async (enabled: boolean) => {
     void Haptics.selectionAsync().catch(() => {});
-    if (enabled) {
-      const scheduled = await enableDailyReminder();
-      if (!scheduled) {
-        Alert.alert(
-          "Напоминания отключены",
-          "Разрешите уведомления в настройках устройства, чтобы включить напоминания.",
-        );
-        return;
+    try {
+      if (enabled) {
+        const scheduled = await enableDailyReminder();
+        if (!scheduled) {
+          Alert.alert(
+            "Напоминания отключены",
+            "Разрешите уведомления в настройках устройства, чтобы включить напоминания.",
+          );
+          return;
+        }
+      } else {
+        await disableDailyReminder();
       }
-    } else {
-      await disableDailyReminder();
-    }
 
-    await setReminderEnabled(enabled);
-    setReminderEnabledState(enabled);
+      await setReminderEnabled(enabled);
+      setReminderEnabledState(enabled);
+    } catch {
+      showErrorAlert();
+    }
   };
 
   const handleThemePreferenceChange = (pref: ThemePreference) => {
     setThemePreferenceState(pref);
     applyThemePreference(pref);
-    void setThemePreference(pref);
+    void setThemePreference(pref).catch(() => {
+      showErrorAlert();
+    });
     void Haptics.selectionAsync().catch(() => {});
   };
 

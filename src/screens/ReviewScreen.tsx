@@ -15,6 +15,7 @@ import { FlipCard } from "../components/FlipCard";
 import { PressableScale } from "../components/PressableScale";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
+import { confirmResetProgress, showErrorAlert } from "../utils/alerts";
 
 export const ReviewScreen = () => {
   const router = useRouter();
@@ -26,10 +27,14 @@ export const ReviewScreen = () => {
   const [isFlipped, setIsFlipped] = useState(false);
 
   const loadWords = useCallback(async () => {
-    const words = await getReviewWords();
-    setReviewWords(words);
-    setCurrentIndex(0);
-    setIsFlipped(false);
+    try {
+      const words = await getReviewWords();
+      setReviewWords(words);
+      setCurrentIndex(0);
+      setIsFlipped(false);
+    } catch {
+      showErrorAlert();
+    }
   }, []);
 
   // Загружаем актуальные слова на повторение при каждом переходе на экран
@@ -51,18 +56,22 @@ export const ReviewScreen = () => {
     ).catch(() => {});
     if (reviewWords.length === 0) return;
 
-    // Переводим слово в статус 'learned'
-    const currentWord = reviewWords[currentIndex];
-    await markWordAsLearned(currentWord.id);
+    try {
+      // Переводим слово в статус 'learned'
+      const currentWord = reviewWords[currentIndex];
+      await markWordAsLearned(currentWord.id);
 
-    // Удаляем выученное слово из текущего локального списка
-    const updated = reviewWords.filter((_, idx) => idx !== currentIndex);
-    setReviewWords(updated);
+      // Удаляем выученное слово из текущего локального списка
+      const updated = reviewWords.filter((_, idx) => idx !== currentIndex);
+      setReviewWords(updated);
 
-    if (currentIndex >= updated.length) {
-      setCurrentIndex(0);
+      if (currentIndex >= updated.length) {
+        setCurrentIndex(0);
+      }
+      setIsFlipped(false);
+    } catch {
+      showErrorAlert();
     }
-    setIsFlipped(false);
   };
 
   const nextCard = () => {
@@ -74,9 +83,15 @@ export const ReviewScreen = () => {
     setIsFlipped(false);
   };
 
-  const handleResetProgress = async () => {
-    await resetProgressOnly();
-    await loadWords();
+  const handleResetProgress = () => {
+    confirmResetProgress(async () => {
+      try {
+        await resetProgressOnly();
+        await loadWords();
+      } catch {
+        showErrorAlert();
+      }
+    });
   };
 
   // ЕСЛИ СЛОВ НА ПОВТОРЕНИЕ НЕТ
@@ -107,15 +122,15 @@ export const ReviewScreen = () => {
           </Text>
           <PressableScale
             style={styles.emptyButton}
-            onPress={handleResetProgress}
+            onPress={() => router.push("/")}
           >
-            <Text style={styles.emptyButtonText}>Сбросить прогресс</Text>
+            <Text style={styles.emptyButtonText}>Учить новые слова</Text>
           </PressableScale>
           <PressableScale
             style={styles.secondaryButton}
-            onPress={() => router.push("/")}
+            onPress={handleResetProgress}
           >
-            <Text style={styles.secondaryButtonText}>Учить новые слова</Text>
+            <Text style={styles.secondaryButtonText}>Сбросить прогресс</Text>
           </PressableScale>
         </View>
       </SafeAreaView>

@@ -32,6 +32,7 @@ import {
 } from "../db/database";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
+import { confirmResetProgress, showErrorAlert } from "../utils/alerts";
 
 // Паддинг дорожки-переключателя источника слов (он же — отступ ползунка)
 const TRACK_PADDING = 4;
@@ -74,14 +75,32 @@ export const LearnScreen = () => {
     lastSessionLengthRef.current = sessionWords.length;
   }
 
+  // До первой загрузки (успешной или нет) показываем только фон; экран
+  // ошибки — лишь если статистика ещё ни разу не загрузилась
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const hasStatsRef = useRef(false);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await getWordsStats();
+      hasStatsRef.current = true;
+      setStats(data);
+      setLoadFailed(false);
+      setIsLoaded(true);
+    } catch {
+      if (!hasStatsRef.current) {
+        setLoadFailed(true);
+      }
+      setIsLoaded(true);
+      showErrorAlert();
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      async function loadStats() {
-        const data = await getWordsStats();
-        setStats(data);
-      }
       loadStats();
-    }, []),
+    }, [loadStats]),
   );
 
   const missingCustomCount =
@@ -153,20 +172,30 @@ export const LearnScreen = () => {
 
   const handleStart = async () => {
     lastSessionLengthRef.current = 0;
-    const words = await getSessionWords(source, sessionSize);
-    if (words.length === 0) {
-      setShowCompletion(true);
-      return;
+    try {
+      const words = await getSessionWords(source, sessionSize);
+      if (words.length === 0) {
+        setShowCompletion(true);
+        return;
+      }
+      setShowCompletion(false);
+      setSessionWords(words);
+      setCurrentIndex(0);
+    } catch {
+      showErrorAlert();
     }
-    setShowCompletion(false);
-    setSessionWords(words);
-    setCurrentIndex(0);
   };
 
-  const handleResetProgress = async () => {
-    await resetProgressOnly();
-    const data = await getWordsStats();
-    setStats(data);
+  const handleResetProgress = () => {
+    confirmResetProgress(async () => {
+      try {
+        await resetProgressOnly();
+        const data = await getWordsStats();
+        setStats(data);
+      } catch {
+        showErrorAlert();
+      }
+    });
   };
 
   const handleSourceChange = (nextSource: "custom" | "dictionary") => {
@@ -311,10 +340,45 @@ export const LearnScreen = () => {
           Haptics.NotificationFeedbackType.Success,
         ).catch(() => {});
       }
+    } catch {
+      // Ошибка до смены экрана: карточка остаётся на месте
+      showErrorAlert();
     } finally {
       setIsProcessing(false);
     }
   };
+
+  // 0. ЭКРАН: ДАННЫЕ ЕЩЁ НЕ ЗАГРУЖЕНЫ ИЛИ ПЕРВАЯ ЗАГРУЗКА НЕ УДАЛАСЬ
+  if (!isLoaded) {
+    return <View style={styles.container} />;
+  }
+
+  if (loadFailed) {
+    return (
+      <View
+        style={[
+          styles.emptyContainer,
+          {
+            paddingTop: Math.max(insets.top + 20, 32),
+            paddingBottom: Math.max(insets.bottom + 20, 32),
+          },
+        ]}
+      >
+        <Ionicons
+          name="alert-circle-outline"
+          size={48}
+          style={styles.errorIcon}
+        />
+        <Text style={styles.emptyTitle}>Не удалось загрузить данные</Text>
+        <PressableScale
+          style={[styles.startButton, styles.retryButton]}
+          onPress={loadStats}
+        >
+          <Text style={styles.startButtonText}>Повторить</Text>
+        </PressableScale>
+      </View>
+    );
+  }
 
   // 1. ЭКРАН: АКТИВНАЯ СЕССИЯ ИЗУЧЕНИЯ КАРТОЧЕК
   if (sessionWords && sessionWords.length > 0) {
@@ -920,6 +984,13 @@ const createStyles = (theme: Theme) =>
   emptyIcon: {
     color: theme.successIcon,
     marginBottom: 16,
+  },
+  errorIcon: {
+    color: theme.textMuted,
+    marginBottom: 16,
+  },
+  retryButton: {
+    marginTop: 24,
   },
   completionContent: {
     width: "100%",

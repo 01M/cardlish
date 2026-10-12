@@ -27,13 +27,19 @@ Notifications?.setNotificationHandler({
   }),
 });
 
+const getScheduledReminders = async () => {
+  if (!Notifications) return [];
+
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  return scheduled.filter(
+    (request) => request.content.data?.type === DAILY_REMINDER_ID,
+  );
+};
+
 const cancelDailyReminder = async () => {
   if (!Notifications) return;
 
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  const reminders = scheduled.filter(
-    (request) => request.content.data?.type === DAILY_REMINDER_ID,
-  );
+  const reminders = await getScheduledReminders();
 
   await Promise.all(
     reminders.map((request) =>
@@ -79,6 +85,18 @@ export const enableDailyReminder = async (): Promise<boolean> => {
 
 export const disableDailyReminder = async () => {
   await cancelDailyReminder();
+};
+
+// Напоминание реально работает: уведомления разрешены и оно запланировано.
+// Только проверка — разрешение здесь не запрашивается
+export const isDailyReminderActive = async (): Promise<boolean> => {
+  if (!Notifications) return false; // Expo Go на Android — напоминания недоступны
+
+  const permissions = await Notifications.getPermissionsAsync();
+  if (!permissions.granted) return false;
+
+  const reminders = await getScheduledReminders();
+  return reminders.length > 0;
 };
 
 export const getDailyReminderTime = () =>

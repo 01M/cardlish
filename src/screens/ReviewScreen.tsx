@@ -16,14 +16,18 @@ import { PressableScale } from "../components/PressableScale";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 import { confirmResetProgress, showErrorAlert } from "../utils/alerts";
+import { mergeReviewQueue, ReviewQueue } from "../utils/reviewQueue";
 
 export const ReviewScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [reviewWords, setReviewWords] = useState<Word[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [queue, setQueue] = useState<ReviewQueue<Word>>({
+    words: [],
+    index: 0,
+  });
+  const { words: reviewWords, index: currentIndex } = queue;
   const [isFlipped, setIsFlipped] = useState(false);
   // Счётчик продвижений очереди: входит в key карточки, чтобы она
   // пересоздавалась лицевой стороной, даже если то же слово показано подряд
@@ -32,8 +36,8 @@ export const ReviewScreen = () => {
   const loadWords = useCallback(async () => {
     try {
       const words = await getReviewWords();
-      setReviewWords(words);
-      setCurrentIndex(0);
+      // Порядок и позиция сохраняются; карточка всегда открывается лицевой стороной
+      setQueue((prev) => mergeReviewQueue(prev, words));
       setIsFlipped(false);
       setAdvanceCount((prev) => prev + 1);
     } catch {
@@ -41,7 +45,7 @@ export const ReviewScreen = () => {
     }
   }, []);
 
-  // Загружаем актуальные слова на повторение при каждом переходе на экран
+  // Сверяем очередь с базой при каждом переходе на экран
   useFocusEffect(
     useCallback(() => {
       loadWords();
@@ -67,11 +71,10 @@ export const ReviewScreen = () => {
 
       // Удаляем выученное слово из текущего локального списка
       const updated = reviewWords.filter((_, idx) => idx !== currentIndex);
-      setReviewWords(updated);
-
-      if (currentIndex >= updated.length) {
-        setCurrentIndex(0);
-      }
+      setQueue({
+        words: updated,
+        index: currentIndex >= updated.length ? 0 : currentIndex,
+      });
       setIsFlipped(false);
       setAdvanceCount((prev) => prev + 1);
     } catch {
@@ -80,11 +83,10 @@ export const ReviewScreen = () => {
   };
 
   const nextCard = () => {
-    if (currentIndex + 1 < reviewWords.length) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      setCurrentIndex(0);
-    }
+    setQueue({
+      words: reviewWords,
+      index: currentIndex + 1 < reviewWords.length ? currentIndex + 1 : 0,
+    });
     setIsFlipped(false);
     setAdvanceCount((prev) => prev + 1);
   };

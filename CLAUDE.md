@@ -41,7 +41,8 @@ src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts)
 src/services/     Side-effectful services (notifications.ts)
-src/utils/        alerts.ts (confirmResetProgress, showErrorAlert)
+src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); reviewQueue.ts (pure
+                  mergeReviewQueue(prev, fresh), no React/DB — first candidate for unit tests)
 src/assets/       dictionary.json (large, git-tracked, never read it)
 scripts/          Python tooling
 assets/           App icons / splash
@@ -92,7 +93,18 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 3. **Data access lives in `src/db/`.** All SQL, schema, migrations, and model types stay in
    `src/db/database.ts`. Screens/services call exported async functions — never issue queries inline.
    The DB is opened once via `getDb()` (memoized promise; a failed open clears the memo so a retry
-   reopens) and seeded from `src/assets/dictionary.json` on first launch.
+   reopens) and seeded from `src/assets/dictionary.json` only when the `words` table is empty.
+   - Row type `Word`: `transcription`/`example` are `string | null`; `status` is
+     `"new" | "review" | "learned"`. `WordsStats` is exported and shared by Learn and Profile.
+   - `getWordsStats()` is one query (`COUNT(CASE …)`), backed by index `idx_words_is_custom_status`.
+   - `markWordAsReview()` only moves words that are still `'new'` (guards against a stale Learn
+     session).
+   - `resetDatabase()` runs in one exclusive transaction: deletes custom words and sets all
+     remaining words to `'new'`. Dictionary rows are NOT re-seeded and keep their ids.
+     `resetProgressOnly()` sets every word to `'new'` and keeps custom words.
+   - Known limitation: no schema versioning (no `user_version`/migrations), and dictionary words
+     have no stable key besides the autoincrement `id`. Before changing the bundled dictionary,
+     add versioning plus a stable key.
 4. **React Native primitives only.** No HTML tags (`div`, `span`, `p`, `button`), no DOM APIs, no
    `tailwindcss`/`react-native-web` shortcuts. Use `View`/`Text`/`Pressable`/`FlatList`/
    `ScrollView`/`Modal` + `StyleSheet.create`. Keep list rendering virtualized (`FlatList`).
@@ -154,6 +166,37 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - The composition split mirrors what `getSessionWords()` will load — derive counts only from
   `sessionSize`, `stats` and `source`, never new queries.
 - Completion (`SessionComplete`): badge pop, `Confetti`, word count-up, success haptic.
+- Empty state ("Новые слова закончились"): "Добавить слова" is the orange primary, "Сбросить
+  прогресс" the outlined secondary below it (goes through `confirmResetProgress()`).
+
+**Review screen**
+- On focus the queue is merged with the DB via `mergeReviewQueue()`: words still due keep their
+  order and the current position, newly due words are appended, no-longer-due words are dropped.
+  Only an empty queue is built from scratch (in the DB's random order).
+- The card always returns to its front face on focus.
+
+**Profile screen**
+- On focus, before loading data, the reminders flag is synced with the OS
+  (`isDailyReminderActive()`: permission granted + reminder scheduled). A stale flag is turned off
+  silently (`console.error` on failure) and leftover scheduled reminders are cancelled; nothing is
+  scheduled and no permission is requested.
+
+**Components**
+- `FlipCard`: fixed height 370; the back face content is in a `ScrollView` (tap flips, drag
+  scrolls); the front term uses `numberOfLines` + `adjustsFontSizeToFit`.
+- Big digits (Learn counter and stat strip, Profile numbers) set `maxFontSizeMultiplier`; the Words
+  search field uses `minHeight`, not `height`.
+- `WordFormModal` top padding comes from safe-area insets (min 24).
+
+**Accessibility**
+- `PressableScale` defaults to `accessibilityRole="button"`. Icon-only buttons need a Russian
+  `accessibilityLabel`. Selectable controls (Learn source toggle, Words filter chips) set
+  `accessibilityState={{ selected }}`. Small touch targets use `hitSlop` to reach 44pt.
+- `FlipCard`: only the visible face is exposed to screen readers; each face has an invisible
+  full-size button with the label and an `activate` action; speak buttons stay separately
+  focusable, labelled "Произнести слово".
+- TextInputs have an `accessibilityLabel`: the visible field name in `WordFormModal`, "Поиск слов"
+  for the Words search.
 
 ## Motion
 
@@ -170,17 +213,21 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 
 ## Conventions observed in the codebase
 
-- UI strings and comments are in Russian; code identifiers, function names, and log messages use
-  English. Match the file you are editing.
-- Async data loading uses `try/catch/finally` + local `isLoading` state (see `src/app/_layout.tsx`
-  for the DB gate pattern). ProfileScreen: independent loads go through one `Promise.all`, an
-  `isLoaded` flag gates a ~180 ms content fade-in, and derived values come from
-  `getWordsStats()` (totalCount = totalNew + review + learned).
-- Loading/error states: until the first load completes a screen renders only the page background.
-  A failed first load shows an icon + "Не удалось загрузить данные" + a "Повторить" button. Action
-  handlers keep the previous state on failure and call `showErrorAlert()`.
+- UI strings and comments are in Russian; code identifiers and function names use English.
+  `console.error` messages are mixed (older ones Russian) — match the file you are editing.
+- Async data loading uses `try/catch` (+ `finally` where a flag must flip) and local state flags
+  (DB gate in `src/app/_layout.tsx`: `isReady` / `initFailed`). ProfileScreen: independent loads go
+  through one `Promise.all`, an `isLoaded` flag gates a ~180 ms content fade-in, and derived values
+  come from `getWordsStats()` (totalCount = totalNew + review + learned).
+- Loading/error states: the DB gate shows a spinner, and on failure "Не удалось открыть базу
+  данных" + "Повторить". LearnScreen renders only the page background until its first load
+  completes; a failed first load shows an icon + "Не удалось загрузить данные" + "Повторить".
+  Profile fades its content in even after a failed load (with `showErrorAlert()`); Review and
+  Words render immediately and alert on failure. Action handlers keep the previous state on
+  failure and call `showErrorAlert()`.
 - `FlipCard` has no internal reset: parents remount it via `key` (Learn: `word.id`; Review:
-  `word.id` + a counter bumped on every queue advance or reload, so a repeated word still resets).
+  `word.id` + a counter bumped on every queue advance or focus reload, so a repeated word still
+  resets).
 - Word lifecycle is a 3-state machine: `new` → `review` → `learned`, stored in
   `words.status`. Progress resets go through `resetProgressOnly()` / `resetDatabase()`.
 - Comments in this repo are numbered section headers (`// 1. Инициализация базы данных`) — keep that
@@ -199,8 +246,13 @@ asks: `node_modules/`, `.git/`, `.expo/`, generated `ios/`+`android/`, `dist/`, 
   `useTheme()`. No hex/rgba/named color literals in screens or components. A new color role means
   a new key in the `Theme` interface plus light and dark values (text must reach at least 4.5:1
   contrast on the dark surfaces).
-- An element using `buttonInk` as its background uses `textOnButtonInk` for its text. Orange used
-  as TEXT on dark ink surfaces uses `amberAccent`.
+- An element using `buttonInk` as its background uses `textOnButtonInk` for its text.
+- `orangeAccent` is `#D97706` in both themes and is only for fills (buttons, the Learn toggle
+  thumb, the plan bar segment and legend dot), the tab bar tint and confetti. Orange TEXT or icons
+  on surfaces use `amberAccent`. `textMutedHint` and `statAmber` no longer exist — use
+  `textMuted` / `amberAccent`.
+- White text on `#D97706` is ~3.2:1 — accepted consciously for bold button labels; do not "fix" it
+  without asking.
 - The scheme is decided in one place: `useColorSchemeName()` (`src/theme/useTheme.ts`).
 - The user's appearance preference (System/Light/Dark, default System) is stored in `app_settings`
   and applied via `applyThemePreference()` before the app is shown (in the DB init flow).

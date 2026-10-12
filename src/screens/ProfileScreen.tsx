@@ -34,6 +34,7 @@ import {
   disableDailyReminder,
   enableDailyReminder,
   getDailyReminderTime,
+  isDailyReminderActive,
 } from "../services/notifications";
 import { SegmentedControl } from "@expo/ui/community/segmented-control";
 import { Theme } from "../theme/tokens";
@@ -98,9 +99,25 @@ export const ProfileScreen = () => {
     }
   };
 
+  // Флаг напоминаний мог разойтись с системой: разрешение отозвано в
+  // настройках устройства или уведомление больше не запланировано. Тогда
+  // выключаем его — без запроса разрешения, планирования и алерта
+  const syncReminderWithSystem = async () => {
+    try {
+      if (!(await getReminderEnabled())) return;
+      if (await isDailyReminderActive()) return;
+      await disableDailyReminder();
+      await setReminderEnabled(false);
+    } catch (error) {
+      console.error("Failed to sync reminder state:", error);
+    }
+  };
+
+  // Сначала сверяем напоминания, чтобы переключатель сразу показал
+  // актуальное состояние из базы
   useFocusEffect(
     useCallback(() => {
-      loadProfileData();
+      void syncReminderWithSystem().then(loadProfileData);
     }, []),
   );
 

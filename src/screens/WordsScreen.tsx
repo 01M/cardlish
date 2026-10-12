@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo } from "react";
 import {
   Alert,
   FlatList,
@@ -235,7 +235,7 @@ export const WordsScreen = () => {
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderWord}
         contentContainerStyle={[
-          filteredWords.length === 0 ? styles.emptyList : styles.list,
+          filteredWords.length === 0 && styles.emptyList,
           { paddingTop: 16, paddingBottom: 16 },
         ]}
         contentInsetAdjustmentBehavior="automatic"
@@ -341,7 +341,7 @@ const createStyles = (theme: Theme) =>
   clearSearchIcon: {
     color: theme.textMutedSoft,
   },
-  filterRow: { flexDirection: "row", gap: 8, marginBottom: 0, zIndex: 1 },
+  filterRow: { flexDirection: "row", gap: 8, zIndex: 1 },
   filterButton: {
     backgroundColor: theme.secondaryControlBackground,
     borderRadius: 16,
@@ -351,7 +351,6 @@ const createStyles = (theme: Theme) =>
   filterButtonActive: { backgroundColor: theme.buttonInk },
   filterText: { color: theme.textTertiary, fontSize: 12, fontWeight: "600" },
   filterTextActive: { color: theme.textOnButtonInk },
-  list: { paddingBottom: 24 },
   emptyList: { flexGrow: 1, justifyContent: "center" },
   wordCard: {
     backgroundColor: theme.surface,

@@ -6,8 +6,6 @@ export type ThemePreference = "system" | "light" | "dark";
 /**
  * Единственное место, где определяется цветовая схема приложения.
  * null/undefined трактуются как светлая тема.
- *
- * Чтобы временно посмотреть тёмную тему, верните здесь "dark".
  */
 export function useColorSchemeName(): "light" | "dark" {
   const colorScheme = useColorScheme();

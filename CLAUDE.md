@@ -16,10 +16,12 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 - **expo-sqlite ~57** for the local on-device database (`english_cards.db`)
 - **expo-notifications** for the daily reminder, **expo-speech** for pronunciation,
   **expo-constants**, **expo-font**, **expo-linking**, **expo-status-bar**
+- **expo-system-ui** is installed so that `userInterfaceStyle: "automatic"` works on Android —
+  no imports, but do not remove it
 - **react-native-safe-area-context ~5.7** + **react-native-screens ~4.26**
 - **@expo/vector-icons ^15** (Ionicons), **expo-haptics**, **expo-linear-gradient** (edge fades);
   animations use the built-in `Animated` API (react-native-reanimated is NOT used)
-- **EAS Build/Submit/Update** — profiles `development`, `preview`, `production` (see `eas.json`);
+- **EAS Build/Submit** — profiles `development`, `preview`, `production` (see `eas.json`);
   all Android builds are APKs, `appVersionSource: "remote"`
 - **Python helper** `scripts/convert-freedict.py` converts FreeDict TEI archives into
   `src/assets/dictionary.json` (build-time only, not part of the app runtime)
@@ -63,7 +65,6 @@ npx expo install --fix     # fix incompatible versions
 npx eas-cli@latest build --profile development|preview|production
 npx eas-cli@latest build --profile development --platform android   # dev client with native modules
 npx eas-cli@latest submit --profile production
-npx eas-cli@latest update --branch production
 ```
 
 `expo-notifications` needs a **development build** — Expo Go on Android crashes on import
@@ -151,9 +152,11 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 
 **Native UI, icons, haptics**
 - Allowed: @expo/ui (e.g. SegmentedControl on Profile), expo-symbols, expo-haptics,
-  @expo/vector-icons. RN `Alert` and `Switch` stay as they are. Reset confirmations and error
-  alerts go only through `confirmResetProgress()` / `showErrorAlert()` (`src/utils/alerts.ts`) —
-  no inline `Alert.alert` for these.
+  @expo/vector-icons. RN `Alert` and `Switch` stay as they are. The PROGRESS reset (all words
+  back to `'new'`, `resetProgressOnly()`) is confirmed only through `confirmResetProgress()`, and
+  error alerts go only through `showErrorAlert()` (`src/utils/alerts.ts`) — no inline
+  `Alert.alert` for these. The full database reset in Profile ("Удалить всё",
+  `resetDatabase()`, deletes custom words) has its own dedicated confirmation dialog.
 - Icons are Ionicons from @expo/vector-icons — never emoji or text glyphs.
 - Haptics are fire-and-forget: `void Haptics.x().catch(() => {})`. Selection: FlipCard flip,
   Learn source toggle and session-size stepper, Profile reminder switch and theme setting.

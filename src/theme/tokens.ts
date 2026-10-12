@@ -1,6 +1,5 @@
 /**
  * Семантические токены темы. Единый источник цветов для всех экранов.
- * Светлая тема повторяет текущие hex-значения в точности.
  *
  * Правило оранжевого: #D97706 (orangeAccent, обе темы) — заливки кнопок и тинт таб-бара.
  * Оранжевый как ТЕКСТ или иконка — только amberAccent (#B45309 светлая,
@@ -33,8 +32,8 @@ export interface Theme {
   textTertiary: string; // текст кнопок-переключателей и крестика закрытия
   textMuted: string; // приглушённый текст (подзаголовки, sectionLabel)
   textMutedAlt: string; // альтернативный приглушённый (транскрипции, label в форме)
-  textMutedSoft: string; // самый слабый: подсказки, placeholder, infoSubText
-  textOnAccent: string; // текст на оранжевых/чернильных заливках
+  textMutedSoft: string; // самый слабый: подсказки, placeholder
+  textOnAccent: string; // текст на оранжевых и индиго-заливках (на buttonInk — textOnButtonInk)
   textOnButtonInk: string; // текст на заливке buttonInk (nextButton, pill, активный фильтр)
   textButtonSecondary: string; // текст светлых вторичных кнопок (сброс в Profile/Review)
   placeholder: string; // placeholder поисковой строки
@@ -87,7 +86,7 @@ export interface Theme {
   shadowColor: string; // цвет тени карточки (iOS-only shadow)
 }
 
-// 4. Утилита прозрачности: 6-значный "#RRGGBB" → "#RRGGBBAA" (alpha 0..1).
+// 2. Утилита прозрачности: 6-значный "#RRGGBB" → "#RRGGBBAA" (alpha 0..1).
 //    Чужой формат возвращается без изменений.
 export function withAlpha(hex: string, alpha: number): string {
   if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
@@ -100,7 +99,7 @@ export function withAlpha(hex: string, alpha: number): string {
   return `${hex}${alphaHex}`;
 }
 
-// 2. Светлая тема — точные текущие значения из кода
+// 3. Светлая тема
 export const lightTheme: Theme = {
   pageBackground: "#F7F7F2",
   surface: "#FFFDF8",
@@ -169,7 +168,7 @@ export const lightTheme: Theme = {
   shadowColor: "#000",
 };
 
-// 3. Тёмная тема: страница < карточка < приподнятая поверхность,
+// 4. Тёмная тема: страница < карточка < приподнятая поверхность,
 //    приглушённый текст #9AA5AD, зелёный светлее (#56B77D), индиго #5B62E0
 export const darkTheme: Theme = {
   pageBackground: "#0F1519",

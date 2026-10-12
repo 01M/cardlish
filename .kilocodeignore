@@ -45,3 +45,11 @@ assets/**/*.otf
 # Agent scratch space
 .kilo/
 .claude/settings.local.json
+
+# Build artifacts & logs
+build/
+*.log
+
+# OS noise
+.DS_Store
+Thumbs.db

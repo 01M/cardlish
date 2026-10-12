@@ -9,7 +9,7 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 
 ## Tech stack
 
-- **Expo SDK 57** (`expo ~57.0.26`) + **React Native 0.86** + **React 19.2**
+- **Expo SDK 57** (`expo ~57.0.28`) + **React Native 0.86** + **React 19.2**
 - **Expo Router ~57** (`main: "expo-router/entry"`, `experiments.typedRoutes: true`) under `src/app/`
 - **TypeScript ~6** with `strict: true`, path alias `@/* → ./src/*`
 - **Package manager: npm** (`package-lock.json` present, no `bun.lock`)
@@ -41,6 +41,7 @@ src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts)
 src/services/     Side-effectful services (notifications.ts)
+src/utils/        alerts.ts (confirmResetProgress, showErrorAlert)
 src/assets/       dictionary.json (large, git-tracked, never read it)
 scripts/          Python tooling
 assets/           App icons / splash
@@ -90,8 +91,8 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    `StepperButton`, `SessionComplete` in `LearnScreen.tsx`) may stay in the screen file.
 3. **Data access lives in `src/db/`.** All SQL, schema, migrations, and model types stay in
    `src/db/database.ts`. Screens/services call exported async functions — never issue queries inline.
-   The DB is opened once via `getDb()` (memoized promise) and seeded from
-   `src/assets/dictionary.json` on first launch.
+   The DB is opened once via `getDb()` (memoized promise; a failed open clears the memo so a retry
+   reopens) and seeded from `src/assets/dictionary.json` on first launch.
 4. **React Native primitives only.** No HTML tags (`div`, `span`, `p`, `button`), no DOM APIs, no
    `tailwindcss`/`react-native-web` shortcuts. Use `View`/`Text`/`Pressable`/`FlatList`/
    `ScrollView`/`Modal` + `StyleSheet.create`. Keep list rendering virtualized (`FlatList`).
@@ -138,7 +139,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 
 **Native UI, icons, haptics**
 - Allowed: @expo/ui (e.g. SegmentedControl on Profile), expo-symbols, expo-haptics,
-  @expo/vector-icons. RN `Alert` and `Switch` stay as they are.
+  @expo/vector-icons. RN `Alert` and `Switch` stay as they are. Reset confirmations and error
+  alerts go only through `confirmResetProgress()` / `showErrorAlert()` (`src/utils/alerts.ts`) —
+  no inline `Alert.alert` for these.
 - Icons are Ionicons from @expo/vector-icons — never emoji or text glyphs.
 - Haptics are fire-and-forget: `void Haptics.x().catch(() => {})`. Selection: FlipCard flip,
   Learn source toggle and session-size stepper, Profile reminder switch and theme setting.
@@ -170,6 +173,11 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   for the DB gate pattern). ProfileScreen: independent loads go through one `Promise.all`, an
   `isLoaded` flag gates a ~180 ms content fade-in, and derived values come from
   `getWordsStats()` (totalCount = totalNew + review + learned).
+- Loading/error states: until the first load completes a screen renders only the page background.
+  A failed first load shows an icon + "Не удалось загрузить данные" + a "Повторить" button. Action
+  handlers keep the previous state on failure and call `showErrorAlert()`.
+- `FlipCard` has no internal reset: parents remount it via `key` (Learn: `word.id`; Review:
+  `word.id` + a counter bumped on every queue advance or reload, so a repeated word still resets).
 - Word lifecycle is a 3-state machine: `new` → `review` → `learned`, stored in
   `words.status`. Progress resets go through `resetProgressOnly()` / `resetDatabase()`.
 - Comments in this repo are numbered section headers (`// 1. Инициализация базы данных`) — keep that

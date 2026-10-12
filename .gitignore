@@ -39,3 +39,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local tooling output
+repomix-output.xml
+.tmp-docs/
+.kilo/

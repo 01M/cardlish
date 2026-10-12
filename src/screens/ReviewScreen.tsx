@@ -25,6 +25,9 @@ export const ReviewScreen = () => {
   const [reviewWords, setReviewWords] = useState<Word[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  // Счётчик продвижений очереди: входит в key карточки, чтобы она
+  // пересоздавалась лицевой стороной, даже если то же слово показано подряд
+  const [advanceCount, setAdvanceCount] = useState(0);
 
   const loadWords = useCallback(async () => {
     try {
@@ -32,6 +35,7 @@ export const ReviewScreen = () => {
       setReviewWords(words);
       setCurrentIndex(0);
       setIsFlipped(false);
+      setAdvanceCount((prev) => prev + 1);
     } catch {
       showErrorAlert();
     }
@@ -69,6 +73,7 @@ export const ReviewScreen = () => {
         setCurrentIndex(0);
       }
       setIsFlipped(false);
+      setAdvanceCount((prev) => prev + 1);
     } catch {
       showErrorAlert();
     }
@@ -81,6 +86,7 @@ export const ReviewScreen = () => {
       setCurrentIndex(0);
     }
     setIsFlipped(false);
+    setAdvanceCount((prev) => prev + 1);
   };
 
   const handleResetProgress = () => {
@@ -165,7 +171,11 @@ export const ReviewScreen = () => {
 
         {/* Интерактивная карточка */}
         <View style={styles.cardContainer}>
-          <FlipCard word={currentWord} onFlipChange={setIsFlipped} />
+          <FlipCard
+            key={`${currentWord.id}-${advanceCount}`}
+            word={currentWord}
+            onFlipChange={setIsFlipped}
+          />
         </View>
 
         {/* Кнопки ответа */}
@@ -280,7 +290,7 @@ const createStyles = (theme: Theme) =>
   },
   flipHintText: {
     textAlign: "center",
-    color: theme.textMutedHint,
+    color: theme.textMuted,
     fontSize: 14,
     fontWeight: "500",
   },

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useMemo } from "react";
+import React, { useRef, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -47,12 +47,6 @@ export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
       flipCard();
     }
   };
-
-  useEffect(() => {
-    setIsFlipped(false);
-    animatedValue.setValue(0);
-    if (onFlipChange) onFlipChange(false);
-  }, [animatedValue, onFlipChange, word]);
 
   const flipCard = () => {
     void Haptics.selectionAsync().catch(() => {});
@@ -246,7 +240,7 @@ const createStyles = (theme: Theme) =>
     position: "absolute",
     bottom: 25,
     fontSize: 13,
-    color: theme.textMutedHint,
+    color: theme.textMuted,
   },
   translation: {
     fontSize: 28,

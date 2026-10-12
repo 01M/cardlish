@@ -415,7 +415,7 @@ export const LearnScreen = () => {
 
         {/* 3D Карточка */}
         <View style={styles.cardWrapper}>
-          <FlipCard word={currentWord} />
+          <FlipCard key={currentWord.id} word={currentWord} />
         </View>
 
         {/* Кнопка "Далее" */}

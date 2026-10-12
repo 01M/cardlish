@@ -34,7 +34,6 @@ export interface Theme {
   textMuted: string; // приглушённый текст (подзаголовки, sectionLabel)
   textMutedAlt: string; // альтернативный приглушённый (транскрипции, label в форме)
   textMutedSoft: string; // самый слабый: подсказки, placeholder, infoSubText
-  textMutedHint: string; // подсказки на карточке и флип-хинт
   textOnAccent: string; // текст на оранжевых/чернильных заливках
   textOnButtonInk: string; // текст на заливке buttonInk (nextButton, pill, активный фильтр)
   textButtonSecondary: string; // текст светлых вторичных кнопок (сброс в Profile/Review)
@@ -124,7 +123,6 @@ export const lightTheme: Theme = {
   textMuted: "#68737D",
   textMutedAlt: "#6B7280",
   textMutedSoft: "#9CA3AF",
-  textMutedHint: "#7A858D",
   textOnAccent: "#FFFFFF",
   textOnButtonInk: "#FFFFFF",
   textButtonSecondary: "#3F4A50",
@@ -196,7 +194,6 @@ export const darkTheme: Theme = {
   textMuted: "#9AA5AD",
   textMutedAlt: "#9AA5AD",
   textMutedSoft: "#9AA5AD",
-  textMutedHint: "#9AA5AD",
   textOnAccent: "#FFFFFF",
   textOnButtonInk: "#0F1519",
   textButtonSecondary: "#C3CCD2",

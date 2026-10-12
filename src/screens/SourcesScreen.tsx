@@ -81,12 +81,16 @@ const SourceCard = ({
     <Text style={styles.fieldLabel}>Что изменено</Text>
     <Text style={styles.fieldText}>{source.changesRu}</Text>
 
-    <Text style={styles.fieldLabel}>Сайт проекта</Text>
-    <SourceLink
-      url={source.url}
-      accessibilityLabel={`Открыть сайт проекта: ${formatUrlForDisplay(source.url)}`}
-      styles={styles}
-    />
+    {source.url !== "" && (
+      <>
+        <Text style={styles.fieldLabel}>Сайт проекта</Text>
+        <SourceLink
+          url={source.url}
+          accessibilityLabel={`Открыть сайт проекта: ${formatUrlForDisplay(source.url)}`}
+          styles={styles}
+        />
+      </>
+    )}
 
     {source.noticeText !== "" && (
       <>

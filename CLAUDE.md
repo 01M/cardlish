@@ -96,7 +96,30 @@ scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python
   Entries are grouped by lowercase headword; if a group has a lowercase-spelled entry, its
   capitalised entries are dropped. One card per group: translations round-robin across the
   group's entries, deduped (NFC, stress mark U+0301 ignored, stressed variant kept), capped at
-  5; transcription = first non-empty one (cut at `<`).
+  5; transcription chosen by `ACCENT_PREFERENCE` (module constant, General American only: the
+  first pronunciation labelled `GA` or `GenAm` in its TEI `<a:…>` annotation, lists like
+  `RP,GA` included, else the first non-empty one), then cut at `<`.
+- Transcription convention — **General American**, phonemic `/…/`; every hand-written
+  transcription follows it: `ɹ` for r, `ɡ` (U+0261), no length marks (`/i/ /u/ /ɔ/`), `oʊ` for
+  GOAT, `ɑ` for PALM/START (`/stɑɹt/`), `ɝ`/`ɚ`, `ʌ`, `ɛ`; `ˈ` before the stressed syllable of
+  multi-syllable words only; no syllable dots, parentheses, hyphens or off-glide marks; affricates
+  tied (`t͡ʃ`, `d͡ʒ`) as in most generated entries. Ranks 1–300 conform (via overrides); the rest
+  of the dictionary still has mixed source notation (dots, parentheses, length marks, British
+  vowels) — a converter-level normalisation is not implemented.
+- Order of the build: cards → `assign_ranks` → `apply_overrides`. Rank is computed from the
+  generated cards, so an override (even a `term` change such as i → I) never changes a rank.
+- **Hand corrections** live in `scripts/data/card_overrides.json` (UTF-8, LF, one object per
+  line): `{ "key", "translations"?, "transcription"?, "term"?, "reason" }`. To correct a card,
+  add an object keyed by the lowercase `term`, giving only the fields to replace: `translations`
+  is a list of 1..5 items (most common meaning first, stress marks only where sure, no slang,
+  vulgar, archaic or jargon items; at most one grammatical function as one parenthesised item
+  without a comma, e.g. "(родительный падеж)"); `transcription` in General American (convention below); `term` only to change
+  the case of the spelling. Then regenerate and update the counts in the `manual-corrections`
+  entry of `src/data/sources.json` (a Python test checks them). The build fails loudly, listing
+  every problem at once, on: unknown key, duplicate key, an override identical to the generated
+  card (stale), a `term` whose lowercase differs from the key, an empty `reason`, unknown
+  fields, nothing to override, translations that are not 1..5 trimmed items or contain
+  duplicates (stress ignored), an empty transcription.
 - JSON shape: array of `{ term, translation, transcription, example, rank }`, one entry per
   lowercase `term` (= `dict_key`), in the order of each group's first eligible source entry.
   This order no longer matches pre-M3b files, so fresh-install ids differ from upgraded ones —
@@ -122,9 +145,11 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Keep edits scoped to the files named in the task.
 - No dead code or leftover legacy after a migration — remove the old path in the same change.
 - **Every new data source must be added to `src/data/sources.json` before its data ships**
-  (title, author, version, https URLs, licence, what is used, what was changed; `noticeText` when
-  the licence requires a full notice). `parseSources()` validates it and a test checks the real
-  file; the "Источники и лицензии" screen shows it with no UI changes.
+  (title, author, version, https licence URL, licence, what is used, what was changed;
+  optional https project `url` — the app's own work has none and the screen then hides
+  "Сайт проекта"; `noticeText` when the licence requires a full notice). `parseSources()`
+  validates it and a test checks the real file; the "Источники и лицензии" screen shows it with
+  no UI changes.
 - Run `npx tsc --noEmit`, `npm run lint` and `npm test` before finishing.
 
 ## Testing

@@ -6,6 +6,7 @@ export interface DataSource {
   title: string;
   author: string;
   version: string;
+  // Сайт проекта; "" у источника без своей страницы (ручные исправления)
   url: string;
   licenceName: string;
   licenceUrl: string;
@@ -23,14 +24,13 @@ const REQUIRED_TEXT_FIELDS = [
   "title",
   "author",
   "version",
-  "url",
   "licenceName",
   "licenceUrl",
   "usageRu",
   "changesRu",
 ] as const;
 
-const URL_FIELDS = ["url", "licenceUrl"] as const;
+const isHttpsUrl = (value: string) => value.startsWith("https://");
 
 const parseSource = (raw: unknown, index: number): DataSource => {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
@@ -44,10 +44,15 @@ const parseSource = (raw: unknown, index: number): DataSource => {
       throw new Error(`Source #${index}: "${field}" must be a non-empty string`);
     }
   }
-  for (const field of URL_FIELDS) {
-    if (!(item[field] as string).startsWith("https://")) {
-      throw new Error(`Source #${index}: "${field}" must start with https://`);
-    }
+  if (item.url !== undefined && typeof item.url !== "string") {
+    throw new Error(`Source #${index}: "url" must be a string`);
+  }
+  const url = (item.url as string | undefined) ?? "";
+  if (url !== "" && !isHttpsUrl(url)) {
+    throw new Error(`Source #${index}: "url" must start with https://`);
+  }
+  if (!isHttpsUrl(item.licenceUrl as string)) {
+    throw new Error(`Source #${index}: "licenceUrl" must start with https://`);
   }
   if (item.noticeText !== undefined && typeof item.noticeText !== "string") {
     throw new Error(`Source #${index}: "noticeText" must be a string`);
@@ -61,7 +66,7 @@ const parseSource = (raw: unknown, index: number): DataSource => {
     title: item.title as string,
     author: item.author as string,
     version: item.version as string,
-    url: item.url as string,
+    url,
     licenceName: item.licenceName as string,
     licenceUrl: item.licenceUrl as string,
     usageRu: item.usageRu as string,
@@ -72,7 +77,8 @@ const parseSource = (raw: unknown, index: number): DataSource => {
 };
 
 // 1. Проверка и разбор списка источников: обязательные поля заполнены,
-// ссылки только https://, ключи уникальны; результат упорядочен по sortOrder
+// ссылки только https:// (сайт проекта может отсутствовать), ключи уникальны;
+// результат упорядочен по sortOrder
 export const parseSources = (raw: unknown): DataSource[] => {
   if (!Array.isArray(raw)) {
     throw new Error("Sources: expected an array");

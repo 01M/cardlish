@@ -1,5 +1,8 @@
 """Convert the FreeDict eng-rus TEI archive into the app's dictionary JSON.
 
+Hand-written corrections live in scripts/data/card_overrides.json and are applied last, after
+the ranks (see apply_overrides).
+
 Run from the repository root with the pipeline venv (see scripts/requirements.txt):
     scripts/.venv/Scripts/python.exe scripts/convert_freedict.py \
         path/to/freedict-eng-rus-2025.11.23.src.tar.xz src/assets/dictionary.json
@@ -28,6 +31,15 @@ WORD_PATTERN = re.compile(r"^[A-Za-z][A-Za-z'-]*$")
 MAX_TRANSLATIONS = 5
 STRESS_MARK = '́'
 
+# Which pronunciation a card shows: the first one annotated with a label of the first group
+# (labels as spelled in the TEI, e.g. <a:GA> or <a:RP,GA>), else of the next group, else the
+# first one. The dictionary uses General American; hand-written transcriptions in
+# scripts/data/card_overrides.json follow the same accent.
+ACCENT_PREFERENCE = (('GA', 'GenAm'),)
+
+# Accent annotation without nested markup, e.g. <a:RP> or <a:RP,GA>
+ACCENT_ANNOTATION = re.compile(r'<a:([^<>]*)>')
+
 # Wiki link without nested brackets: [[target]] or [[target|label]]
 WIKI_LINK = re.compile(r'\[\[([^\[\]|]*)(?:\|([^\[\]]*))?\]\]')
 
@@ -54,6 +66,28 @@ def clean_translation(text):
 def clean_transcription(text):
     """Drop WikDict annotations that follow the IPA, e.g. '/ˈeɪ.pəɹn/<q:obsolete><ref:{{R:…}}>'."""
     return text.split('<', 1)[0].strip()
+
+
+def accent_labels(pronunciation):
+    return {
+        label.strip()
+        for annotation in ACCENT_ANNOTATION.findall(pronunciation)
+        for label in annotation.split(',')
+    }
+
+
+def choose_transcription(pronunciations, preference=ACCENT_PREFERENCE):
+    """Pick a card's transcription from raw TEI pronunciations (in entry order) following the
+    accent preference, then cut its annotations; '' when none is left non-empty."""
+    candidates = [
+        (pronunciation, clean_transcription(pronunciation)) for pronunciation in pronunciations
+    ]
+    candidates = [(raw, cut) for raw, cut in candidates if cut]
+    for accents in preference:
+        for raw, cut in candidates:
+            if accent_labels(raw) & set(accents):
+                return cut
+    return candidates[0][1] if candidates else ''
 
 
 def without_stress(text):
@@ -101,11 +135,11 @@ def merge_translations(translation_lists):
 def build_cards(entries):
     """Merge eligible source entries into one card per lowercase headword.
 
-    `entries` are dicts with `term`, `translations` (cleaned, non-empty) and `transcription`
-    ('' when missing), in source order. When a group has entries spelled in lowercase, its
+    `entries` are dicts with `term`, `translations` (cleaned, non-empty) and `pronunciations`
+    (raw TEI texts), in source order. When a group has entries spelled in lowercase, its
     capitalised entries are dropped. The card keeps the spelling of its first remaining entry,
-    merges the translations of all remaining entries and takes the first non-empty
-    transcription. Cards come in the order of each group's first entry.
+    merges the translations of all remaining entries and picks its transcription from their
+    pronunciations (choose_transcription). Cards come in the order of each group's first entry.
     """
     groups = {}
     for entry in entries:
@@ -117,8 +151,8 @@ def build_cards(entries):
         cards.append({
             'term': kept[0]['term'],
             'translation': ', '.join(merge_translations([entry['translations'] for entry in kept])),
-            'transcription': next(
-                (entry['transcription'] for entry in kept if entry['transcription']), ''
+            'transcription': choose_transcription(
+                [pronunciation for entry in kept for pronunciation in entry['pronunciations']]
             ),
             'example': '',
         })
@@ -148,6 +182,90 @@ def assign_ranks(words, frequency):
 
     for rank, word in enumerate(sorted(words, key=sort_key), start=1):
         word['rank'] = rank
+
+
+OVERRIDES_PATH = Path(__file__).parent / 'data' / 'card_overrides.json'
+OVERRIDE_FIELDS = {'key', 'translations', 'transcription', 'term', 'reason'}
+OVERRIDABLE_FIELDS = {'translations', 'transcription', 'term'}
+
+
+def override_problems(override):
+    """Problems of a single hand-written override that can be seen without the cards."""
+    if not isinstance(override, dict):
+        return ['must be an object']
+    problems = []
+    key = override.get('key')
+    unknown = set(override) - OVERRIDE_FIELDS
+    if unknown:
+        problems.append(f'unknown fields {sorted(unknown)}')
+    if not isinstance(key, str) or not key:
+        problems.append('missing key')
+    reason = override.get('reason')
+    if not isinstance(reason, str) or not reason.strip():
+        problems.append('empty reason')
+    if not OVERRIDABLE_FIELDS & set(override):
+        problems.append('nothing to override')
+    if 'term' in override:
+        term = override['term']
+        if not isinstance(term, str) or term.lower() != key:
+            problems.append(f'term {term!r} does not match the key in lowercase')
+    if 'transcription' in override:
+        transcription = override['transcription']
+        if not isinstance(transcription, str) or not transcription.strip():
+            problems.append('transcription must be a non-empty string')
+    if 'translations' in override:
+        translations = override['translations']
+        if not isinstance(translations, list) or not all(
+            isinstance(item, str) and item and item == item.strip() for item in translations
+        ):
+            problems.append('translations must be a list of non-empty trimmed strings')
+        elif not 1 <= len(translations) <= MAX_TRANSLATIONS:
+            problems.append(f'translations must have 1..{MAX_TRANSLATIONS} items')
+        elif dedupe_translations(translations) != translations:
+            problems.append('translations contain duplicates (stress marks ignored)')
+    return problems
+
+
+def override_values(override):
+    """The card fields an override sets, in the card's format."""
+    values = {field: override[field] for field in ('term', 'transcription') if field in override}
+    if 'translations' in override:
+        values['translation'] = ', '.join(override['translations'])
+    return values
+
+
+def apply_overrides(cards, overrides):
+    """Replace the given fields of cards, looked up by lowercase key, with hand-written values.
+
+    Runs after assign_ranks, so an override never changes a rank. Every problem is collected
+    first and reported together; nothing is applied when there is any.
+    """
+    by_key = {card['term'].lower(): card for card in cards}
+    problems = []
+    seen = set()
+    for override in overrides:
+        key = override.get('key') if isinstance(override, dict) else None
+        own_problems = override_problems(override)
+        problems.extend(f'{key!r}: {problem}' for problem in own_problems)
+        if key in seen:
+            problems.append(f'{key!r}: duplicate key')
+        seen.add(key)
+        card = by_key.get(key)
+        if card is None:
+            problems.append(f'{key!r}: unknown key')
+        elif not own_problems and all(
+            card[field] == value for field, value in override_values(override).items()
+        ):
+            problems.append(f'{key!r}: identical to the generated card (stale)')
+    if problems:
+        raise ValueError('Invalid card overrides:\n' + '\n'.join(problems))
+
+    for override in overrides:
+        by_key[override['key']].update(override_values(override))
+
+
+def load_overrides(path=OVERRIDES_PATH):
+    return json.loads(Path(path).read_text(encoding='utf-8'))
 
 
 def read_tei(archive_path):
@@ -180,23 +298,16 @@ def read_entries(tree):
         if not translations:
             continue
 
-        transcription = next(
-            (
-                pronunciation
-                for pronunciation in (
-                    clean_transcription(text_of(pron))
-                    for pron in entry.findall('./tei:form/tei:pron', NAMESPACE)
-                )
-                if pronunciation
-            ),
-            '',
-        )
-        yield {'term': term, 'translations': translations, 'transcription': transcription}
+        pronunciations = [
+            text_of(pron) for pron in entry.findall('./tei:form/tei:pron', NAMESPACE)
+        ]
+        yield {'term': term, 'translations': translations, 'pronunciations': pronunciations}
 
 
 def convert(archive_path):
     words = build_cards(read_entries(read_tei(archive_path)))
     assign_ranks(words, frequency_of)
+    apply_overrides(words, load_overrides())
     return words
 
 

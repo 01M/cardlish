@@ -58,7 +58,20 @@ Converter rules (details in CLAUDE.md): single-word headwords; content parts of 
 closed-class function words (pronoun, preposition, postposition, conjunction, determiner,
 numeral, interjection, particle); entries grouped by lowercase headword, lowercase spelling
 wins over capitalised; translations merged round-robin across a group's entries, deduped
-ignoring the U+0301 stress mark (stressed variant kept), capped at 5.
+ignoring the U+0301 stress mark (stressed variant kept), capped at 5. Transcription follows the
+`ACCENT_PREFERENCE` constant in `convert_freedict.py` (General American: the first pronunciation
+labelled GA/GenAm, else the first one). Hand-written transcriptions are General American,
+phonemic `/…/`: `ɹ`, `ɡ`, no length marks, `oʊ`, `ɑ`, `ɝ`/`ɚ`, `ʌ`, `ɛ`, `ˈ` only on
+multi-syllable words, no dots/parentheses/off-glide marks, tied affricates (`t͡ʃ`, `d͡ʒ`).
+
+Build order: cards → ranks → hand corrections, so corrections never change a rank. Corrections
+live in `scripts/data/card_overrides.json`, one object per line:
+`{ "key", "translations"?, "transcription"?, "term"?, "reason" }` keyed by the lowercase term,
+replacing only the given fields (translations: 1..5 items, no duplicates). After editing, update
+the counts in the `manual-corrections` entry of `src/data/sources.json` (a Python test checks
+them). The build fails loudly, listing every problem, on an unknown or duplicate key, a stale
+override (identical to the generated card), a `term` that differs from the key other than by
+case, an empty `reason`, unknown fields or invalid values.
 
 JSON shape: array of `{ term, translation, transcription, example, rank }`, one per lowercase
 `term` (= `dict_key`), in the order of each group's first source entry. Fresh-install ids

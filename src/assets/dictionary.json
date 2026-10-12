@@ -1,8 +1,8 @@
 [
   {
     "term": "a",
-    "translation": "а, эй",
-    "transcription": "/eɪ/",
+    "translation": "(неопределённый артикль), оди́н, како́й-то",
+    "transcription": "/ə/",
     "example": "",
     "rank": 5
   },
@@ -4089,7 +4089,7 @@
   },
   {
     "term": "even",
-    "translation": "пло́ский, как ра́з, ве́чер, выра́внивать, гла́дкий",
+    "translation": "да́же, ро́вный, чётный, гла́дкий, ещё",
     "transcription": "/ˈivn̩/",
     "example": "",
     "rank": 94
@@ -4678,7 +4678,7 @@
   {
     "term": "Ghanaian",
     "translation": "га́нский, га́нец",
-    "transcription": "/ɡɑːˈneɪ.ən/",
+    "transcription": "/ˈɡɑ.ni.ən/",
     "example": "",
     "rank": 30031
   },
@@ -5467,8 +5467,8 @@
     "rank": 32916
   },
   {
-    "term": "i",
-    "translation": "ай, и",
+    "term": "I",
+    "translation": "я",
     "transcription": "/aɪ/",
     "example": "",
     "rank": 7
@@ -5531,8 +5531,8 @@
   },
   {
     "term": "it",
-    "translation": "во́да, он, она́, оно́, э́то",
-    "transcription": "/ɘt/",
+    "translation": "оно́, э́то, он, она́, его́",
+    "transcription": "/ɪt/",
     "example": "",
     "rank": 11
   },
@@ -11699,7 +11699,7 @@
   {
     "term": "thing",
     "translation": "вещь, не́что, предме́т",
-    "transcription": "/tɪn/",
+    "transcription": "/θɪŋ/",
     "example": "",
     "rank": 154
   },
@@ -13694,7 +13694,7 @@
   {
     "term": "able",
     "translation": "в состоя́нии, спосо́бный, уме́лый, компете́нтный, полнопра́вный",
-    "transcription": "/ebl̩/",
+    "transcription": "/ˈeɪbəl/",
     "example": "",
     "rank": 293
   },
@@ -13917,8 +13917,8 @@
   },
   {
     "term": "about",
-    "translation": "вокру́г, взад-вперёд, круго́м, туда́-сюда́, повсю́ду",
-    "transcription": "/əˈbaʊ̯t/",
+    "translation": "о, об, про, о́коло, приблизи́тельно",
+    "transcription": "/əˈbaʊt/",
     "example": "",
     "rank": 40
   },
@@ -15745,7 +15745,7 @@
   {
     "term": "actually",
     "translation": "факти́чески, вообще́-то, действи́тельно, на са́мом де́ле",
-    "transcription": "/ˈat͡ʃ.li/",
+    "transcription": "/ˈækt͡ʃuəli/",
     "example": "",
     "rank": 253
   },
@@ -17551,7 +17551,7 @@
   {
     "term": "after",
     "translation": "по́сле, по́сле того́, как, в результа́те, пото́м, и́з-за",
-    "transcription": "/ˈaftə(ɹ)/",
+    "transcription": "/ˈæftɚ/",
     "example": "",
     "rank": 69
   },
@@ -17669,15 +17669,15 @@
   },
   {
     "term": "again",
-    "translation": "наза́д, обра́тно, говори́те, сно́ва, ещё раз",
-    "transcription": "/eɪˈɡeɪn/",
+    "translation": "сно́ва, опя́ть, ещё раз",
+    "transcription": "/əˈɡɛn/",
     "example": "",
     "rank": 159
   },
   {
     "term": "against",
     "translation": "про́тив, по, напро́тив, рядом, пе́ред",
-    "transcription": "/əˈɡeɪnst/",
+    "transcription": "/əˈɡɛnst/",
     "example": "",
     "rank": 163
   },
@@ -19265,8 +19265,8 @@
   },
   {
     "term": "all",
-    "translation": "по́лностью, весь, всё, совсе́м, це́лый",
-    "transcription": "/aːl/",
+    "translation": "все, весь, всё, вся, по́лностью",
+    "transcription": "/ɔl/",
     "example": "",
     "rank": 29
   },
@@ -19945,7 +19945,7 @@
   {
     "term": "also",
     "translation": "то́же, та́кже",
-    "transcription": "/ˈɑl.soʊ/",
+    "transcription": "/ˈɑlsoʊ/",
     "example": "",
     "rank": 60
   },
@@ -20204,7 +20204,7 @@
   {
     "term": "always",
     "translation": "всегда́, ве́чно, постоя́нно, всё вре́мя",
-    "transcription": "/ˈɑl.weɪz/",
+    "transcription": "/ˈɑlweɪz/",
     "example": "",
     "rank": 141
   },
@@ -21688,7 +21688,7 @@
   {
     "term": "and",
     "translation": "и, а, да, но",
-    "transcription": "/and/",
+    "transcription": "/ænd/",
     "example": "",
     "rank": 3
   },
@@ -22815,7 +22815,7 @@
   {
     "term": "another",
     "translation": "друго́й, ещё оди́н, разли́чный",
-    "transcription": "/eɪˈnʌð.ɚ/",
+    "transcription": "/əˈnʌðɚ/",
     "example": "",
     "rank": 149
   },
@@ -24270,8 +24270,8 @@
   },
   {
     "term": "any",
-    "translation": "ещё, како́й-нибудь, вся́кий, никако́й, любо́й",
-    "transcription": "/ˈæni/",
+    "translation": "любо́й, како́й-нибудь, ско́лько-нибудь, вся́кий, никако́й",
+    "transcription": "/ˈɛni/",
     "example": "",
     "rank": 79
   },
@@ -24306,7 +24306,7 @@
   {
     "term": "anything",
     "translation": "всё, всё, что уго́дно, что уго́дно, что́-нибудь",
-    "transcription": "/ˈæn.i.θɪŋ/",
+    "transcription": "/ˈɛniθɪŋ/",
     "example": "",
     "rank": 214
   },
@@ -26272,15 +26272,15 @@
   },
   {
     "term": "are",
-    "translation": "ар",
-    "transcription": "/ɛə/",
+    "translation": "(форма глагола be), есть, явля́ются, нахо́дятся",
+    "transcription": "/ɑɹ/",
     "example": "",
     "rank": 17
   },
   {
     "term": "area",
     "translation": "пло́щадь, край, о́бласть, райо́н",
-    "transcription": "/ˈerɪjɑ/",
+    "transcription": "/ˈɛɹiə/",
     "example": "",
     "rank": 269
   },
@@ -27315,7 +27315,7 @@
   },
   {
     "term": "as",
-    "translation": "как, так, поско́льку, ас, чем",
+    "translation": "как, в ка́честве, так как, когда́, поско́льку",
     "transcription": "/æz/",
     "example": "",
     "rank": 16
@@ -30850,7 +30850,7 @@
   },
   {
     "term": "back",
-    "translation": "ста́рый, вспять, зад, подде́рживать, за́дний",
+    "translation": "наза́д, обра́тно, спина́, за́дний, подде́рживать",
     "transcription": "/bæk/",
     "example": "",
     "rank": 81
@@ -31277,8 +31277,8 @@
   },
   {
     "term": "bad",
-    "translation": "плохо́й, злой, лихо́й, неприя́тный, по́длый",
-    "transcription": "/baːd/",
+    "translation": "плохо́й, злой, неприя́тный, вре́дный",
+    "transcription": "/bæd/",
     "example": "",
     "rank": 227
   },
@@ -32852,7 +32852,7 @@
   },
   {
     "term": "based",
-    "translation": "ба́за",
+    "translation": "осно́ванный, бази́рующийся, располо́женный",
     "transcription": "/beɪst/",
     "example": "",
     "rank": 239
@@ -33720,7 +33720,7 @@
   },
   {
     "term": "because",
-    "translation": "и́з-за, ведь, потому́ что, и́бо, поне́же",
+    "translation": "потому́ что, так как, и́з-за, ведь",
     "transcription": "/biˈkɔz/",
     "example": "",
     "rank": 85
@@ -34259,8 +34259,8 @@
   },
   {
     "term": "being",
-    "translation": "(живо́е) существо́, созда́ние, тварь, творе́ние, бытие́",
-    "transcription": "/ˈbiŋ/",
+    "translation": "живо́е существо́, созда́ние, существова́ние, бытие́",
+    "transcription": "/ˈbiɪŋ/",
     "example": "",
     "rank": 103
   },
@@ -34358,7 +34358,7 @@
   {
     "term": "believe",
     "translation": "ве́рить, пове́рить, ду́мать, полага́ть, счита́ть",
-    "transcription": "/bi-/",
+    "transcription": "/bɪˈliv/",
     "example": "",
     "rank": 240
   },
@@ -35079,7 +35079,7 @@
   {
     "term": "best",
     "translation": "лу́чший, всё возмо́жное, победи́ть, наилу́чший, превзойти́",
-    "transcription": "/ˈbɛst/",
+    "transcription": "/bɛst/",
     "example": "",
     "rank": 122
   },
@@ -35233,7 +35233,7 @@
   {
     "term": "better",
     "translation": "лу́чше, улу́чшиться, лу́чший, улучша́ться, превзойти́",
-    "transcription": "/ˈbɛt.ə/",
+    "transcription": "/ˈbɛtɚ/",
     "example": "",
     "rank": 142
   },
@@ -39223,7 +39223,7 @@
   {
     "term": "book",
     "translation": "кни́га, брони́ровать, заброни́ровать, кни́жка, зака́зывать",
-    "transcription": "/buːk/",
+    "transcription": "/bʊk/",
     "example": "",
     "rank": 294
   },
@@ -39783,7 +39783,7 @@
   {
     "term": "both",
     "translation": "и... и..., о́ба, о́бе",
-    "transcription": "/boʊlθ/",
+    "transcription": "/boʊθ/",
     "example": "",
     "rank": 133
   },
@@ -43234,7 +43234,7 @@
   {
     "term": "business",
     "translation": "предприя́тие, фи́рма, би́знес, компа́ния, заня́тие",
-    "transcription": "/ˈbɪd.nɪs/",
+    "transcription": "/ˈbɪznəs/",
     "example": "",
     "rank": 207
   },
@@ -43346,7 +43346,7 @@
   {
     "term": "but",
     "translation": "но, а, то́лько, хоть, хотя́",
-    "transcription": "/bət/",
+    "transcription": "/bʌt/",
     "example": "",
     "rank": 23
   },
@@ -43632,7 +43632,7 @@
   },
   {
     "term": "by",
-    "translation": "у, ря́дом с, о́коло, до, во и́мя",
+    "translation": "(творительный падеж), у, о́коло, ми́мо, к",
     "transcription": "/baɪ/",
     "example": "",
     "rank": 22
@@ -44451,8 +44451,8 @@
   },
   {
     "term": "call",
-    "translation": "крик, звать, зов, вы́звать, клич",
-    "transcription": "/kaːl/",
+    "translation": "звони́ть, звать, называ́ть, звоно́к, вы́звать",
+    "transcription": "/kɔl/",
     "example": "",
     "rank": 241
   },
@@ -44899,8 +44899,8 @@
   },
   {
     "term": "can",
-    "translation": "бидо́н, мочь, законсерви́ровать, жбан, консерви́ровать",
-    "transcription": "/ˈkæn/",
+    "translation": "мочь, уме́ть, ба́нка, консерви́ровать, мо́жно",
+    "transcription": "/kæn/",
     "example": "",
     "rank": 36
   },
@@ -45747,7 +45747,7 @@
   {
     "term": "car",
     "translation": "авто́, автомаши́на, автомоби́ль, маши́на, та́чка",
-    "transcription": "/kaː/",
+    "transcription": "/kɑɹ/",
     "example": "",
     "rank": 276
   },
@@ -46139,7 +46139,7 @@
   {
     "term": "care",
     "translation": "забо́та, беспоко́иться, забо́титься, беспоко́йство, пригля́дывать",
-    "transcription": "/keə/",
+    "transcription": "/kɛɹ/",
     "example": "",
     "rank": 208
   },
@@ -46153,7 +46153,7 @@
   {
     "term": "career",
     "translation": "карье́ра, по́прище, призва́ние, профе́ссия, карье́р",
-    "transcription": "/kəˈrɪjə(r)/",
+    "transcription": "/kəˈɹɪɹ/",
     "example": "",
     "rank": 708
   },
@@ -49148,7 +49148,7 @@
   },
   {
     "term": "change",
-    "translation": "ме́лкие де́ньги, измени́ться, измене́ние, изменя́ться, переме́на",
+    "translation": "измене́ние, меня́ть, измени́ть, переме́на, сда́ча",
     "transcription": "/t͡ʃeɪnd͡ʒ/",
     "example": "",
     "rank": 219
@@ -52355,7 +52355,7 @@
   {
     "term": "city",
     "translation": "го́род, град",
-    "transcription": "/sɪtɪ/",
+    "transcription": "/ˈsɪti/",
     "example": "",
     "rank": 185
   },
@@ -55756,8 +55756,8 @@
   },
   {
     "term": "come",
-    "translation": "приходи́ть, прие́хать, приезжа́ть, прийти́, изверга́ть",
-    "transcription": "/kʊm/",
+    "translation": "приходи́ть, прийти́, приезжа́ть, прие́хать, идти́",
+    "transcription": "/kʌm/",
     "example": "",
     "rank": 135
   },
@@ -56359,7 +56359,7 @@
   {
     "term": "company",
     "translation": "компа́ния, о́бщество, това́рищество, ро́та, со́тня",
-    "transcription": "/kəmp(ə)ˈni/",
+    "transcription": "/ˈkʌmpəni/",
     "example": "",
     "rank": 192
   },
@@ -61951,8 +61951,8 @@
   },
   {
     "term": "country",
-    "translation": "дереве́нский, край, се́льский, страна́, госуда́рство",
-    "transcription": "/kəɳʈɾi/",
+    "translation": "страна́, дереве́нский, се́льская ме́стность, ро́дина",
+    "transcription": "/ˈkʌntɹi/",
     "example": "",
     "rank": 261
   },
@@ -62049,8 +62049,8 @@
   },
   {
     "term": "course",
-    "translation": "ход, течь, блю́до, бежа́ть, циркули́ровать",
-    "transcription": "/koəs/",
+    "translation": "курс, ход, блю́до, направле́ние",
+    "transcription": "/kɔɹs/",
     "example": "",
     "rank": 285
   },
@@ -67013,7 +67013,7 @@
   {
     "term": "days",
     "translation": "дни",
-    "transcription": "/ˈdeɪz/",
+    "transcription": "/deɪz/",
     "example": "",
     "rank": 186
   },
@@ -72508,7 +72508,7 @@
   {
     "term": "different",
     "translation": "друго́й, ино́й, не тако́й как, отли́чный, ра́зный",
-    "transcription": "/ˈdɪ.fə.ɹənt/",
+    "transcription": "/ˈdɪfɹənt/",
     "example": "",
     "rank": 197
   },
@@ -75650,8 +75650,8 @@
   },
   {
     "term": "do",
-    "translation": "до, ведь, вечери́нка, причёска, же",
-    "transcription": "/diː/",
+    "translation": "де́лать, сде́лать, выполня́ть, занима́ться, (вспомогательный глагол)",
+    "transcription": "/du/",
     "example": "",
     "rank": 46
   },
@@ -75994,7 +75994,7 @@
   {
     "term": "doing",
     "translation": "де́йствие, де́ло, дея́ние, посту́пок",
-    "transcription": "/ˈdiːɪn/",
+    "transcription": "/ˈduɪŋ/",
     "example": "",
     "rank": 193
   },
@@ -76287,8 +76287,8 @@
   },
   {
     "term": "done",
-    "translation": "гото́вый, готово, завершённый, истощённый, конченый",
-    "transcription": "/duːn/",
+    "translation": "сде́ланный, гото́вый, завершённый, око́нченный",
+    "transcription": "/dʌn/",
     "example": "",
     "rank": 200
   },
@@ -76959,7 +76959,7 @@
   },
   {
     "term": "down",
-    "translation": "снижа́ющийся, внизу́, безле́сая возвы́шенность, вдоль, вы́пить за́лпом",
+    "translation": "вниз, внизу́, по, пух, пода́вленный",
     "transcription": "/daʊn/",
     "example": "",
     "rank": 117
@@ -78794,7 +78794,7 @@
   {
     "term": "during",
     "translation": "в тече́ние, в продолже́ние, во вре́мя, во времена́, при",
-    "transcription": "/ˈd(j)ɜɹɪŋ/",
+    "transcription": "/ˈdʊɹɪŋ/",
     "example": "",
     "rank": 152
   },
@@ -79403,7 +79403,7 @@
   {
     "term": "early",
     "translation": "ра́нний, ра́но",
-    "transcription": "/ˈɜɹli/",
+    "transcription": "/ˈɝli/",
     "example": "",
     "rank": 295
   },
@@ -82917,7 +82917,7 @@
   {
     "term": "end",
     "translation": "коне́ц, заверша́ть, смерть, заверши́ть, зака́нчивать",
-    "transcription": "/iːnd/",
+    "transcription": "/ɛnd/",
     "example": "",
     "rank": 164
   },
@@ -83659,7 +83659,7 @@
   {
     "term": "enough",
     "translation": "дово́льно, доста́точно!, доста́точно, хватать",
-    "transcription": "/i-/",
+    "transcription": "/ɪˈnʌf/",
     "example": "",
     "rank": 220
   },
@@ -85157,7 +85157,7 @@
   {
     "term": "ergot",
     "translation": "спорынья́",
-    "transcription": "/ɛɹˈɡoʊ/",
+    "transcription": "/ˈəɹɡət/",
     "example": "",
     "rank": 22261
   },
@@ -85661,7 +85661,7 @@
   {
     "term": "essay",
     "translation": "о́черк, сочине́ние, эссе́",
-    "transcription": "/ɛˈseɪ/",
+    "transcription": "/ˈɛs.eɪ/",
     "example": "",
     "rank": 3160
   },
@@ -86557,7 +86557,7 @@
   {
     "term": "ever",
     "translation": "всегда́, когда́-либо",
-    "transcription": "/ˈɛvə/",
+    "transcription": "/ˈɛvɚ/",
     "example": "",
     "rank": 172
   },
@@ -86606,7 +86606,7 @@
   {
     "term": "every",
     "translation": "ка́ждый, вся́кий",
-    "transcription": "/ˈɛv.(ə.)ɹi/",
+    "transcription": "/ˈɛvɹi/",
     "example": "",
     "rank": 134
   },
@@ -86627,7 +86627,7 @@
   {
     "term": "everyone",
     "translation": "все, вся́кий, ка́ждый",
-    "transcription": "/ˈɛv.ɹi.wʌn/",
+    "transcription": "/ˈɛvɹiwʌn/",
     "example": "",
     "rank": 266
   },
@@ -89195,7 +89195,7 @@
   },
   {
     "term": "face",
-    "translation": "лицо́, предстать, лик, сме́ло встреча́ть, еба́ло",
+    "translation": "лицо́, ста́лкиваться, встреча́ть, смотре́ть в лицо́",
     "transcription": "/feɪs/",
     "example": "",
     "rank": 277
@@ -89874,8 +89874,8 @@
   },
   {
     "term": "family",
-    "translation": "семе́йный, семья́, семе́йство, фами́лия, род",
-    "transcription": "/ˈfæ.m(ə.)li/",
+    "translation": "семья́, семе́йство, род, семе́йный",
+    "transcription": "/ˈfæməli/",
     "example": "",
     "rank": 173
   },
@@ -90099,7 +90099,7 @@
   {
     "term": "far",
     "translation": "далёкий, дале́че, да́льний, далёко, далеко́",
-    "transcription": "/faɹ/",
+    "transcription": "/fɑɹ/",
     "example": "",
     "rank": 247
   },
@@ -91071,8 +91071,8 @@
   },
   {
     "term": "feel",
-    "translation": "нащу́пывать, ощу́пывать, тро́гать, чу́вствовать, щу́пать",
-    "transcription": "/fiːl/",
+    "translation": "чу́вствовать, ощуща́ть, чу́вство, тро́гать, щу́пать",
+    "transcription": "/fil/",
     "example": "",
     "rank": 169
   },
@@ -91870,7 +91870,7 @@
   {
     "term": "few",
     "translation": "ма́ло, не́сколько, немно́гий",
-    "transcription": "/fjuː/",
+    "transcription": "/fju/",
     "example": "",
     "rank": 194
   },
@@ -92709,7 +92709,7 @@
   },
   {
     "term": "find",
-    "translation": "нахо́дка, находи́ть, иска́ние, найти́, нахожде́ние",
+    "translation": "находи́ть, найти́, обнару́живать, счита́ть, нахо́дка",
     "transcription": "/faɪnd/",
     "example": "",
     "rank": 143
@@ -93151,7 +93151,7 @@
   {
     "term": "first",
     "translation": "пе́рвый, в пе́рвую о́чередь, во-пе́рвых, пре́жде всего́, сперва́",
-    "transcription": "/fɔːst/",
+    "transcription": "/fɝst/",
     "example": "",
     "rank": 70
   },
@@ -93423,8 +93423,8 @@
   },
   {
     "term": "five",
-    "translation": "пятёрка, пять, пя́теро, пято́к",
-    "transcription": "/faj(v)/",
+    "translation": "пять, пя́теро, пятёрка",
+    "transcription": "/faɪv/",
     "example": "",
     "rank": 278
   },
@@ -95684,8 +95684,8 @@
   },
   {
     "term": "for",
-    "translation": "ибо, к, и́з-за того́, что, на, потому́ что",
-    "transcription": "/foː(ɹ)/",
+    "translation": "для, за, на, в тече́ние, ра́ди",
+    "transcription": "/fɔɹ/",
     "example": "",
     "rank": 8
   },
@@ -96511,7 +96511,7 @@
   {
     "term": "forte",
     "translation": "фо́рте, си́ла, си́льная сторона́",
-    "transcription": "/ˈfoəteɪ/",
+    "transcription": "/ˈfoɹteɪ/",
     "example": "",
     "rank": 10482
   },
@@ -96846,7 +96846,7 @@
   },
   {
     "term": "found",
-    "translation": "осно́вывать, основа́ть, учреди́ть, учрежда́ть",
+    "translation": "нашёл, на́йденный, осно́вывать, основа́ть",
     "transcription": "/faʊnd/",
     "example": "",
     "rank": 165
@@ -96895,8 +96895,8 @@
   },
   {
     "term": "four",
-    "translation": "четвёрка, четы́ре, четырёхлетка, четырёхлетнее, четырёхлетний",
-    "transcription": "/fo(ː)r/",
+    "translation": "четы́ре, че́тверо, четвёрка",
+    "transcription": "/fɔɹ/",
     "example": "",
     "rank": 228
   },
@@ -97344,7 +97344,7 @@
   {
     "term": "free",
     "translation": "свобо́дный, беспла́тно, вы́зволить, во́льный, да́ром",
-    "transcription": "/fɹiː/",
+    "transcription": "/fɹi/",
     "example": "",
     "rank": 179
   },
@@ -97967,7 +97967,7 @@
   {
     "term": "from",
     "translation": "из, от, с",
-    "transcription": "/fɹɒm/",
+    "transcription": "/fɹʌm/",
     "example": "",
     "rank": 24
   },
@@ -98429,7 +98429,7 @@
   {
     "term": "full",
     "translation": "по́лный, запо́лненный, напо́лненный, перепо́лненный, це́лый",
-    "transcription": "/fʉl/",
+    "transcription": "/fʊl/",
     "example": "",
     "rank": 222
   },
@@ -100781,7 +100781,7 @@
   {
     "term": "general",
     "translation": "о́бщий, военача́льник, всео́бщий, генера́л, генера́льный",
-    "transcription": "/ˈd͡ʒen.(ə.)ɹəl/",
+    "transcription": "/ˈd͡ʒɛnɹəl/",
     "example": "",
     "rank": 267
   },
@@ -101585,7 +101585,7 @@
   },
   {
     "term": "get",
-    "translation": "стать, де́латься, сде́латься, станови́ться, добира́ться",
+    "translation": "получа́ть, получи́ть, станови́ться, достава́ть, добира́ться",
     "transcription": "/ɡɛt/",
     "example": "",
     "rank": 54
@@ -103097,7 +103097,7 @@
   },
   {
     "term": "go",
-    "translation": "го, говори́ть, о́чередь, ходи́ть, попы́тка",
+    "translation": "идти́, е́хать, ходи́ть, уходи́ть, попы́тка",
     "transcription": "/ɡoʊ/",
     "example": "",
     "rank": 86
@@ -103637,7 +103637,7 @@
   {
     "term": "good",
     "translation": "хоро́ший, добро́, до́брый, прок, толк",
-    "transcription": "/ɡʉd/",
+    "transcription": "/ɡʊd/",
     "example": "",
     "rank": 67
   },
@@ -104043,7 +104043,7 @@
   {
     "term": "government",
     "translation": "прави́тельство, управле́ние, госуда́рство",
-    "transcription": "/ˈɡaʊməɳʈ/",
+    "transcription": "/ˈɡʌvɚnmənt/",
     "example": "",
     "rank": 203
   },
@@ -104953,7 +104953,7 @@
   {
     "term": "great",
     "translation": "великоле́пный, здо́рово, замеча́тельный, класс, отли́чный",
-    "transcription": "/ɡɹiːt/",
+    "transcription": "/ɡɹeɪt/",
     "example": "",
     "rank": 118
   },
@@ -105779,7 +105779,7 @@
   {
     "term": "group",
     "translation": "гру́ппа, группирова́ть, коллекти́в, сгруппирова́ть, группирова́ться",
-    "transcription": "/ɡɹuːp/",
+    "transcription": "/ɡɹup/",
     "example": "",
     "rank": 204
   },
@@ -109146,7 +109146,7 @@
   {
     "term": "have",
     "translation": "име́ть",
-    "transcription": "/heɪv/",
+    "transcription": "/hæv/",
     "example": "",
     "rank": 18
   },
@@ -109328,7 +109328,7 @@
   {
     "term": "he",
     "translation": "он",
-    "transcription": "/(h)i/",
+    "transcription": "/hi/",
     "example": "",
     "rank": 20
   },
@@ -109348,8 +109348,8 @@
   },
   {
     "term": "head",
-    "translation": "головно́й, глава́, возгла́вить, голова́, возглавля́ть",
-    "transcription": "/hiːd/",
+    "translation": "голова́, глава́, возглавля́ть, направля́ться, головно́й",
+    "transcription": "/hɛd/",
     "example": "",
     "rank": 242
   },
@@ -110959,7 +110959,7 @@
   {
     "term": "her",
     "translation": "её, ей, она́",
-    "transcription": "/heː/",
+    "transcription": "/hɝ/",
     "example": "",
     "rank": 51
   },
@@ -111071,7 +111071,7 @@
   {
     "term": "here",
     "translation": "здесь, тут, сюда́",
-    "transcription": "/hiə/",
+    "transcription": "/hɪɹ/",
     "example": "",
     "rank": 97
   },
@@ -111903,7 +111903,7 @@
   },
   {
     "term": "high",
-    "translation": "высо́кий, высоко, балдёж, кайф, прихо́д",
+    "translation": "высо́кий, высоко́",
     "transcription": "/haɪ/",
     "example": "",
     "rank": 145
@@ -112198,7 +112198,7 @@
   {
     "term": "him",
     "translation": "его́, ему́",
-    "transcription": "/əm/",
+    "transcription": "/hɪm/",
     "example": "",
     "rank": 71
   },
@@ -112407,7 +112407,7 @@
   },
   {
     "term": "his",
-    "translation": "свой, его́",
+    "translation": "его́, свой",
     "transcription": "/hɪz/",
     "example": "",
     "rank": 31
@@ -113051,7 +113051,7 @@
   },
   {
     "term": "home",
-    "translation": "домо́й, дом, навести́сь, ро́дина, наводи́ться",
+    "translation": "дом, домо́й, до́ма, ро́дина, дома́шний",
     "transcription": "/hoʊm/",
     "example": "",
     "rank": 126
@@ -114465,7 +114465,7 @@
   },
   {
     "term": "house",
-    "translation": "пала́та, вмеща́ть, дом, помеща́ть, сели́ть",
+    "translation": "дом, жили́ще, пала́та, вмеща́ть, размеща́ть",
     "transcription": "/haʊs/",
     "example": "",
     "rank": 156
@@ -114613,7 +114613,7 @@
   {
     "term": "however",
     "translation": "одна́ко, тем не ме́нее",
-    "transcription": "/haʊˈɛvə/",
+    "transcription": "/haʊˈɛvɚ/",
     "example": "",
     "rank": 201
   },
@@ -118841,7 +118841,7 @@
   {
     "term": "important",
     "translation": "ва́жный, зна́чимый",
-    "transcription": "/-ˈpo(r)-/",
+    "transcription": "/ɪmˈpɔɹtənt/",
     "example": "",
     "rank": 288
   },
@@ -119247,7 +119247,7 @@
   {
     "term": "in",
     "translation": "в, за, че́рез, из, по",
-    "transcription": "/ɘn/",
+    "transcription": "/ɪn/",
     "example": "",
     "rank": 6
   },
@@ -119772,7 +119772,7 @@
   {
     "term": "including",
     "translation": "включа́я, в том числе́",
-    "transcription": "/ɪnˈkluːdɪŋ/",
+    "transcription": "/ɪnˈkludɪŋ/",
     "example": "",
     "rank": 234
   },
@@ -121515,7 +121515,7 @@
   {
     "term": "information",
     "translation": "информа́ция, да́нные, инфа́, све́дение",
-    "transcription": "/ˌɪn.fəˈmeɪ.ʃn̩/",
+    "transcription": "/ˌɪnfɚˈmeɪʃən/",
     "example": "",
     "rank": 296
   },
@@ -124280,7 +124280,7 @@
   {
     "term": "into",
     "translation": "в, на, увлечён",
-    "transcription": "/ˈɪn.tiː/",
+    "transcription": "/ˈɪntu/",
     "example": "",
     "rank": 72
   },
@@ -127632,8 +127632,8 @@
   },
   {
     "term": "just",
-    "translation": "пра́вильный, лишь, ве́рный, то́лько, то́чный",
-    "transcription": "/d͡ʒəs(t)/",
+    "translation": "про́сто, то́лько что, то́лько, лишь, справедли́вый",
+    "transcription": "/d͡ʒʌst/",
     "example": "",
     "rank": 38
   },
@@ -128297,8 +128297,8 @@
   },
   {
     "term": "keep",
-    "translation": "цитаде́ль, обеспе́чивать, содержа́ние, обеспе́чить, содержа́ть",
-    "transcription": "/kiːp/",
+    "translation": "держа́ть, храни́ть, продолжа́ть, сохраня́ть, содержа́ть",
+    "transcription": "/kip/",
     "example": "",
     "rank": 174
   },
@@ -129193,7 +129193,7 @@
   },
   {
     "term": "kind",
-    "translation": "до́брый, ка́чество, доброду́шный, приро́да, доброжела́тельный",
+    "translation": "до́брый, вид, тип, сорт, род",
     "transcription": "/kaɪnd/",
     "example": "",
     "rank": 279
@@ -131938,7 +131938,7 @@
   {
     "term": "last",
     "translation": "после́дний, в конце́, про́шлый, коло́дка, дли́ться",
-    "transcription": "/last/",
+    "transcription": "/læst/",
     "example": "",
     "rank": 120
   },
@@ -131994,7 +131994,7 @@
   {
     "term": "later",
     "translation": "по́зже, пото́м, по́сле, поздне́е",
-    "transcription": "/ˈleɪ.tə/",
+    "transcription": "/ˈleɪtɚ/",
     "example": "",
     "rank": 254
   },
@@ -132239,7 +132239,7 @@
   {
     "term": "law",
     "translation": "зако́н, пра́во, пра́вило, поли́ция",
-    "transcription": "/laː/",
+    "transcription": "/lɔ/",
     "example": "",
     "rank": 272
   },
@@ -132862,7 +132862,7 @@
   {
     "term": "left",
     "translation": "ле́вый, сле́ва, оста́вшийся, либера́льный, вле́во",
-    "transcription": "/lɛf/",
+    "transcription": "/lɛft/",
     "example": "",
     "rank": 183
   },
@@ -134205,7 +134205,7 @@
   },
   {
     "term": "life",
-    "translation": "жизнь, живо́т, житие́, житьё, дни",
+    "translation": "жизнь",
     "transcription": "/laɪf/",
     "example": "",
     "rank": 114
@@ -134555,8 +134555,8 @@
   },
   {
     "term": "like",
-    "translation": "похо́жий, лайк, ти́па, как, нра́виться",
-    "transcription": "/laɪ̯k/",
+    "translation": "нра́виться, люби́ть, как, похо́жий, вро́де",
+    "transcription": "/laɪk/",
     "example": "",
     "rank": 39
   },
@@ -135508,7 +135508,7 @@
   {
     "term": "little",
     "translation": "ма́ленький, ма́ло, ма́лый, немно́го, мла́дший",
-    "transcription": "/lɪʈl̩/",
+    "transcription": "/ˈlɪtəl/",
     "example": "",
     "rank": 146
   },
@@ -135535,8 +135535,8 @@
   },
   {
     "term": "live",
-    "translation": "живо́й, в прямо́м эфи́ре, жить, вживу́ю, прожи́ть",
-    "transcription": "/laɪv/",
+    "translation": "жить, прожи́ть, живо́й, в прямо́м эфи́ре",
+    "transcription": "/lɪv/",
     "example": "",
     "rank": 223
   },
@@ -135802,7 +135802,7 @@
   {
     "term": "local",
     "translation": "лока́льный, ме́стный, тузе́мец",
-    "transcription": "/ˈloʊ.kl̩/",
+    "transcription": "/ˈloʊkəl/",
     "example": "",
     "rank": 297
   },
@@ -136355,7 +136355,7 @@
   {
     "term": "long",
     "translation": "дли́нный, далеко́, до́лго, до́лгий",
-    "transcription": "/læŋ/",
+    "transcription": "/lɔŋ/",
     "example": "",
     "rank": 127
   },
@@ -136529,8 +136529,8 @@
   },
   {
     "term": "look",
-    "translation": "смотри́, взгляд, вы́глядеть, смотри́те, вид",
-    "transcription": "/luːk/",
+    "translation": "смотре́ть, вы́глядеть, взгляд, вид, иска́ть",
+    "transcription": "/lʊk/",
     "example": "",
     "rank": 128
   },
@@ -136760,7 +136760,7 @@
   },
   {
     "term": "lot",
-    "translation": "гру́ппа, судьба́, у́часть, жре́бий",
+    "translation": "мно́го, уча́сток, па́ртия, жре́бий, судьба́",
     "transcription": "/lɑt/",
     "example": "",
     "rank": 187
@@ -136893,8 +136893,8 @@
   },
   {
     "term": "love",
-    "translation": "ноль, люби́ть, любо́вь, люби́мая, люби́мый",
-    "transcription": "/lʊv/",
+    "translation": "любо́вь, люби́ть, дорого́й, ми́лый",
+    "transcription": "/lʌv/",
     "example": "",
     "rank": 124
   },
@@ -138790,7 +138790,7 @@
   },
   {
     "term": "make",
-    "translation": "ма́рка, де́лать, заста́вить, заставля́ть, изгота́вливать",
+    "translation": "де́лать, сде́лать, заставля́ть, производи́ть, ма́рка",
     "transcription": "/meɪk/",
     "example": "",
     "rank": 76
@@ -139266,7 +139266,7 @@
   },
   {
     "term": "man",
-    "translation": "блин, муж, чёрт, мужчи́на, челове́к",
+    "translation": "мужчи́на, челове́к, челове́чество",
     "transcription": "/mæn/",
     "example": "",
     "rank": 125
@@ -140009,7 +140009,7 @@
   {
     "term": "many",
     "translation": "мно́гие, мно́гий, мно́гое, мно́го",
-    "transcription": "/ˈmæni/",
+    "transcription": "/ˈmɛni/",
     "example": "",
     "rank": 111
   },
@@ -141520,7 +141520,7 @@
   },
   {
     "term": "may",
-    "translation": "боя́рышник, мочь, мо́жно, мо́жет быть, да",
+    "translation": "мочь, мо́жно, мо́жет быть, боя́рышник",
     "transcription": "/meɪ/",
     "example": "",
     "rank": 96
@@ -141528,7 +141528,7 @@
   {
     "term": "maybe",
     "translation": "возмо́жно, мо́жет быть, наве́рное, то́ ли",
-    "transcription": "/mɛˈbiː/",
+    "transcription": "/ˈmeɪbi/",
     "example": "",
     "rank": 280
   },
@@ -141612,7 +141612,7 @@
   {
     "term": "me",
     "translation": "мне, меня́, себе́, я",
-    "transcription": "/meɪ/",
+    "transcription": "/mi/",
     "example": "",
     "rank": 33
   },
@@ -141695,8 +141695,8 @@
   },
   {
     "term": "mean",
-    "translation": "сре́дний, сре́днее, намерева́ться, дрянной, сре́дство",
-    "transcription": "/mijən/",
+    "translation": "зна́чить, име́ть в виду́, подразумева́ть, сре́дний, злой",
+    "transcription": "/min/",
     "example": "",
     "rank": 230
   },
@@ -144572,7 +144572,7 @@
   },
   {
     "term": "might",
-    "translation": "мощь, могу́щество, си́ла, возмо́жность",
+    "translation": "мог бы, мо́жет быть, мощь, си́ла",
     "transcription": "/maɪt/",
     "example": "",
     "rank": 175
@@ -146994,8 +146994,8 @@
   },
   {
     "term": "money",
-    "translation": "ба́бки, ба́шли, бабло́, бабло́сы, бабо́сы",
-    "transcription": "/məˈni/",
+    "translation": "де́ньги, сре́дства",
+    "transcription": "/ˈmʌni/",
     "example": "",
     "rank": 178
   },
@@ -147849,7 +147849,7 @@
   {
     "term": "more",
     "translation": "бо́льше, бо́лее, ещё",
-    "transcription": "/mo(ː)ɹ/",
+    "transcription": "/mɔɹ/",
     "example": "",
     "rank": 45
   },
@@ -148198,8 +148198,8 @@
   },
   {
     "term": "most",
-    "translation": "-а́йший, бо́льше всего́, -е́йший, наи-, большинство́",
-    "transcription": "/ˈmoʊst/",
+    "translation": "са́мый, бо́льше всего́, большинство́, наибо́лее",
+    "transcription": "/moʊst/",
     "example": "",
     "rank": 90
   },
@@ -148850,7 +148850,7 @@
   {
     "term": "much",
     "translation": "намно́го, мно́го, гора́здо, нема́ло, о́чень",
-    "transcription": "/mʊt͡ʃ/",
+    "transcription": "/mʌt͡ʃ/",
     "example": "",
     "rank": 91
   },
@@ -150011,8 +150011,8 @@
   },
   {
     "term": "must",
-    "translation": "муст, до́лжен, должна́, должно́, должны́",
-    "transcription": "/məs/",
+    "translation": "до́лжен, на́до, ну́жно, обяза́тельно",
+    "transcription": "/mʌst/",
     "example": "",
     "rank": 166
   },
@@ -151251,7 +151251,7 @@
   {
     "term": "national",
     "translation": "госуда́рственный, гражданин, наро́дный, национа́льный",
-    "transcription": "/ˈnaʃ.(ə).n(ə)l/",
+    "transcription": "/ˈnæʃənəl/",
     "example": "",
     "rank": 244
   },
@@ -151810,7 +151810,7 @@
   },
   {
     "term": "need",
-    "translation": "нужда́, нужда́ться, необходи́мость, быть ну́жным, потре́ба",
+    "translation": "нужда́ться, ну́жно, на́до, потре́бность, нужда́",
     "transcription": "/nid/",
     "example": "",
     "rank": 98
@@ -152805,7 +152805,7 @@
   {
     "term": "never",
     "translation": "никогда́",
-    "transcription": "/ˈnɛv.ə(ɹ)/",
+    "transcription": "/ˈnɛvɚ/",
     "example": "",
     "rank": 112
   },
@@ -152840,7 +152840,7 @@
   {
     "term": "new",
     "translation": "но́вый, Нью-",
-    "transcription": "/njuː/",
+    "transcription": "/nu/",
     "example": "",
     "rank": 56
   },
@@ -152909,8 +152909,8 @@
   },
   {
     "term": "news",
-    "translation": "весть, ве́сти, ве́сточка, изве́стия, но́вости",
-    "transcription": "/n(j)udʒ/",
+    "translation": "но́вости, изве́стия, весть",
+    "transcription": "/nuz/",
     "example": "",
     "rank": 291
   },
@@ -153014,7 +153014,7 @@
   },
   {
     "term": "next",
-    "translation": "ближа́йший, вблизи́, сле́дующий, во́зле, сосе́дний",
+    "translation": "сле́дующий, бу́дущий, зате́м, ря́дом, сосе́дний",
     "transcription": "/nɛkst/",
     "example": "",
     "rank": 160
@@ -153749,8 +153749,8 @@
   },
   {
     "term": "no",
-    "translation": "воспрещаться, нет, не",
-    "transcription": "/neɪ/",
+    "translation": "нет, не, никако́й, ни",
+    "transcription": "/noʊ/",
     "example": "",
     "rank": 47
   },
@@ -154870,7 +154870,7 @@
   {
     "term": "not",
     "translation": "не, а не",
-    "transcription": "/nɒt/",
+    "transcription": "/nɑt/",
     "example": "",
     "rank": 21
   },
@@ -154954,7 +154954,7 @@
   {
     "term": "nothing",
     "translation": "ничто́, ничего́",
-    "transcription": "/-ŋk/",
+    "transcription": "/ˈnʌθɪŋ/",
     "example": "",
     "rank": 216
   },
@@ -155163,7 +155163,7 @@
   },
   {
     "term": "now",
-    "translation": "ны́не, раз уж, пора́, сейча́с, тепе́рь",
+    "translation": "сейча́с, тепе́рь, раз уж",
     "transcription": "/naʊ/",
     "example": "",
     "rank": 62
@@ -155430,7 +155430,7 @@
   {
     "term": "number",
     "translation": "число́, исчисля́ться, коли́чество, насчи́тывать, нумерова́ть",
-    "transcription": "/ˈnʌmbər/",
+    "transcription": "/ˈnʌmbɚ/",
     "example": "",
     "rank": 184
   },
@@ -157046,14 +157046,14 @@
   },
   {
     "term": "of",
-    "translation": "из, насчёт, о, об, про",
-    "transcription": "/ɒv/",
+    "translation": "(родительный падеж), из, о, от",
+    "transcription": "/ʌv/",
     "example": "",
     "rank": 4
   },
   {
     "term": "off",
-    "translation": "выкл., вон, от, замочи́ть, выключить",
+    "translation": "прочь, от, с, вы́ключен, выходно́й",
     "transcription": "/ɑf/",
     "example": "",
     "rank": 107
@@ -157530,7 +157530,7 @@
   {
     "term": "old",
     "translation": "ста́рый, пожило́й, в во́зрасте, в года́х, в лета́х",
-    "transcription": "/aʊld/",
+    "transcription": "/oʊld/",
     "example": "",
     "rank": 147
   },
@@ -157900,8 +157900,8 @@
   },
   {
     "term": "on",
-    "translation": "вкл., на, вклю́чить, за счёт, с",
-    "transcription": "/än/",
+    "translation": "на, в, по, о, включён",
+    "transcription": "/ɑn/",
     "example": "",
     "rank": 12
   },
@@ -157936,7 +157936,7 @@
   {
     "term": "once",
     "translation": "оди́н раз, как то́лько, одна́жды, когда́-то, ра́нее",
-    "transcription": "/wɒn(t)s/",
+    "transcription": "/wʌns/",
     "example": "",
     "rank": 231
   },
@@ -157984,8 +157984,8 @@
   },
   {
     "term": "one",
-    "translation": "еди́нственный, едини́ца, раз, мо́жно, оди́н",
-    "transcription": "/(w)ɵn/",
+    "translation": "оди́н, одна́, одно́, едини́ца, еди́нственный",
+    "transcription": "/wʌn/",
     "example": "",
     "rank": 35
   },
@@ -158188,7 +158188,7 @@
   {
     "term": "only",
     "translation": "еди́нственный, то́лько, за исключе́нием того́, что, еди́ный, лишь",
-    "transcription": "/(w)ɵnˈli/",
+    "transcription": "/ˈoʊnli/",
     "example": "",
     "rank": 68
   },
@@ -158461,7 +158461,7 @@
   {
     "term": "open",
     "translation": "откры́тый, отвори́ть, отворя́ть, поднима́ть, подня́ть",
-    "transcription": "/ˈoʊ.pən/",
+    "transcription": "/ˈoʊpən/",
     "example": "",
     "rank": 262
   },
@@ -158957,8 +158957,8 @@
   },
   {
     "term": "or",
-    "translation": "золото́й, а́ли, зо́лото, и́ли, ли́бо",
-    "transcription": "/oɹ/",
+    "translation": "и́ли, ли́бо, ина́че",
+    "transcription": "/ɔɹ/",
     "example": "",
     "rank": 26
   },
@@ -159182,7 +159182,7 @@
   {
     "term": "order",
     "translation": "поря́док, прика́зывать, приказа́ть, кома́нда, зака́зывать",
-    "transcription": "/ˈɔɹ.dɚ/",
+    "transcription": "/ˈɔɹdɚ/",
     "example": "",
     "rank": 257
   },
@@ -160085,7 +160085,7 @@
   {
     "term": "other",
     "translation": "друго́й, ино́й",
-    "transcription": "/ʊðə/",
+    "transcription": "/ˈʌðɚ/",
     "example": "",
     "rank": 63
   },
@@ -160239,7 +160239,7 @@
   {
     "term": "our",
     "translation": "наш",
-    "transcription": "/aʊ(ə)ɹ/",
+    "transcription": "/aʊɚ/",
     "example": "",
     "rank": 65
   },
@@ -160280,7 +160280,7 @@
   },
   {
     "term": "out",
-    "translation": "а́ут, из, удалённый, удале́ние, вне",
+    "translation": "из, нару́жу, вне, снару́жи, нет до́ма",
     "transcription": "/aʊt/",
     "example": "",
     "rank": 42
@@ -160707,8 +160707,8 @@
   },
   {
     "term": "over",
-    "translation": "око́нченный, опя́ть, приём, над, сно́ва",
-    "transcription": "/aʊæ/",
+    "translation": "над, че́рез, бо́лее, око́нчен, сно́ва",
+    "transcription": "/ˈoʊvɚ/",
     "example": "",
     "rank": 77
   },
@@ -161492,7 +161492,7 @@
   {
     "term": "own",
     "translation": "свой, владе́ть, со́бственный, име́ть, облада́ть",
-    "transcription": "/aʊn/",
+    "transcription": "/oʊn/",
     "example": "",
     "rank": 150
   },
@@ -162276,7 +162276,7 @@
   {
     "term": "paleography",
     "translation": "палеогра́фия",
-    "transcription": "/ˌpalɪˈɒɡɹəfi/",
+    "transcription": "/ˌpeɪliˈɑɡɹəfi/",
     "example": "",
     "rank": 26288
   },
@@ -164068,7 +164068,7 @@
   {
     "term": "part",
     "translation": "часть, разлуча́ться, до́ля, разлучи́ться, роль",
-    "transcription": "/pæɹt/",
+    "transcription": "/pɑɹt/",
     "example": "",
     "rank": 136
   },
@@ -164256,8 +164256,8 @@
   },
   {
     "term": "party",
-    "translation": "гру́ппа, сторона́, уча́стник, уча́стница, партия",
-    "transcription": "/ˈpɐːti/",
+    "translation": "вечери́нка, па́ртия, сторона́, гру́ппа, уча́стник",
+    "transcription": "/ˈpɑɹti/",
     "example": "",
     "rank": 258
   },
@@ -166433,8 +166433,8 @@
   },
   {
     "term": "people",
-    "translation": "лю́ди, населя́ть, люд, наро́д, на́ция",
-    "transcription": "/-ɐl/",
+    "translation": "лю́ди, наро́д, на́ция, населя́ть",
+    "transcription": "/ˈpipəl/",
     "example": "",
     "rank": 57
   },
@@ -166539,7 +166539,7 @@
   {
     "term": "per",
     "translation": "в, че́рез, по, согла́сно",
-    "transcription": "/peː/",
+    "transcription": "/pɝ/",
     "example": "",
     "rank": 281
   },
@@ -167477,7 +167477,7 @@
   {
     "term": "person",
     "translation": "ли́чность, осо́ба, персо́на, геро́й, герои́ня",
-    "transcription": "/-zən/",
+    "transcription": "/ˈpɝsən/",
     "example": "",
     "rank": 217
   },
@@ -170703,7 +170703,7 @@
   },
   {
     "term": "place",
-    "translation": "дом, класть, жили́ще, положи́ть, ме́сто",
+    "translation": "ме́сто, класть, положи́ть, поме́стить, дом",
     "transcription": "/pleɪs/",
     "example": "",
     "rank": 157
@@ -171208,7 +171208,7 @@
   {
     "term": "platypus",
     "translation": "утконо́с",
-    "transcription": "/ˈplætɪpəs/",
+    "transcription": "/ˈplætɪˌpʊs/",
     "example": "",
     "rank": 16439
   },
@@ -171229,7 +171229,7 @@
   {
     "term": "play",
     "translation": "игра́, игра́ть, пье́са, играться, поигра́ть",
-    "transcription": "/ple(j)/",
+    "transcription": "/pleɪ/",
     "example": "",
     "rank": 190
   },
@@ -171368,7 +171368,7 @@
   },
   {
     "term": "please",
-    "translation": "бу́дь добр, доставля́ть удово́льствие, бу́дь добра́, нра́виться, бу́дьте добры́",
+    "translation": "пожа́луйста, доставля́ть удово́льствие, нра́виться, бу́дьте добры́",
     "transcription": "/pliz/",
     "example": "",
     "rank": 176
@@ -172180,7 +172180,7 @@
   },
   {
     "term": "point",
-    "translation": "полуо́стров, ука́зывать, пункт, указа́ть, то́чка",
+    "translation": "то́чка, пункт, смысл, ука́зывать, балл",
     "transcription": "/pɔɪnt/",
     "example": "",
     "rank": 224
@@ -174519,7 +174519,7 @@
   {
     "term": "power",
     "translation": "власть, влия́ние, могущество, держа́ва, си́ла",
-    "transcription": "/ˈpaʊ̯.(ə)ɹ/",
+    "transcription": "/ˈpaʊɚ/",
     "example": "",
     "rank": 236
   },
@@ -179524,7 +179524,7 @@
   {
     "term": "public",
     "translation": "обще́ственный, обще́ственность, общедосту́пный, пу́блика, публи́чный",
-    "transcription": "/ˈpʊblɪk/",
+    "transcription": "/ˈpʌblɪk/",
     "example": "",
     "rank": 205
   },
@@ -180511,7 +180511,7 @@
   {
     "term": "put",
     "translation": "класть, положи́ть, поста́вить, ста́вить",
-    "transcription": "/pʉt/",
+    "transcription": "/pʊt/",
     "example": "",
     "rank": 177
   },
@@ -183724,7 +183724,7 @@
   {
     "term": "read",
     "translation": "чита́ть, прочита́ть, гласи́ть, изуча́ть, толкова́ть",
-    "transcription": "/riːd/",
+    "transcription": "/ɹid/",
     "example": "",
     "rank": 225
   },
@@ -183899,7 +183899,7 @@
   {
     "term": "really",
     "translation": "действи́тельно, да?, пра́вда?, пра́вда, ра́зве?",
-    "transcription": "/rɪˈjɜli/",
+    "transcription": "/ˈɹiəli/",
     "example": "",
     "rank": 99
   },
@@ -189464,7 +189464,7 @@
   {
     "term": "right",
     "translation": "пра́вильный, спра́ва, ве́рно, права́, вы́прямить",
-    "transcription": "/ˈɹaɪt/",
+    "transcription": "/ɹaɪt/",
     "example": "",
     "rank": 100
   },
@@ -191403,7 +191403,7 @@
   {
     "term": "run",
     "translation": "бег, бежа́ть, пробе́жка, убега́ть, убежа́ть",
-    "transcription": "/ɹʊn/",
+    "transcription": "/ɹʌn/",
     "example": "",
     "rank": 259
   },
@@ -192200,8 +192200,8 @@
   },
   {
     "term": "said",
-    "translation": "ска́занный, вышеука́занный, упомя́нутый, вышеупомя́нутый",
-    "transcription": "/seɪd/",
+    "translation": "сказа́л, ска́занный",
+    "transcription": "/sɛd/",
     "example": "",
     "rank": 88
   },
@@ -193838,7 +193838,7 @@
   },
   {
     "term": "say",
-    "translation": "ска́жем, пра́во го́лоса, говори́ть, го́лос, сказа́ть",
+    "translation": "говори́ть, сказа́ть, ска́жем, пра́во го́лоса",
     "transcription": "/seɪ/",
     "example": "",
     "rank": 115
@@ -194672,7 +194672,7 @@
   {
     "term": "school",
     "translation": "шко́ла, учи́ть, учи́лище, кося́к, ста́я",
-    "transcription": "/(ɪ)ˈsk(ʰ)ul/",
+    "transcription": "/skul/",
     "example": "",
     "rank": 158
   },
@@ -195854,8 +195854,8 @@
   },
   {
     "term": "season",
-    "translation": "припра́ва, спе́ция, сезо́н, вре́мя го́да",
-    "transcription": "/ˈsi.zn̩/",
+    "translation": "сезо́н, вре́мя го́да, припра́вить",
+    "transcription": "/ˈsizən/",
     "example": "",
     "rank": 263
   },
@@ -196009,7 +196009,7 @@
   {
     "term": "second",
     "translation": "второ́й, секунда́нт, секу́нда, добавка, командирова́ть",
-    "transcription": "/ˈsɛk.(ə)nd/",
+    "transcription": "/ˈsɛkənd/",
     "example": "",
     "rank": 180
   },
@@ -196316,8 +196316,8 @@
   },
   {
     "term": "see",
-    "translation": "диоце́з, ви́деть, епа́рхия, уви́деть, понима́ть",
-    "transcription": "/ˈsi/",
+    "translation": "ви́деть, уви́деть, понима́ть, смотре́ть, встреча́ться",
+    "transcription": "/si/",
     "example": "",
     "rank": 74
   },
@@ -198438,7 +198438,7 @@
   {
     "term": "service",
     "translation": "услу́га, обслу́живать, слу́жба, обслужи́ть, служе́ние",
-    "transcription": "/ˈsɜː.vɪs/",
+    "transcription": "/ˈsɝvɪs/",
     "example": "",
     "rank": 260
   },
@@ -198563,7 +198563,7 @@
   },
   {
     "term": "set",
-    "translation": "гото́вый, аппара́т, класть, устано́вленный, приёмник",
+    "translation": "набо́р, ста́вить, устана́вливать, компле́кт, гото́вый",
     "transcription": "/sɛt/",
     "example": "",
     "rank": 198
@@ -200943,8 +200943,8 @@
   },
   {
     "term": "should",
-    "translation": "е́жели, е́сли, бу́дет, до́лжен, должно́ быть",
-    "transcription": "/ʃuːld/",
+    "translation": "сле́дует, до́лжен, сто́ит, на́до бы, должно́ быть",
+    "transcription": "/ʃʊd/",
     "example": "",
     "rank": 95
   },
@@ -200993,7 +200993,7 @@
   {
     "term": "show",
     "translation": "вы́ставка, пока́зывать, зре́лище, показа́ть, переда́ча",
-    "transcription": "/ʃo(w)/",
+    "transcription": "/ʃoʊ/",
     "example": "",
     "rank": 167
   },
@@ -202225,7 +202225,7 @@
   {
     "term": "since",
     "translation": "с тех пор как, с, так как, поско́льку, потому́ что",
-    "transcription": "/sɪn(t)s/",
+    "transcription": "/sɪns/",
     "example": "",
     "rank": 148
   },
@@ -204367,7 +204367,7 @@
   {
     "term": "small",
     "translation": "ма́ленький, ма́лый, молодо́й",
-    "transcription": "/smoːl/",
+    "transcription": "/smɔl/",
     "example": "",
     "rank": 245
   },
@@ -205466,7 +205466,7 @@
   {
     "term": "so",
     "translation": "так, о́чень, ита́к, тако́й, что́бы",
-    "transcription": "/siː/",
+    "transcription": "/soʊ/",
     "example": "",
     "rank": 30
   },
@@ -206313,7 +206313,7 @@
   {
     "term": "some",
     "translation": "не́сколько, не́который, немно́го, како́й-нибудь, небольшая часть",
-    "transcription": "/sɐm/",
+    "transcription": "/sʌm/",
     "example": "",
     "rank": 59
   },
@@ -206369,7 +206369,7 @@
   {
     "term": "something",
     "translation": "что́-то, кое-что́, не́что",
-    "transcription": "/ˈsʊm.tɪn/",
+    "transcription": "/ˈsʌmθɪŋ/",
     "example": "",
     "rank": 129
   },
@@ -210289,7 +210289,7 @@
   {
     "term": "start",
     "translation": "нача́ло, запуска́ть, старт, стартова́ть, рыво́к",
-    "transcription": "/stæɹt/",
+    "transcription": "/stɑɹt/",
     "example": "",
     "rank": 209
   },
@@ -210358,7 +210358,7 @@
   },
   {
     "term": "state",
-    "translation": "состоя́ние, заяви́ть, госуда́рство, заявля́ть, констати́ровать",
+    "translation": "госуда́рство, штат, состоя́ние, заявля́ть, госуда́рственный",
     "transcription": "/steɪt/",
     "example": "",
     "rank": 137
@@ -211303,7 +211303,7 @@
   },
   {
     "term": "still",
-    "translation": "неподви́жный, ещё, штиль, угомони́ть, всё ещё",
+    "translation": "всё ещё, ещё, тем не ме́нее, неподви́жный, ти́хий",
     "transcription": "/stɪl/",
     "example": "",
     "rank": 109
@@ -211976,7 +211976,7 @@
   {
     "term": "story",
     "translation": "расска́з, исто́рия, по́весть",
-    "transcription": "/ˈstɔ.ɹi/",
+    "transcription": "/ˈstɔɹi/",
     "example": "",
     "rank": 283
   },
@@ -214279,7 +214279,7 @@
   {
     "term": "successor",
     "translation": "прее́мник, прее́мница, насле́дник, насле́дница, правопрее́мник",
-    "transcription": "/səkˈsɛsə/",
+    "transcription": "/səkˈsɛsɚ/",
     "example": "",
     "rank": 4486
   },
@@ -214328,7 +214328,7 @@
   {
     "term": "such",
     "translation": "тако́в, тако́й, э́такий",
-    "transcription": "/sɛt͡ʃ/",
+    "transcription": "/sʌt͡ʃ/",
     "example": "",
     "rank": 123
   },
@@ -215700,7 +215700,7 @@
   {
     "term": "support",
     "translation": "опо́ра, подде́рживать, подде́ржка, поддержа́ть",
-    "transcription": "/səˈpo(ː)ɹt/",
+    "transcription": "/səˈpɔɹt/",
     "example": "",
     "rank": 232
   },
@@ -215854,7 +215854,7 @@
   {
     "term": "sure",
     "translation": "уве́ренный, коне́чно, надёжный, ве́рный",
-    "transcription": "/sjuːɹ/",
+    "transcription": "/ʃʊɹ/",
     "example": "",
     "rank": 170
   },
@@ -218240,7 +218240,7 @@
   },
   {
     "term": "take",
-    "translation": "взятие, брать, дубль, взять, схвати́ть",
+    "translation": "брать, взять, занима́ть, принима́ть, отвози́ть",
     "transcription": "/teɪk/",
     "example": "",
     "rank": 110
@@ -219472,8 +219472,8 @@
   },
   {
     "term": "team",
-    "translation": "упря́жка, кома́нда, арте́ль, брига́да, гру́ппа",
-    "transcription": "/tiːm/",
+    "translation": "кома́нда, брига́да, гру́ппа, упря́жка",
+    "transcription": "/tim/",
     "example": "",
     "rank": 171
   },
@@ -220109,7 +220109,7 @@
   },
   {
     "term": "tell",
-    "translation": "телль, говори́ть, приказа́ть, сказа́ть, отлича́ть",
+    "translation": "сказа́ть, говори́ть, расска́зывать, отлича́ть, веле́ть",
     "transcription": "/tɛl/",
     "example": "",
     "rank": 233
@@ -220978,7 +220978,7 @@
   {
     "term": "testator",
     "translation": "завеща́тель, завеща́тельница, наследода́тель, наследода́тельница",
-    "transcription": "/tɛsˈteɪ.tɚ/",
+    "transcription": "/ˈtɛˌsteɪ.tɚ/",
     "example": "",
     "rank": 22059
   },
@@ -221391,7 +221391,7 @@
   {
     "term": "thank",
     "translation": "благодари́ть, поблагодари́ть",
-    "transcription": "/ðæŋk/",
+    "transcription": "/θæŋk/",
     "example": "",
     "rank": 265
   },
@@ -221426,7 +221426,7 @@
   {
     "term": "thanks",
     "translation": "благодарю́, благода́рность, спаси́бо",
-    "transcription": "/ðæŋks/",
+    "transcription": "/θæŋks/",
     "example": "",
     "rank": 300
   },
@@ -221439,8 +221439,8 @@
   },
   {
     "term": "that",
-    "translation": "насто́лько, что́бы, тот, то, так",
-    "transcription": "/ðət/",
+    "translation": "тот, то, что, кото́рый, э́тот",
+    "transcription": "/ðæt/",
     "example": "",
     "rank": 9
   },
@@ -221474,8 +221474,8 @@
   },
   {
     "term": "the",
-    "translation": "чем + comp., тем + comp.",
-    "transcription": "/jiː/",
+    "translation": "(определённый артикль), тот са́мый, чем… тем…",
+    "transcription": "/ðə/",
     "example": "",
     "rank": 1
   },
@@ -221537,8 +221537,8 @@
   },
   {
     "term": "their",
-    "translation": "их, ихний",
-    "transcription": "/d̪ʱa/",
+    "translation": "их, свой",
+    "transcription": "/ðɛɹ/",
     "example": "",
     "rank": 49
   },
@@ -221573,7 +221573,7 @@
   {
     "term": "them",
     "translation": "им, их, они́",
-    "transcription": "/ˈðəm/",
+    "transcription": "/ðɛm/",
     "example": "",
     "rank": 61
   },
@@ -221600,8 +221600,8 @@
   },
   {
     "term": "then",
-    "translation": "тогда́шний, тогда́, зате́м, по́сле, пото́м",
-    "transcription": "/ðen/",
+    "translation": "тогда́, зате́м, пото́м, в тако́м слу́чае",
+    "transcription": "/ðɛn/",
     "example": "",
     "rank": 80
   },
@@ -221824,8 +221824,8 @@
   },
   {
     "term": "there",
-    "translation": "есть, вот, иметься, там, туда́",
-    "transcription": "/ðeə/",
+    "translation": "там, туда́, вот, есть, име́ется",
+    "transcription": "/ðɛɹ/",
     "example": "",
     "rank": 50
   },
@@ -222258,7 +222258,7 @@
   },
   {
     "term": "think",
-    "translation": "обдумывание, ду́мать, размышление, поду́мать, мы́слить",
+    "translation": "ду́мать, поду́мать, счита́ть, полага́ть, мы́слить",
     "transcription": "/θɪŋk/",
     "example": "",
     "rank": 78
@@ -222489,8 +222489,8 @@
   },
   {
     "term": "this",
-    "translation": "сей, э́та, э́ти, э́то, э́тот",
-    "transcription": "/ðəs/",
+    "translation": "э́тот, э́та, э́то",
+    "transcription": "/ðɪs/",
     "example": "",
     "rank": 14
   },
@@ -222644,7 +222644,7 @@
   {
     "term": "thought",
     "translation": "мысль, ду́ма, иде́я, мышле́ние, размышле́ние",
-    "transcription": "/θoːt/",
+    "transcription": "/θɔt/",
     "example": "",
     "rank": 199
   },
@@ -222755,8 +222755,8 @@
   },
   {
     "term": "three",
-    "translation": "тро́йка, три, тро́е",
-    "transcription": "/fɹiː/",
+    "translation": "три, тро́е, тро́йка",
+    "transcription": "/θɹi/",
     "example": "",
     "rank": 138
   },
@@ -223021,7 +223021,7 @@
   },
   {
     "term": "through",
-    "translation": "благодаря́, за счёт, и́з-за, при по́мощи, сквозь",
+    "translation": "че́рез, сквозь, по, благодаря́, до конца́",
     "transcription": "/θɹu/",
     "example": "",
     "rank": 119
@@ -223616,7 +223616,7 @@
   },
   {
     "term": "time",
-    "translation": "вре́мя, хронометрировать, час, засекать время, времена́",
+    "translation": "вре́мя, раз, час, пора́, засека́ть вре́мя",
     "transcription": "/taɪm/",
     "example": "",
     "rank": 53
@@ -223672,7 +223672,7 @@
   },
   {
     "term": "times",
-    "translation": "на",
+    "translation": "раз, времена́, умно́женный на",
     "transcription": "/taɪmz/",
     "example": "",
     "rank": 211
@@ -224113,8 +224113,8 @@
   },
   {
     "term": "to",
-    "translation": "-ать, к, -еть, в, -ить",
-    "transcription": "/tiː/",
+    "translation": "(частица инфинитива), к, в, на, до",
+    "transcription": "/tu/",
     "example": "",
     "rank": 2
   },
@@ -224310,7 +224310,7 @@
   {
     "term": "together",
     "translation": "вме́сте, совме́стно, сообща́",
-    "transcription": "/təˈɡɛð.ə(ɹ)/",
+    "transcription": "/təˈɡɛðɚ/",
     "example": "",
     "rank": 273
   },
@@ -224785,7 +224785,7 @@
   },
   {
     "term": "top",
-    "translation": "лу́чший, ве́рхняя оде́жда, топ-, верх, топ",
+    "translation": "верх, верши́на, ве́рхний, лу́чший, кры́шка",
     "transcription": "/tɑp/",
     "example": "",
     "rank": 206
@@ -229608,7 +229608,7 @@
   },
   {
     "term": "two",
-    "translation": "дво́йка, два, па́ра, две, дво́е",
+    "translation": "два, две, дво́е, па́ра, дво́йка",
     "transcription": "/tu/",
     "example": "",
     "rank": 75
@@ -231135,7 +231135,7 @@
   {
     "term": "under",
     "translation": "под, ни́же, ме́ньше",
-    "transcription": "/ˈʊndə/",
+    "transcription": "/ˈʌndɚ/",
     "example": "",
     "rank": 151
   },
@@ -233949,7 +233949,7 @@
   {
     "term": "up",
     "translation": "вве́рх, вверху́, наве́рх, да́льше, наверху́",
-    "transcription": "/ɐp/",
+    "transcription": "/ʌp/",
     "example": "",
     "rank": 41
   },
@@ -234544,7 +234544,7 @@
   {
     "term": "us",
     "translation": "нам, нас, на́ми",
-    "transcription": "/əs/",
+    "transcription": "/ʌs/",
     "example": "",
     "rank": 83
   },
@@ -234572,14 +234572,14 @@
   {
     "term": "use",
     "translation": "испо́льзование, испо́льзовать, употребле́ние, примени́ть, по́льза",
-    "transcription": "/(j)ɪu̯s/",
+    "transcription": "/jus/",
     "example": "",
     "rank": 130
   },
   {
     "term": "used",
     "translation": "испо́льзованный, испо́льзуемый, б/у, поде́ржанный, привы́кший",
-    "transcription": "/just/",
+    "transcription": "/juzd/",
     "example": "",
     "rank": 132
   },
@@ -236503,7 +236503,7 @@
   },
   {
     "term": "very",
-    "translation": "са́мый, вельми́, тот са́мый, весьма́, дю́же",
+    "translation": "о́чень, весьма́, са́мый, тот са́мый",
     "transcription": "/ˈvɛɹi/",
     "example": "",
     "rank": 92
@@ -239023,8 +239023,8 @@
   },
   {
     "term": "want",
-    "translation": "жела́ние, хоте́ть, нужда́, жела́ть, потре́бность",
-    "transcription": "/wɐnt/",
+    "translation": "хоте́ть, жела́ть, нужда́ться, жела́ние, нехва́тка",
+    "transcription": "/wɑnt/",
     "example": "",
     "rank": 84
   },
@@ -239059,7 +239059,7 @@
   {
     "term": "war",
     "translation": "война́, вести́ войну́, воева́ть, борьба́",
-    "transcription": "/wɑ(r)/",
+    "transcription": "/wɔɹ/",
     "example": "",
     "rank": 274
   },
@@ -239549,7 +239549,7 @@
   {
     "term": "water",
     "translation": "вода́, полива́ть, поли́ть, во́ды, напои́ть",
-    "transcription": "/-ɑ/",
+    "transcription": "/ˈwɔtɚ/",
     "example": "",
     "rank": 238
   },
@@ -240416,8 +240416,8 @@
   },
   {
     "term": "well",
-    "translation": "здоро́вый, хорошо́, так, коло́дец, как сле́дует",
-    "transcription": "/wel/",
+    "translation": "хорошо́, ну, здоро́вый, коло́дец, как сле́дует",
+    "transcription": "/wɛl/",
     "example": "",
     "rank": 87
   },
@@ -240745,8 +240745,8 @@
   },
   {
     "term": "what",
-    "translation": "кото́рая, как!, что, кото́рое, что!",
-    "transcription": "/hɒt/",
+    "translation": "что, како́й, кото́рый, как!",
+    "transcription": "/wʌt/",
     "example": "",
     "rank": 43
   },
@@ -240921,7 +240921,7 @@
   {
     "term": "where",
     "translation": "где, куда́, отку́да",
-    "transcription": "/weə/",
+    "transcription": "/wɛɹ/",
     "example": "",
     "rank": 93
   },
@@ -241320,7 +241320,7 @@
   {
     "term": "who",
     "translation": "кто, что, кото́рая, кото́рый",
-    "transcription": "/h(w)uː/",
+    "transcription": "/hu/",
     "example": "",
     "rank": 48
   },
@@ -241459,7 +241459,7 @@
   },
   {
     "term": "why",
-    "translation": "почему́, как, причи́на, заче́м, о",
+    "translation": "почему́, заче́м, ну",
     "transcription": "/waɪ/",
     "example": "",
     "rank": 108
@@ -241774,7 +241774,7 @@
   },
   {
     "term": "will",
-    "translation": "во́ля, жела́ть, пожела́ть, завеща́ть, наме́рение",
+    "translation": "(вспомогательный глагол будущего времени), во́ля, завеща́ние, жела́ние",
     "transcription": "/wɪl/",
     "example": "",
     "rank": 37
@@ -242405,7 +242405,7 @@
   {
     "term": "with",
     "translation": "с",
-    "transcription": "/wəð/",
+    "transcription": "/wɪð/",
     "example": "",
     "rank": 13
   },
@@ -242461,7 +242461,7 @@
   {
     "term": "within",
     "translation": "внутри́",
-    "transcription": "/wɪtˈɪn/",
+    "transcription": "/wɪˈðɪn/",
     "example": "",
     "rank": 292
   },
@@ -243049,7 +243049,7 @@
   {
     "term": "work",
     "translation": "рабо́та, рабо́тать, труди́ться, труд, де́лать",
-    "transcription": "/(w)ɵrk/",
+    "transcription": "/wɝk/",
     "example": "",
     "rank": 101
   },
@@ -243133,7 +243133,7 @@
   {
     "term": "working",
     "translation": "рабо́чий, действие, работоспособный, функционирование, рабочая",
-    "transcription": "/ˈwɜːkɪŋ/",
+    "transcription": "/ˈwɝkɪŋ/",
     "example": "",
     "rank": 284
   },
@@ -243217,7 +243217,7 @@
   {
     "term": "world",
     "translation": "мир, свет, вселе́нная, земно́й шар",
-    "transcription": "/wɜɹld/",
+    "transcription": "/wɝld/",
     "example": "",
     "rank": 116
   },
@@ -244435,7 +244435,7 @@
   {
     "term": "year",
     "translation": "год, лет, годи́на, ле́то, курс",
-    "transcription": "/jir/",
+    "transcription": "/jɪɹ/",
     "example": "",
     "rank": 102
   },
@@ -244617,7 +244617,7 @@
   {
     "term": "yes",
     "translation": "да, подда́кивать, ага́, подда́кнуть, ещё как",
-    "transcription": "/jes/",
+    "transcription": "/jɛs/",
     "example": "",
     "rank": 252
   },
@@ -244903,8 +244903,8 @@
   },
   {
     "term": "you",
-    "translation": "вы, вы́кать, ты, обраща́ться на «Вы», вам",
-    "transcription": "/d/",
+    "translation": "ты, вы, тебя́, вас, тебе́",
+    "transcription": "/ju/",
     "example": "",
     "rank": 10
   },
@@ -244946,7 +244946,7 @@
   {
     "term": "your",
     "translation": "твой, ваш",
-    "transcription": "/jo(ː)ɹ/",
+    "transcription": "/jɔɹ/",
     "example": "",
     "rank": 28
   },

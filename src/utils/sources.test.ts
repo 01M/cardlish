@@ -44,7 +44,6 @@ describe("parseSources", () => {
     "title",
     "author",
     "version",
-    "url",
     "licenceName",
     "licenceUrl",
     "usageRu",
@@ -56,6 +55,18 @@ describe("parseSources", () => {
     expect(() => parseSources([validSource({ [field]: "  " })])).toThrow(
       `"${field}"`,
     );
+  });
+
+  it("treats a missing or empty url as no project page", () => {
+    const { url: _omitted, ...withoutUrl } = validSource();
+
+    expect(parseSources([withoutUrl])[0].url).toBe("");
+    expect(parseSources([validSource({ url: "" })])[0].url).toBe("");
+  });
+
+  it("rejects a non-string or blank url", () => {
+    expect(() => parseSources([validSource({ url: 42 })])).toThrow('"url"');
+    expect(() => parseSources([validSource({ url: "  " })])).toThrow("https://");
   });
 
   it.each(["url", "licenceUrl"])("rejects a non-https %s", (field) => {

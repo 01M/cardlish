@@ -3,16 +3,23 @@
 Run from the repository root:
     scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v
 """
+import json
 import unittest
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 from convert_freedict import (
+    accent_labels,
+    apply_overrides,
     assign_ranks,
     build_cards,
+    choose_transcription,
     clean_transcription,
     clean_translation,
     dedupe_translations,
+    load_overrides,
     merge_translations,
+    override_problems,
     read_entries,
 )
 
@@ -111,8 +118,42 @@ class MergeTranslationsTest(unittest.TestCase):
         self.assertEqual(merge_translations([]), [])
 
 
-def entry(term, translations, transcription=''):
-    return {'term': term, 'translations': translations, 'transcription': transcription}
+BRITISH_FIRST = (('RP',), ('GA', 'GenAm'))
+AMERICAN_FIRST = (('GA', 'GenAm'), ('RP',))
+
+
+class ChooseTranscriptionTest(unittest.TestCase):
+    def test_follows_the_preference_then_falls_back_to_the_first(self):
+        pronunciations = ['/ə/<a:US>', '/ɑ/<a:GA>', '/ɒ/<a:RP>']
+        self.assertEqual(choose_transcription(pronunciations, BRITISH_FIRST), '/ɒ/')
+        self.assertEqual(choose_transcription(pronunciations, AMERICAN_FIRST), '/ɑ/')
+        self.assertEqual(choose_transcription(['/ə/<a:UK>', '/ɑ/<a:GenAm>'], BRITISH_FIRST), '/ɑ/')
+        self.assertEqual(choose_transcription(['/ə/<a:UK>', '/ɑ/<a:US>'], BRITISH_FIRST), '/ə/')
+
+    def test_takes_the_first_matching_pronunciation_in_order(self):
+        self.assertEqual(choose_transcription(['/a/<a:RP>', '/b/<a:RP>'], BRITISH_FIRST), '/a/')
+
+    def test_reads_label_lists(self):
+        self.assertEqual(
+            choose_transcription(['/x/', '/ˈbeɪ.sɪs/<a:RP,GA>'], BRITISH_FIRST), '/ˈbeɪ.sɪs/'
+        )
+
+    def test_ignores_labels_inside_nested_markup(self):
+        self.assertEqual(
+            choose_transcription(['/a/', '/b/<a:<<GA>> in fast speech>'], AMERICAN_FIRST), '/a/'
+        )
+
+    def test_skips_pronunciations_that_are_empty_after_the_cut(self):
+        self.assertEqual(choose_transcription(['<a:RP>', '', '/c/'], BRITISH_FIRST), '/c/')
+        self.assertEqual(choose_transcription([], BRITISH_FIRST), '')
+
+    def test_accent_labels(self):
+        self.assertEqual(accent_labels('/x/<a:RP,GA><ref:{{R:OED}}>'), {'RP', 'GA'})
+        self.assertEqual(accent_labels('/x/'), set())
+
+
+def entry(term, translations, *pronunciations):
+    return {'term': term, 'translations': translations, 'pronunciations': list(pronunciations)}
 
 
 class BuildCardsTest(unittest.TestCase):
@@ -143,10 +184,27 @@ class BuildCardsTest(unittest.TestCase):
         cards = build_cards([
             entry('Light', ['Лайт'], '/laɪt/'),
             entry('light', ['свет']),
-            entry('light', ['лёгкий'], '/lait/'),
+            entry('light', ['лёгкий'], '<a:dated>', '/lait/'),
         ])
 
         self.assertEqual(cards[0]['transcription'], '/lait/')
+
+    def test_transcription_uses_the_accent_preference_across_merged_entries(self):
+        # Relies on the module's ACCENT_PREFERENCE (General American)
+        cards = build_cards([
+            entry('either', ['любо́й'], '/ˈaɪðə/<a:RP>'),
+            entry('either', ['и́ли'], '/ˈiðɚ/<a:GA>'),
+        ])
+
+        self.assertEqual(cards[0]['transcription'], '/ˈiðɚ/')
+
+    def test_without_a_general_american_label_the_first_pronunciation_wins(self):
+        cards = build_cards([
+            entry('either', ['любо́й'], '/ˈaɪðə/'),
+            entry('either', ['и́ли'], '/ˈaɪðə/<a:RP>', '/ˈiðɚ/<a:US>'),
+        ])
+
+        self.assertEqual(cards[0]['transcription'], '/ˈaɪðə/')
 
     def test_cards_follow_the_first_entry_of_each_group(self):
         cards = build_cards([
@@ -175,7 +233,122 @@ class ReadEntriesTest(unittest.TestCase):
 
         self.assertEqual(
             list(read_entries(tree)),
-            [{'term': 'light', 'translations': ['свет'], 'transcription': '/laɪt/'}],
+            [{'term': 'light', 'translations': ['свет'], 'pronunciations': ['/laɪt/<a:UK>']}],
+        )
+
+
+def card(term, translation, transcription='', rank=1):
+    return {
+        'term': term, 'translation': translation, 'transcription': transcription,
+        'example': '', 'rank': rank,
+    }
+
+
+def override(key, reason='проверка', **fields):
+    return {'key': key, 'reason': reason, **fields}
+
+
+class ApplyOverridesTest(unittest.TestCase):
+    def cards(self):
+        return [card('i', 'ай, и', '/aɪ/', 7), card('can', 'бидо́н, мочь', '/kæn/', 36)]
+
+    def assert_rejected(self, overrides, *messages):
+        cards = self.cards()
+        with self.assertRaises(ValueError) as raised:
+            apply_overrides(cards, overrides)
+        for message in messages:
+            self.assertIn(message, str(raised.exception))
+        self.assertEqual(cards, self.cards())
+
+    def test_replaces_only_the_given_fields(self):
+        cards = self.cards()
+
+        apply_overrides(cards, [override('can', translations=['мочь', 'уме́ть', 'ба́нка'])])
+
+        self.assertEqual(cards[1], card('can', 'мочь, уме́ть, ба́нка', '/kæn/', 36))
+        self.assertEqual(cards[0], self.cards()[0])
+
+    def test_term_and_transcription_overrides_keep_the_rank(self):
+        cards = self.cards()
+
+        apply_overrides(cards, [override('i', term='I', translations=['я'], transcription='/aɪ/ ')])
+
+        self.assertEqual(cards[0], card('I', 'я', '/aɪ/ ', 7))
+
+    def test_items_may_contain_commas(self):
+        cards = self.cards()
+
+        apply_overrides(cards, [override('can', translations=['всё, что уго́дно'])])
+
+        self.assertEqual(cards[1]['translation'], 'всё, что уго́дно')
+
+    def test_reports_every_problem_at_once_and_applies_nothing(self):
+        self.assert_rejected(
+            [
+                override('missing', translations=['x']),
+                override('can', translations=['мочь']),
+                override('can', translations=['уме́ть']),
+                override('i', term='Me'),
+                override('i', reason='  ', translations=['я']),
+            ],
+            "'missing': unknown key",
+            "'can': duplicate key",
+            "'i': term 'Me' does not match the key in lowercase",
+            "'i': empty reason",
+        )
+
+    def test_rejects_a_stale_override(self):
+        self.assert_rejected(
+            [override('can', translations=['бидо́н', 'мочь'], transcription='/kæn/')],
+            "'can': identical to the generated card (stale)",
+        )
+
+    def test_rejects_bad_translation_lists(self):
+        self.assert_rejected([override('can', translations=[])], '1..5 items')
+        self.assert_rejected(
+            [override('can', translations=['а', 'б', 'в', 'г', 'д', 'е'])], '1..5 items'
+        )
+        self.assert_rejected(
+            [override('can', translations=['мочь', 'мо́чь'])], 'duplicates'
+        )
+        self.assert_rejected(
+            [override('can', translations=['мочь', ' уме́ть'])], 'non-empty trimmed strings'
+        )
+
+    def test_rejects_unknown_fields_and_empty_overrides(self):
+        self.assert_rejected(
+            [override('can', transcripton='/kæn/')], 'unknown fields', 'nothing to override'
+        )
+        self.assert_rejected([override('can', transcription='')], 'non-empty string')
+
+
+class RealOverridesFileTest(unittest.TestCase):
+    def test_every_override_is_well_formed_and_keys_are_unique(self):
+        overrides = load_overrides()
+
+        self.assertIsInstance(overrides, list)
+        problems = [
+            (item.get('key'), problem)
+            for item in overrides
+            for problem in override_problems(item)
+        ]
+        self.assertEqual(problems, [])
+        keys = [item['key'] for item in overrides]
+        self.assertEqual(len(keys), len(set(keys)))
+
+    def test_the_sources_entry_states_the_current_counts(self):
+        overrides = load_overrides()
+        sources_path = Path(__file__).parent.parent / 'src' / 'data' / 'sources.json'
+        sources = json.loads(sources_path.read_text(encoding='utf-8'))
+        entry = next(source for source in sources if source['key'] == 'manual-corrections')
+
+        def count(field):
+            return sum(field in item for item in overrides)
+
+        self.assertIn(
+            f'Число исправленных карточек: {len(overrides)} (переводы — {count("translations")},'
+            f' транскрипции — {count("transcription")}, написание — {count("term")})',
+            entry['changesRu'],
         )
 
 

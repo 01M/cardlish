@@ -14,10 +14,18 @@ export interface Word {
   id: number;
   term: string;
   translation: string;
-  transcription?: string;
-  example?: string;
+  transcription: string | null;
+  example: string | null;
   is_custom: number;
   status: "new" | "review" | "learned";
+}
+
+export interface WordsStats {
+  newCustom: number;
+  newDict: number;
+  totalNew: number;
+  review: number;
+  learned: number;
 }
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -47,6 +55,9 @@ export const initDatabase = async () => {
       is_custom INTEGER DEFAULT 0,
       status TEXT DEFAULT 'new'
     );
+
+    CREATE INDEX IF NOT EXISTS idx_words_is_custom_status
+      ON words (is_custom, status);
 
     CREATE TABLE IF NOT EXISTS app_settings (
       key TEXT PRIMARY KEY NOT NULL,
@@ -129,29 +140,33 @@ export const deleteCustomWord = async (id: number) => {
   await db.runAsync("DELETE FROM words WHERE id = ? AND is_custom = 1;", [id]);
 };
 
-// 4. Статистика по статусам слов
-export const getWordsStats = async () => {
+// 4. Статистика по статусам слов (один проход по таблице)
+export const getWordsStats = async (): Promise<WordsStats> => {
   const db = await getDb();
 
-  const newCustom = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM words WHERE status = 'new' AND is_custom = 1;",
-  );
-  const newDict = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM words WHERE status = 'new' AND is_custom = 0;",
-  );
-  const reviewCount = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM words WHERE status = 'review';",
-  );
-  const learnedCount = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM words WHERE status = 'learned';",
+  const row = await db.getFirstAsync<{
+    newCustom: number;
+    newDict: number;
+    review: number;
+    learned: number;
+  }>(
+    `SELECT
+       COUNT(CASE WHEN status = 'new' AND is_custom = 1 THEN 1 END) AS newCustom,
+       COUNT(CASE WHEN status = 'new' AND is_custom = 0 THEN 1 END) AS newDict,
+       COUNT(CASE WHEN status = 'review' THEN 1 END) AS review,
+       COUNT(CASE WHEN status = 'learned' THEN 1 END) AS learned
+     FROM words;`,
   );
 
+  const newCustom = row?.newCustom ?? 0;
+  const newDict = row?.newDict ?? 0;
+
   return {
-    newCustom: newCustom?.count || 0,
-    newDict: newDict?.count || 0,
-    totalNew: (newCustom?.count || 0) + (newDict?.count || 0),
-    review: reviewCount?.count || 0,
-    learned: learnedCount?.count || 0,
+    newCustom,
+    newDict,
+    totalNew: newCustom + newDict,
+    review: row?.review ?? 0,
+    learned: row?.learned ?? 0,
   };
 };
 
@@ -186,12 +201,14 @@ export const getSessionWords = async (
   }
 };
 
-// 6. Перевод слова в статус 'review'
+// 6. Перевод слова в статус 'review' (только из 'new': устаревшая сессия
+// «Учить» не должна трогать слова, которые уже ушли дальше)
 export const markWordAsReview = async (wordId: number) => {
   const db = await getDb();
-  await db.runAsync("UPDATE words SET status = 'review' WHERE id = ?;", [
-    wordId,
-  ]);
+  await db.runAsync(
+    "UPDATE words SET status = 'review' WHERE id = ? AND status = 'new';",
+    [wordId],
+  );
 };
 
 // 7. Получение слов на повторение
@@ -210,11 +227,14 @@ export const markWordAsLearned = async (wordId: number) => {
   ]);
 };
 
-// 9. Полный сброс базы
+// 9. Полный сброс базы: удаляем свои слова, словарь возвращаем в 'new'.
+// Строки словаря сохраняют свои id
 export const resetDatabase = async () => {
   const db = await getDb();
-  await db.execAsync("DROP TABLE IF EXISTS words;");
-  await initDatabase();
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync("DELETE FROM words WHERE is_custom = 1;");
+    await txn.runAsync("UPDATE words SET status = 'new';");
+  });
 };
 
 // 10. Сброс только прогресса

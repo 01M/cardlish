@@ -28,6 +28,7 @@ import {
   markWordAsReview,
   resetProgressOnly,
   Word,
+  WordsStats,
 } from "../db/database";
 import { useReduceMotion } from "../hooks/useReduceMotion";
 import { Theme } from "../theme/tokens";
@@ -59,7 +60,7 @@ export const LearnScreen = () => {
   const [source, setSource] = useState<"custom" | "dictionary">("custom");
   const [sessionSize, setSessionSize] = useState<number>(10);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<WordsStats>({
     newCustom: 0,
     newDict: 0,
     totalNew: 0,

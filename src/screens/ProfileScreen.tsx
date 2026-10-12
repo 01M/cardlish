@@ -26,6 +26,7 @@ import {
   resetProgressOnly,
   setReminderEnabled,
   setThemePreference,
+  WordsStats,
 } from "../db/database";
 import { PressableScale } from "../components/PressableScale";
 import { useReduceMotion } from "../hooks/useReduceMotion";
@@ -53,7 +54,7 @@ export const ProfileScreen = () => {
   const theme = useTheme();
   const scheme = useColorSchemeName();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<WordsStats>({
     newCustom: 0,
     newDict: 0,
     totalNew: 0,

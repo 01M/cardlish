@@ -15,7 +15,7 @@ export interface Theme {
   pageBackground: string; // фон экрана
   surface: string; // фон карточек, строк, инфо-блоков
   surfaceElevated: string; // приподнятая поверхность: кнопки-счётчики, поля ввода
-  backdrop: string; // фон загрузочного экрана и модального окна
+  backdrop: string; // фон модального окна
   border: string; // основная рамка карточек
   borderSubtle: string; // рамка кнопок-счётчиков (LearnScreen)
   inputBackground: string; // фон полей ввода

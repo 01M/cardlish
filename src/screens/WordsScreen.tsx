@@ -11,6 +11,7 @@ import {
 import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-screens/experimental";
 import { deleteCustomWord, getCustomWords, Word } from "../db/database";
 import { Button } from "../components/Button";
 import { PressableScale } from "../components/PressableScale";
@@ -230,7 +231,14 @@ export const WordsScreen = () => {
         <ListTopFade />
       </View>
 
-      {/* Список слов */}
+      {/* Список слов. На iOS таб-бар лежит поверх контента: пустой список
+          обрезаем по его верхнему краю, чтобы пустое состояние центрировалось
+          в видимой области; список со словами, как и раньше, уходит под
+          таб-бар с автоматическим нижним отступом */}
+      <SafeAreaView
+        edges={{ bottom: filteredWords.length === 0 }}
+        style={styles.listArea}
+      >
       <FlatList
         data={filteredWords}
         keyExtractor={(item) => item.id.toString()}
@@ -240,6 +248,11 @@ export const WordsScreen = () => {
           { paddingTop: 16, paddingBottom: 16 },
         ]}
         contentInsetAdjustmentBehavior="automatic"
+        // Пустой список не прокручивается: на iOS контейнер с flexGrow
+        // занимает всю высоту, автоматический нижний отступ под таб-бар
+        // добавляет к ней ход прокрутки, а вертикальный bounce включён
+        // по умолчанию. Тап по списку по-прежнему скрывает клавиатуру
+        scrollEnabled={filteredWords.length > 0}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           searchQuery.length > 0 ? (
@@ -264,6 +277,7 @@ export const WordsScreen = () => {
           )
         }
       />
+      </SafeAreaView>
 
       <WordFormModal
         visible={formVisible}
@@ -350,6 +364,7 @@ const createStyles = (theme: Theme) =>
   filterButtonActive: { backgroundColor: theme.buttonInk },
   filterText: { color: theme.textTertiary, fontSize: 12, fontWeight: "600" },
   filterTextActive: { color: theme.textOnButtonInk },
+  listArea: { flex: 1 },
   emptyList: { flexGrow: 1, justifyContent: "center" },
   wordCard: {
     backgroundColor: theme.surface,

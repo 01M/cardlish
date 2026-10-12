@@ -29,6 +29,7 @@ import {
   WordsStats,
 } from "../db/database";
 import { Button } from "../components/Button";
+import { FadeInView } from "../components/FadeInView";
 import { useReduceMotion } from "../hooks/useReduceMotion";
 import {
   disableDailyReminder,
@@ -67,11 +68,11 @@ export const ProfileScreen = () => {
   const [themePreference, setThemePreferenceState] =
     useState<ThemePreference>("system");
 
-  // Первая загрузка: до её завершения контент прозрачен, затем плавно
-  // появляется; прогресс-бар анимируется только при изменении после загрузки
+  // Первая загрузка: до её завершения контента нет, затем он плавно
+  // появляется (FadeInView); прогресс-бар анимируется только при изменении
+  // после загрузки
   const [isLoaded, setIsLoaded] = useState(false);
   const reduceMotion = useReduceMotion();
-  const contentOpacity = useRef(new Animated.Value(0)).current;
   const progressBarWidth = useRef(new Animated.Value(0)).current;
   const hasLoadedOnce = useRef(false);
   const prevLearnedPercentage = useRef<number | null>(null);
@@ -123,21 +124,6 @@ export const ProfileScreen = () => {
 
   const learnedPercentage =
     totalCount > 0 ? Math.round((stats.learned / totalCount) * 100) : 0;
-
-  // Появление контента: один раз после первой загрузки (180 мс); при
-  // включённой настройке «уменьшить движение» — без анимации
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (reduceMotion) {
-      contentOpacity.setValue(1);
-      return;
-    }
-    Animated.timing(contentOpacity, {
-      toValue: 1,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-  }, [isLoaded, reduceMotion, contentOpacity]);
 
   // Заполнение прогресс-бара: сразу при первой загрузке, дальше — только
   // при изменении процента (width — layout-свойство, useNativeDriver: false)
@@ -243,9 +229,8 @@ export const ProfileScreen = () => {
       ]}
       showsVerticalScrollIndicator={false}
     >
-      <Animated.View
-        style={[styles.contentInner, { opacity: contentOpacity }]}
-      >
+      {isLoaded && (
+      <FadeInView style={styles.contentInner}>
       <Text style={styles.eyebrow}>ВАШ ПРОГРЕСС</Text>
       <Text style={styles.title}>Профиль</Text>
 
@@ -356,7 +341,8 @@ export const ProfileScreen = () => {
         onPress={handleFullReset}
         style={styles.actionButtonGap}
       />
-      </Animated.View>
+      </FadeInView>
+      )}
     </ScrollView>
   );
 };

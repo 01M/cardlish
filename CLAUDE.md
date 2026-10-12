@@ -40,7 +40,7 @@ src/app/          Expo Router routes — THIN wrappers only
   (tabs)/words.tsx   -> re-exports WordsScreen
   (tabs)/profile.tsx -> re-exports ProfileScreen
 src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen)
-src/components/   Shared UI (Button, PressableScale, FlipCard, WordFormModal, Confetti, TopFade, ListTopFade)
+src/components/   Shared UI (Button, PressableScale, FlipCard, FadeInView, WordFormModal, Confetti, TopFade, ListTopFade)
 src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts)
@@ -146,7 +146,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 **Navigation & insets**
 - Tabs use NativeTabs (`expo-router/unstable-native-tabs`) in `src/app/(tabs)/_layout.tsx`.
 - Scrolling tab screens rely on the automatic native inset: the screen's first ScrollView, or a
-  `FlatList` with `contentInsetAdjustmentBehavior="automatic"` (WordsScreen).
+  `FlatList` with `contentInsetAdjustmentBehavior="automatic"` (WordsScreen). WordsScreen wraps
+  its list in a `react-native-screens/experimental` `SafeAreaView` whose bottom edge is on only
+  while the list is empty, so the empty state centers above the tab bar.
 - ReviewScreen uses `SafeAreaView` from `react-native-screens/experimental` +
   `disableAutomaticContentInsets` on its trigger.
 - Non-scrolling Learn states (session, completion, empty) set their own bottom padding from
@@ -250,10 +252,15 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Built-in `Animated` only (no reanimated); springs via `Animated.spring` (speed 18, bounciness 4),
   timings ~220 ms. `useNativeDriver: true` for transform/opacity, `false` for layout props.
 - Respect reduce motion via the shared `useReduceMotion()` hook (`src/hooks/useReduceMotion.ts`,
-  live: follows changes while the app is open) — LearnScreen, ProfileScreen, FlipCard and
-  PressableScale all use it; no local one-shot `isReduceMotionEnabled()` checks. When on, set final
+  live: follows changes while the app is open; a late-mounted consumer starts from the last known
+  value) — LearnScreen, ProfileScreen, FlipCard, PressableScale and FadeInView all use it; no
+  local one-shot `isReduceMotionEnabled()` checks. When on, set final
   values directly instead of animating — except FlipCard, which replaces the 3D rotation with a
   200 ms opacity crossfade between the faces.
+- First-load reveal: Learn, Review and Profile show only the page background until the first load
+  completes, then fade the content in once with `FadeInView` (`src/components/FadeInView.tsx`,
+  180 ms on mount). Learn and Review keep `FadeInView` at the same tree position in every
+  post-load branch so focus reloads and branch switches do not replay it.
 - `LayoutAnimation` is NOT used. Conditional UI animates its own height: the plan-card note uses an
   `overflow: "hidden"` wrapper, measured absolutely-positioned content, opacity interpolated from
   the height, and its row is remounted via `key` on visibility change so `onLayout` re-measures.
@@ -264,13 +271,13 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   `console.error` messages are mixed (older ones Russian) — match the file you are editing.
 - Async data loading uses `try/catch` (+ `finally` where a flag must flip) and local state flags
   (DB gate in `src/app/_layout.tsx`: `isReady` / `initFailed`). ProfileScreen: independent loads go
-  through one `Promise.all`, an `isLoaded` flag gates a ~180 ms content fade-in, and derived values
+  through one `Promise.all`, an `isLoaded` flag gates the `FadeInView` content fade-in, and derived values
   come from `getWordsStats()` (totalCount = totalNew + review + learned).
 - Loading/error states: the DB gate shows a spinner, and on failure "Не удалось открыть базу
-  данных" + "Повторить". LearnScreen renders only the page background until its first load
+  данных" + "Повторить". LearnScreen and ReviewScreen render only the page background until their first load
   completes; a failed first load shows an icon + "Не удалось загрузить данные" + "Повторить".
-  Profile fades its content in even after a failed load (with `showErrorAlert()`); Review and
-  Words render immediately and alert on failure. Action handlers keep the previous state on
+  Profile fades its content in even after a failed load (with `showErrorAlert()`); Words renders
+  immediately and alerts on failure. Action handlers keep the previous state on
   failure and call `showErrorAlert()`.
 - `FlipCard` has no internal reset: parents remount it via `key` (Learn: `word.id`; Review:
   `word.id` + a counter bumped on every queue advance or focus reload, so a repeated word still

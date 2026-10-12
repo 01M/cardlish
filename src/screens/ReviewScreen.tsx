@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +12,7 @@ import {
   Word,
 } from "../db/database";
 import { Button } from "../components/Button";
+import { FadeInView } from "../components/FadeInView";
 import { FlipCard } from "../components/FlipCard";
 import { PressableScale } from "../components/PressableScale";
 import { Theme } from "../theme/tokens";
@@ -34,14 +35,27 @@ export const ReviewScreen = () => {
   // пересоздавалась лицевой стороной, даже если то же слово показано подряд
   const [advanceCount, setAdvanceCount] = useState(0);
 
+  // До первой загрузки (успешной или нет) показываем только фон; экран
+  // ошибки — лишь если очередь ещё ни разу не загрузилась
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const hasQueueRef = useRef(false);
+
   const loadWords = useCallback(async () => {
     try {
       const words = await getReviewWords();
+      hasQueueRef.current = true;
       // Порядок и позиция сохраняются; карточка всегда открывается лицевой стороной
       setQueue((prev) => mergeReviewQueue(prev, words));
       setIsFlipped(false);
       setAdvanceCount((prev) => prev + 1);
+      setLoadFailed(false);
+      setIsLoaded(true);
     } catch {
+      if (!hasQueueRef.current) {
+        setLoadFailed(true);
+      }
+      setIsLoaded(true);
       showErrorAlert();
     }
   }, []);
@@ -103,6 +117,44 @@ export const ReviewScreen = () => {
     });
   };
 
+  // ДАННЫЕ ЕЩЁ НЕ ЗАГРУЖЕНЫ ИЛИ ПЕРВАЯ ЗАГРУЗКА НЕ УДАЛАСЬ
+  if (!isLoaded) {
+    return <View style={styles.safeArea} />;
+  }
+
+  // Все экраны после первой загрузки — SafeAreaView > FadeInView на одном
+  // месте дерева: React сохраняет FadeInView при смене экрана (ошибка, пусто,
+  // карточки), поэтому появление проигрывается один раз
+  if (loadFailed) {
+    return (
+      <SafeAreaView edges={{ bottom: true }} style={styles.safeArea}>
+        <FadeInView style={styles.revealContent}>
+        <View
+          style={[
+            styles.emptyContainer,
+            {
+              paddingTop: Math.max(insets.top + 16, 24),
+              paddingBottom: 24,
+            },
+          ]}
+        >
+          <Ionicons
+            name="alert-circle-outline"
+            size={48}
+            style={styles.errorIcon}
+          />
+          <Text style={styles.emptyTitle}>Не удалось загрузить данные</Text>
+          <Button
+            label="Повторить"
+            onPress={loadWords}
+            style={styles.retryButtonGap}
+          />
+        </View>
+        </FadeInView>
+      </SafeAreaView>
+    );
+  }
+
   // ЕСЛИ СЛОВ НА ПОВТОРЕНИЕ НЕТ
   if (reviewWords.length === 0) {
     return (
@@ -110,6 +162,7 @@ export const ReviewScreen = () => {
         edges={{ bottom: true }}
         style={styles.safeArea}
       >
+        <FadeInView style={styles.revealContent}>
         <View
           style={[
             styles.emptyContainer,
@@ -141,6 +194,7 @@ export const ReviewScreen = () => {
             style={styles.secondaryButtonGap}
           />
         </View>
+        </FadeInView>
       </SafeAreaView>
     );
   }
@@ -149,6 +203,7 @@ export const ReviewScreen = () => {
 
   return (
     <SafeAreaView edges={{ bottom: true }} style={styles.safeArea}>
+      <FadeInView style={styles.revealContent}>
       <View
         style={[
           styles.container,
@@ -205,6 +260,7 @@ export const ReviewScreen = () => {
           )}
         </View>
       </View>
+      </FadeInView>
     </SafeAreaView>
   );
 };
@@ -212,6 +268,7 @@ export const ReviewScreen = () => {
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: theme.pageBackground },
+  revealContent: { flex: 1 },
   container: {
     flex: 1,
     paddingHorizontal: 24,
@@ -304,10 +361,12 @@ const createStyles = (theme: Theme) =>
     backgroundColor: theme.pageBackground,
   },
   emptyIcon: { color: theme.successIcon, marginBottom: 16 },
+  errorIcon: { color: theme.textMuted, marginBottom: 16 },
   emptyTitle: {
     fontSize: 24,
     fontWeight: "900",
     color: theme.textPrimary,
+    textAlign: "center",
     marginBottom: 8,
   },
   emptySubText: {
@@ -321,5 +380,9 @@ const createStyles = (theme: Theme) =>
   },
   secondaryButtonGap: {
     marginTop: 10,
+  },
+  // Вместе с marginBottom заголовка — тот же зазор 24, что на экране «Учить»
+  retryButtonGap: {
+    marginTop: 16,
   },
 });

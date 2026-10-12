@@ -1,4 +1,5 @@
 import {
+  ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -21,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Button } from "../components/Button";
 import { Confetti } from "../components/Confetti";
+import { FadeInView } from "../components/FadeInView";
 import { FlipCard } from "../components/FlipCard";
 import { PressableScale } from "../components/PressableScale";
 import {
@@ -344,8 +346,17 @@ export const LearnScreen = () => {
     return <View style={styles.container} />;
   }
 
+  // Все экраны после первой загрузки — в одной обёртке одинаковой структуры
+  // (фон > FadeInView): React сохраняет FadeInView при смене экрана (ошибка,
+  // сессия, завершение, настройка), поэтому появление проигрывается один раз
+  const reveal = (content: ReactNode) => (
+    <View style={styles.container}>
+      <FadeInView style={styles.revealContent}>{content}</FadeInView>
+    </View>
+  );
+
   if (loadFailed) {
-    return (
+    return reveal(
       <View
         style={[
           styles.emptyContainer,
@@ -374,7 +385,7 @@ export const LearnScreen = () => {
   if (sessionWords && sessionWords.length > 0) {
     const currentWord = sessionWords[currentIndex];
 
-    return (
+    return reveal(
       <View
         style={[
           styles.sessionContainer,
@@ -421,7 +432,7 @@ export const LearnScreen = () => {
 
   // 2. ЭКРАН: СЕССИЯ ЗАВЕРШЕНА
   if (showCompletion) {
-    return (
+    return reveal(
       <View
         style={[
           styles.emptyContainer,
@@ -444,7 +455,7 @@ export const LearnScreen = () => {
 
   // 3. ЭКРАН: СЛОВА ЗАКОНЧИЛИСЬ
   if (stats.totalNew === 0) {
-    return (
+    return reveal(
       <View
         style={[
           styles.emptyContainer,
@@ -480,7 +491,7 @@ export const LearnScreen = () => {
   }
 
   // 4. ЭКРАН: НАСТРОЙКА СЕССИИ (ГЛАВНЫЙ)
-  return (
+  return reveal(
     <ScrollView
       style={styles.container}
       contentContainerStyle={[
@@ -692,6 +703,7 @@ const createStyles = (theme: Theme) =>
     flex: 1,
     backgroundColor: theme.pageBackground,
   },
+  revealContent: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 24,
   },

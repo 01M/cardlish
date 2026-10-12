@@ -104,7 +104,7 @@ const createStyles = (theme: Theme) =>
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 30,
-    backgroundColor: theme.backdrop,
+    backgroundColor: theme.pageBackground,
   },
   loadingText: {
     marginTop: 10,

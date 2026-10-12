@@ -477,15 +477,15 @@ export const LearnScreen = () => {
         </Text>
         <PressableScale
           style={styles.startButton}
-          onPress={handleResetProgress}
+          onPress={() => router.push("/words")}
         >
-          <Text style={styles.startButtonText}>Сбросить прогресс</Text>
+          <Text style={styles.startButtonText}>Добавить слова</Text>
         </PressableScale>
         <PressableScale
           style={styles.secondaryButton}
-          onPress={() => router.push("/words")}
+          onPress={handleResetProgress}
         >
-          <Text style={styles.secondaryButtonText}>Добавить слова</Text>
+          <Text style={styles.secondaryButtonText}>Сбросить прогресс</Text>
         </PressableScale>
       </View>
     );

@@ -2,9 +2,9 @@
  * Семантические токены темы. Единый источник цветов для всех экранов.
  * Светлая тема повторяет текущие hex-значения в точности.
  *
- * Правило оранжевого: #D97706 (orangeAccent) — заливки кнопок, тинт таб-бара
- * и текст на фоне страницы/карточки. Оранжевый как ТЕКСТ на чернильных
- * (тёмных приподнятых) поверхностях заменяется на amberAccent (#E8A34D в тёмной).
+ * Правило оранжевого: #D97706 (orangeAccent, обе темы) — заливки кнопок и тинт таб-бара.
+ * Оранжевый как ТЕКСТ или иконка — только amberAccent (#B45309 светлая,
+ * #E8A34D тёмная).
  *
  * Правило buttonInk: каждый элемент с фоном buttonInk обязан использовать
  * textOnButtonInk для текста (в тёмной теме buttonInk светлый, а текст тёмный).
@@ -42,8 +42,8 @@ export interface Theme {
 
   // Акценты
   greenAccent: string; // зелёный акцент: бровки, перевод на карточке, success-текст
-  orangeAccent: string; // оранжевый: заливки кнопок, тинт таб-бара, warning-текст
-  amberAccent: string; // янтарный текст: бровки, статусы, счётчик сессии
+  orangeAccent: string; // оранжевый: заливки кнопок, тинт таб-бара
+  amberAccent: string; // янтарный текст и иконки (в светлой темнее orangeAccent): бровки, заметка плана, статусы, стат «На повторе»
   indigoAccent: string; // кнопка «Сохранить» в WordFormModal
   linkBlue: string; // ссылка «Изменить», синий стат «Новые»
   dangerLink: string; // ссылка «Удалить» в WordsScreen
@@ -57,7 +57,6 @@ export interface Theme {
   dangerBorder: string; // рамка опасных кнопок
   dangerText: string; // текст опасных кнопок
   statGreen: string; // стат «Выучено»
-  statAmber: string; // стат «На повторе», infoCount
   statBlue: string; // стат «Новые»
   statInk: string; // стат «Всего в базе»
 
@@ -144,7 +143,6 @@ export const lightTheme: Theme = {
   dangerBorder: "#F4B4AE",
   dangerText: "#B42318",
   statGreen: "#087443",
-  statAmber: "#B45309",
   statBlue: "#2563EB",
   statInk: "#17202A",
 
@@ -215,7 +213,6 @@ export const darkTheme: Theme = {
   dangerBorder: "#6B3530",
   dangerText: "#F38B80",
   statGreen: "#56B77D",
-  statAmber: "#E8A34D",
   statBlue: "#8FA8FF",
   statInk: "#E8EDF0",
 

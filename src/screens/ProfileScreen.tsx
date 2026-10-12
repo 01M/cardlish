@@ -253,7 +253,7 @@ export const ProfileScreen = () => {
           <Text style={styles.statLabel}>Выучено</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: theme.statAmber }]}>
+          <Text style={[styles.statValue, { color: theme.amberAccent }]}>
             {stats.review}
           </Text>
           <Text style={styles.statLabel}>На повторе</Text>

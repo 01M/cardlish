@@ -43,7 +43,7 @@ src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen
 src/components/   Shared UI (Button, PressableScale, FlipCard, FadeInView, WordFormModal, Confetti, TopFade, ListTopFade)
 src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
-src/db/           SQLite access + models (database.ts)
+src/db/           SQLite access + models (database.ts), schema/migration SQL + planMigration (schema.ts)
 src/services/     Side-effectful services (notifications.ts)
 src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); pure, no React/DB:
                   reviewQueue.ts (mergeReviewQueue(prev, fresh)), sessionPlan.ts (getSessionPlan)
@@ -94,7 +94,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Tests only for pure logic (no React rendering, no snapshots, no component tests, no hand-written
   mocks of expo-sqlite or React Native internals). To make logic testable, extract it into a pure
   function (`src/utils/`, or an exported helper such as `splitStyle` in `PressableScale.tsx`).
-- DB code (`src/db/database.ts`) is verified by hand on a device.
+- Schema and migration SQL (`src/db/schema.ts`) is tested against real SQLite via `node:sqlite`
+  (`src/db/schema.test.ts`, `@jest-environment node`, `/// <reference types="node" />`). The rest
+  of `src/db/database.ts` is verified by hand on a device.
 - New scheduling logic (SRS: intervals, due dates, grading) must be written as pure functions with
   tests in the same change.
 
@@ -108,10 +110,28 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    extract it; keep components presentational and prop-driven. Screen-local subcomponents (e.g.
    `StepperButton`, `SessionComplete` in `LearnScreen.tsx`) may stay in the screen file.
 3. **Data access lives in `src/db/`.** All SQL, schema, migrations, and model types stay in
-   `src/db/database.ts`. Screens/services call exported async functions — never issue queries inline.
+   `src/db/` — queries and model types in `database.ts`; schema/migration SQL strings and pure
+   helpers in `schema.ts` (no expo-sqlite import, so they are tested on `node:sqlite`).
+   Screens/services call exported async functions — never issue queries inline.
    The DB is opened once via `getDb()` (memoized promise; a failed open clears the memo so a retry
-   reopens) and seeded from `src/assets/dictionary.json` only when the `words` table is empty.
-   - Row type `Word`: `transcription`/`example` are `string | null`; `status` is
+   reopens).
+   - **Schema v2, versioned by `PRAGMA user_version` (= 2; v1 was 0).** `words` has `dict_key`
+     (`term.trim().toLowerCase()`, UNIQUE, NULL for custom words —
+     `CHECK ((is_custom = 1) = (dict_key IS NULL))`), `is_custom` 0/1 and `status` NOT NULL with
+     CHECKs. `initDatabase()` reads the version and follows `planMigration(userVersion,
+     hasWordsTable)`: `fresh` (create schema + seed + set version, one exclusive transaction),
+     `upgrade-v1`, `current`, `too-new` (throws `DatabaseTooNewError`; the DB is not touched and
+     the error screen says to update the app) or `unknown` (error screen).
+   - Seeding: `dictionary.json` is `require`d lazily, only on the seeding path (fresh install, or
+     an empty v1 table), and inserted with batched multi-row INSERTs (`buildSeedBatches`).
+   - v1 → v2: first `VACUUM INTO` `english_cards.v1-backup.db` next to the DB (failure aborts the
+     upgrade); then one exclusive transaction keeps ids, statuses and custom words, merges
+     duplicate dictionary keys into the lowest id with the most advanced status, keeps the
+     AUTOINCREMENT counter, and sets the version. Any error rolls back to the untouched v1 DB. The
+     backup is deleted on the next launch that finds schema v2.
+   - New schema changes: bump `SCHEMA_VERSION`, add a plan step + SQL in `schema.ts` with
+     `node:sqlite` tests (`@jest-environment node` docblock), applied in one transaction.
+   - Row type `Word`: `dict_key`/`transcription`/`example` are `string | null`; `status` is
      `"new" | "review" | "learned"`. `WordsStats` is exported and shared by Learn and Profile.
    - `getWordsStats()` is one query (`COUNT(CASE …)`), backed by index `idx_words_is_custom_status`.
    - `markWordAsReview()` only moves words that are still `'new'` (guards against a stale Learn
@@ -119,9 +139,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    - `resetDatabase()` runs in one exclusive transaction: deletes custom words and sets all
      remaining words to `'new'`. Dictionary rows are NOT re-seeded and keep their ids.
      `resetProgressOnly()` sets every word to `'new'` and keeps custom words.
-   - Known limitation: no schema versioning (no `user_version`/migrations), and dictionary words
-     have no stable key besides the autoincrement `id`. Before changing the bundled dictionary,
-     add versioning plus a stable key.
+   - Known limitation: the schema is versioned and dictionary words have a stable `dict_key`, but
+     dictionary *content* updates (upsert by `dict_key` for existing installs) are not implemented
+     yet — changing `dictionary.json` only affects fresh installs.
 4. **React Native primitives only.** No HTML tags (`div`, `span`, `p`, `button`), no DOM APIs, no
    `tailwindcss`/`react-native-web` shortcuts. Use `View`/`Text`/`Pressable`/`FlatList`/
    `ScrollView`/`Modal` + `StyleSheet.create`. Keep list rendering virtualized (`FlatList`).

@@ -3,7 +3,11 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { initDatabase, getThemePreference } from "@/db/database";
+import {
+  DatabaseTooNewError,
+  initDatabase,
+  getThemePreference,
+} from "@/db/database";
 import {
   applyThemePreference,
   useColorSchemeName,
@@ -19,6 +23,8 @@ export default function RootLayout() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [isReady, setIsReady] = useState(false);
   const [initFailed, setInitFailed] = useState(false);
+  // База от более новой версии приложения: повтор не поможет, нужно обновиться
+  const [isDbTooNew, setIsDbTooNew] = useState(false);
 
   // Тема навигации: фон совпадает с фоном экрана, чтобы не было белой вспышки
   const navTheme = useMemo(
@@ -45,6 +51,7 @@ export default function RootLayout() {
       setIsReady(true);
     } catch (e) {
       console.error("Ошибка инициализации БД:", e);
+      setIsDbTooNew(e instanceof DatabaseTooNewError);
       setInitFailed(true);
     }
   }, []);
@@ -63,6 +70,12 @@ export default function RootLayout() {
       <ThemeProvider value={navTheme}>
         <View style={styles.center}>
           <Text style={styles.errorText}>Не удалось открыть базу данных</Text>
+          {isDbTooNew && (
+            <Text style={styles.errorHint}>
+              Данные сохранены более новой версией приложения. Обновите
+              приложение, чтобы продолжить.
+            </Text>
+          )}
           <Button
             label="Повторить"
             onPress={handleRetry}
@@ -114,6 +127,12 @@ const createStyles = (theme: Theme) =>
     color: theme.textPrimary,
     fontSize: 17,
     fontWeight: "700",
+    textAlign: "center",
+  },
+  errorHint: {
+    marginTop: 8,
+    color: theme.textSecondary,
+    fontSize: 15,
     textAlign: "center",
   },
   retryButtonGap: {

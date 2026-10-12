@@ -1,17 +1,21 @@
 import * as SQLite from "expo-sqlite";
-import initialDictionaryRaw from "../assets/dictionary.json";
-
-type DictionaryItem = {
-  term: string;
-  translation: string;
-  transcription?: string;
-  example?: string;
-};
-
-const initialDictionary = initialDictionaryRaw as DictionaryItem[];
+import {
+  BACKUP_DATABASE_INTO,
+  buildSeedBatches,
+  COUNT_WORDS,
+  CREATE_SCHEMA_V2,
+  DictionaryItem,
+  MIGRATE_V1_TO_V2,
+  planMigration,
+  SELECT_USER_VERSION,
+  SELECT_WORDS_TABLE,
+  SET_SCHEMA_VERSION,
+} from "./schema";
 
 export interface Word {
   id: number;
+  // Ключ слова из словаря; у своих слов — null
+  dict_key: string | null;
   term: string;
   translation: string;
   transcription: string | null;
@@ -41,49 +45,85 @@ const getDb = (): Promise<SQLite.SQLiteDatabase> => {
   return dbPromise;
 };
 
-// 1. Инициализация базы данных
+// База создана более новой версией приложения: её не трогаем
+export class DatabaseTooNewError extends Error {
+  constructor(userVersion: number) {
+    super(`Database schema version ${userVersion} is newer than this app`);
+    this.name = "DatabaseTooNewError";
+  }
+}
+
+// Заполнение словаря. JSON подгружаем лениво — только здесь, чтобы он
+// не разбирался при каждом запуске
+const seedDictionary = async (txn: SQLite.SQLiteDatabase) => {
+  const dictionary: DictionaryItem[] = require("../assets/dictionary.json");
+  for (const batch of buildSeedBatches(dictionary)) {
+    await txn.runAsync(batch.sql, batch.params);
+  }
+};
+
+// Копия базы v1, которая делается перед переносом на v2. Лежит рядом с
+// базой и удаляется при следующем успешном запуске на v2
+const V1_BACKUP_NAME = "english_cards.v1-backup.db";
+
+const getDbDirectory = (db: SQLite.SQLiteDatabase) =>
+  db.databasePath.slice(0, db.databasePath.lastIndexOf("/"));
+
+const deleteV1Backup = async (db: SQLite.SQLiteDatabase) => {
+  try {
+    await SQLite.deleteDatabaseAsync(V1_BACKUP_NAME, getDbDirectory(db));
+  } catch {
+    // Обычно файла просто нет; коды ошибки на iOS и Android разные,
+    // поэтому их не различаем
+  }
+};
+
+// 1. Инициализация базы данных: версия схемы в PRAGMA user_version
 export const initDatabase = async () => {
   const db = await getDb();
 
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS words (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      term TEXT NOT NULL,
-      translation TEXT NOT NULL,
-      transcription TEXT,
-      example TEXT,
-      is_custom INTEGER DEFAULT 0,
-      status TEXT DEFAULT 'new'
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_words_is_custom_status
-      ON words (is_custom, status);
-
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY NOT NULL,
-      value TEXT NOT NULL
-    );
-  `);
-
-  const firstRow = await db.getFirstAsync<{ count: number }>(
-    "SELECT COUNT(*) as count FROM words;",
+  const versionRow = await db.getFirstAsync<{ user_version: number }>(
+    SELECT_USER_VERSION,
   );
+  const userVersion = versionRow?.user_version ?? 0;
+  const wordsTable = await db.getFirstAsync(SELECT_WORDS_TABLE);
 
-  if (firstRow?.count === 0) {
-    await db.withTransactionAsync(async () => {
-      for (const item of initialDictionary) {
-        await db.runAsync(
-          `INSERT INTO words (term, translation, transcription, example, is_custom, status) 
-           VALUES (?, ?, ?, ?, 0, 'new');`,
-          [
-            item.term,
-            item.translation,
-            item.transcription || null,
-            item.example || null,
-          ],
+  switch (planMigration(userVersion, wordsTable != null)) {
+    case "fresh":
+      // Схема, словарь и версия — одной транзакцией
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.execAsync(CREATE_SCHEMA_V2);
+        await seedDictionary(txn);
+        await txn.execAsync(SET_SCHEMA_VERSION);
+      });
+      return;
+    case "upgrade-v1":
+      // Без копии v1 не переносим: ошибка здесь — экран ошибки БД. Копию
+      // от прошлой неудачной попытки удаляем, иначе VACUUM INTO упадёт
+      await deleteV1Backup(db);
+      await db.runAsync(BACKUP_DATABASE_INTO, [
+        `${getDbDirectory(db)}/${V1_BACKUP_NAME}`,
+      ]);
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.execAsync(MIGRATE_V1_TO_V2);
+        // Таблица v1 пуста, если первое заполнение словаря прервалось —
+        // тогда заполняем словарь, как это сделала бы v1
+        const countRow = await txn.getFirstAsync<{ count: number }>(
+          COUNT_WORDS,
         );
-      }
-    });
+        if (countRow?.count === 0) {
+          await seedDictionary(txn);
+        }
+        await txn.execAsync(SET_SCHEMA_VERSION);
+      });
+      return;
+    case "current":
+      await deleteV1Backup(db);
+      return;
+    case "too-new":
+      throw new DatabaseTooNewError(userVersion);
+    case "unknown":
+      throw new Error(`Unknown database schema version ${userVersion}`);
   }
 };
 

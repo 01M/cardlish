@@ -10,7 +10,6 @@ import {
   Animated,
   Easing,
   LayoutChangeEvent,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Confetti } from "../components/Confetti";
 import { FlipCard } from "../components/FlipCard";
+import { PressableScale } from "../components/PressableScale";
 import {
   getSessionWords,
   getWordsStats,
@@ -355,14 +355,13 @@ export const LearnScreen = () => {
         </View>
 
         {/* Кнопка "Далее" */}
-        <TouchableOpacity
+        <PressableScale
           style={styles.nextButton}
           onPress={handleNextWord}
           disabled={isProcessing}
-          activeOpacity={0.8}
         >
           <Text style={styles.nextButtonText}>Далее</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     );
   }
@@ -412,18 +411,18 @@ export const LearnScreen = () => {
           Можно сбросить прогресс и начать обучение заново или добавить
           собственные слова.
         </Text>
-        <TouchableOpacity
+        <PressableScale
           style={styles.startButton}
           onPress={handleResetProgress}
         >
           <Text style={styles.startButtonText}>Сбросить прогресс</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
+        </PressableScale>
+        <PressableScale
           style={styles.secondaryButton}
           onPress={() => router.push("/words")}
         >
           <Text style={styles.secondaryButtonText}>Добавить слова</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     );
   }
@@ -478,9 +477,10 @@ export const LearnScreen = () => {
             pointerEvents="none"
           />
         )}
-        <TouchableOpacity
+        <PressableScale
           style={styles.toggleBtn}
           onPress={() => handleSourceChange("custom")}
+          pressedScale={0.98}
         >
           <Text
             style={[
@@ -490,11 +490,12 @@ export const LearnScreen = () => {
           >
             Свои слова
           </Text>
-        </TouchableOpacity>
+        </PressableScale>
 
-        <TouchableOpacity
+        <PressableScale
           style={styles.toggleBtn}
           onPress={() => handleSourceChange("dictionary")}
+          pressedScale={0.98}
         >
           <Text
             style={[
@@ -504,7 +505,7 @@ export const LearnScreen = () => {
           >
             Словарь
           </Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       <View style={styles.planCard}>
@@ -515,7 +516,6 @@ export const LearnScreen = () => {
             disabled={sessionSize <= 5}
             accessibilityLabel="Меньше слов"
             icon="remove"
-            reduceMotion={reduceMotion}
             styles={styles}
           />
           <View style={styles.counterValueWrap}>
@@ -534,7 +534,6 @@ export const LearnScreen = () => {
             disabled={sessionSize >= 50}
             accessibilityLabel="Больше слов"
             icon="add"
-            reduceMotion={reduceMotion}
             styles={styles}
           />
         </View>
@@ -608,9 +607,9 @@ export const LearnScreen = () => {
         </Animated.View>
       </View>
 
-      <TouchableOpacity style={styles.startButton} onPress={handleStart}>
+      <PressableScale style={styles.startButton} onPress={handleStart}>
         <Text style={styles.startButtonText}>Начать сессию</Text>
-      </TouchableOpacity>
+      </PressableScale>
     </ScrollView>
   );
 };
@@ -722,10 +721,6 @@ const createStyles = (theme: Theme) =>
     borderRadius: 24,
     borderWidth: 1,
     borderColor: theme.borderSubtle,
-  },
-  stepperPressArea: {
-    flex: 1,
-    alignSelf: "stretch",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1003,60 +998,29 @@ type StepperButtonProps = {
   disabled: boolean;
   accessibilityLabel: string;
   icon: "remove" | "add";
-  reduceMotion: boolean;
   styles: ReturnType<typeof createStyles>;
 };
 
-// 7. КНОПКА СТЕППЕРА: нажатие сжимает её до 0.92, отпускание возвращает
-// пружиной; при системной настройке "уменьшить движение" анимации нет
+// 7. КНОПКА СТЕППЕРА: нажатие сжимает её до 0.92 (PressableScale)
 const StepperButton = ({
   onPress,
   disabled,
   accessibilityLabel,
   icon,
-  reduceMotion,
   styles,
-}: StepperButtonProps) => {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const animateTo = (toValue: number) => {
-    if (reduceMotion) {
-      scale.setValue(toValue);
-      return;
-    }
-    Animated.spring(scale, {
-      toValue,
-      speed: 18,
-      bounciness: 4,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  return (
-    <Animated.View
-      style={[
-        styles.counterBtn,
-        {
-          transform: [{ scale }],
-          opacity: disabled ? 0.35 : 1,
-        },
-      ]}
-    >
-      <Pressable
-        onPress={onPress}
-        onPressIn={() => animateTo(0.92)}
-        onPressOut={() => animateTo(1)}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ disabled }}
-        style={styles.stepperPressArea}
-      >
-        <Ionicons name={icon} size={22} style={styles.counterBtnIcon} />
-      </Pressable>
-    </Animated.View>
-  );
-};
+}: StepperButtonProps) => (
+  <PressableScale
+    onPress={onPress}
+    disabled={disabled}
+    pressedScale={0.92}
+    accessibilityRole="button"
+    accessibilityLabel={accessibilityLabel}
+    accessibilityState={{ disabled }}
+    style={[styles.counterBtn, { opacity: disabled ? 0.35 : 1 }]}
+  >
+    <Ionicons name={icon} size={22} style={styles.counterBtnIcon} />
+  </PressableScale>
+);
 
 type SessionCompleteProps = {
   wordCount: number;
@@ -1224,12 +1188,12 @@ const SessionComplete = ({
           </Text>
         </Animated.View>
         <Animated.View style={[styles.completionGroup, groupStyles[3]]}>
-          <TouchableOpacity style={styles.startButton} onPress={onReview}>
+          <PressableScale style={styles.startButton} onPress={onReview}>
             <Text style={styles.startButtonText}>Перейти к повторению</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={onContinue}>
+          </PressableScale>
+          <PressableScale style={styles.secondaryButton} onPress={onContinue}>
             <Text style={styles.secondaryButtonText}>Продолжить обучение</Text>
-          </TouchableOpacity>
+          </PressableScale>
         </Animated.View>
       </View>
       {!reduceMotion && hasWords && confettiOriginY !== null && (

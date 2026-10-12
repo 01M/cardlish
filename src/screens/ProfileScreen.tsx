@@ -15,7 +15,6 @@ import {
   StyleSheet,
   Switch,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
@@ -29,6 +28,7 @@ import {
   setReminderEnabled,
   setThemePreference,
 } from "../db/database";
+import { PressableScale } from "../components/PressableScale";
 import {
   disableDailyReminder,
   enableDailyReminder,
@@ -300,18 +300,18 @@ export const ProfileScreen = () => {
       </View>
 
       <Text style={styles.sectionLabel}>УПРАВЛЕНИЕ ДАННЫМИ</Text>
-      <TouchableOpacity
+      <PressableScale
         style={styles.actionButton}
         onPress={handleResetProgress}
       >
         <Text style={styles.actionButtonText}>Сбросить прогресс изучения</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
+      </PressableScale>
+      <PressableScale
         style={[styles.actionButton, styles.dangerButton]}
         onPress={handleFullReset}
       >
         <Text style={styles.dangerButtonText}>Сбросить всё до начала</Text>
-      </TouchableOpacity>
+      </PressableScale>
       </Animated.View>
     </ScrollView>
   );

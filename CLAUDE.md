@@ -17,9 +17,8 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 - **expo-notifications** for the daily reminder, **expo-speech** for pronunciation,
   **expo-constants**, **expo-font**, **expo-linking**, **expo-status-bar**
 - **react-native-safe-area-context ~5.7** + **react-native-screens ~4.26**
-- **@expo/vector-icons ^15** (Ionicons) for icons, **expo-haptics**, **expo-linear-gradient**
-  (edge fades); animations use the built-in `Animated` API from react-native
-  (react-native-reanimated is NOT used)
+- **@expo/vector-icons ^15** (Ionicons), **expo-haptics**, **expo-linear-gradient** (edge fades);
+  animations use the built-in `Animated` API (react-native-reanimated is NOT used)
 - **EAS Build/Submit/Update** — profiles `development`, `preview`, `production` (see `eas.json`);
   all Android builds are APKs, `appVersionSource: "remote"`
 - **Python helper** `scripts/convert-freedict.py` converts FreeDict TEI archives into
@@ -36,8 +35,9 @@ src/app/          Expo Router routes — THIN wrappers only
   (tabs)/review.tsx  -> re-exports ReviewScreen
   (tabs)/words.tsx   -> re-exports WordsScreen
   (tabs)/profile.tsx -> re-exports ProfileScreen
-src/screens/      Actual screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen)
-src/components/   Reusable UI (FlipCard, WordFormModal, TopFade, ListTopFade)
+src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen)
+src/components/   Shared UI (PressableScale, FlipCard, WordFormModal, Confetti, TopFade, ListTopFade)
+src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts)
 src/services/     Side-effectful services (notifications.ts)
@@ -68,14 +68,26 @@ npx eas-cli@latest update --branch production
 (Since SDK 53 push notifications are stripped from Expo Go). `src/services/notifications.ts`
 already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that guard.
 
+**Windows dev environment**
+- If PowerShell blocks `npx.ps1`, call `npx.cmd` instead.
+- Do not use Python for file edits (`python` resolves to the Windows Store stub); edit files with
+  the editor tools.
+
+## Workflow rules
+
+- Keep edits scoped to the files named in the task.
+- No dead code or leftover legacy after a migration — remove the old path in the same change.
+- Run `npx tsc --noEmit` and `npm run lint` before finishing.
+
 ## Architectural rules
 
 1. **Routes stay thin.** Never put screen logic in `src/app/`. A route file should only import a
    screen from `src/screens/` and export it (`export default LearnScreen;`). Layout files are the
    only place navigator configuration lives. Add new screens as
    `src/screens/XScreen.tsx` + a one-line route wrapper in `src/app/`.
-2. **Shared UI goes to `src/components/`.** If two screens need it, extract it; keep components
-   presentational and prop-driven.
+2. **Shared UI goes to `src/components/`, shared hooks to `src/hooks/`.** If two screens need it,
+   extract it; keep components presentational and prop-driven. Screen-local subcomponents (e.g.
+   `StepperButton`, `SessionComplete` in `LearnScreen.tsx`) may stay in the screen file.
 3. **Data access lives in `src/db/`.** All SQL, schema, migrations, and model types stay in
    `src/db/database.ts`. Screens/services call exported async functions — never issue queries inline.
    The DB is opened once via `getDb()` (memoized promise) and seeded from
@@ -83,70 +95,85 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 4. **React Native primitives only.** No HTML tags (`div`, `span`, `p`, `button`), no DOM APIs, no
    `tailwindcss`/`react-native-web` shortcuts. Use `View`/`Text`/`Pressable`/`FlatList`/
    `ScrollView`/`Modal` + `StyleSheet.create`. Keep list rendering virtualized (`FlatList`).
-5. **Respect safe areas on mobile.** NativeTabs owns the tab bar and its insets — never add
-   manual tab bar height/bottom padding. Follow "Navigation & insets" below; use
-   `useSafeAreaInsets()` only for screen-level top spacing. Avoid hardcoded device assumptions
-   and verify both iOS and Android.
+5. **Respect safe areas.** NativeTabs owns the tab bar and its insets — never add manual tab bar
+   height. Follow "Navigation & insets" below; avoid hardcoded device assumptions and verify both
+   iOS and Android.
 6. **Styling conventions:** Keep styles in a `createStyles(theme)` factory at the bottom of the
    file, called once per screen via `const styles = useMemo(() => createStyles(theme), [theme])`;
-   no inline style objects for anything non-trivial (dynamic values like progress-bar width are
-   exempt). All colors come from the theme (see "Theming" below). TextInputs use the theme's
-   `placeholder` + `keyboardAppearance`.
+   no inline style objects for anything non-trivial (dynamic values like progress-bar width or
+   inset-derived padding are exempt). All colors come from the theme (see "Theming"). TextInputs
+   use the theme's `placeholder` + `keyboardAppearance`. Use `StyleSheet.absoluteFill`
+   (`absoluteFillObject` does not exist in RN 0.86).
 7. **Navigation** via Expo Router only: `Link`, `router`, `useLocalSearchParams` from
    `expo-router`. Never pass non-serializable params (functions, DB handles).
+8. **Branch switches in one synchronous block.** When a screen switches between branches
+   (session / completion / setup), do the async work first (e.g. `await getWordsStats()`), then
+   update all related state together with no `await` in between — otherwise a frame of the wrong
+   branch flashes.
 
 ## UI conventions
 
 **Navigation & insets**
 - Tabs use NativeTabs (`expo-router/unstable-native-tabs`) in `src/app/(tabs)/_layout.tsx`.
-- Tab screens without a ScrollView (ReviewScreen) use `SafeAreaView` from
-  `react-native-screens/experimental` + `disableAutomaticContentInsets` on that trigger.
-- Scrolling tab screens rely on the automatic iOS inset: the screen's first ScrollView, or a
+- Scrolling tab screens rely on the automatic native inset: the screen's first ScrollView, or a
   `FlatList` with `contentInsetAdjustmentBehavior="automatic"` (WordsScreen).
+- ReviewScreen uses `SafeAreaView` from `react-native-screens/experimental` +
+  `disableAutomaticContentInsets` on its trigger.
+- Non-scrolling Learn states (session, completion, empty) set their own bottom padding from
+  `insets.bottom` (`useSafeAreaInsets()`). Checked on iPhone; Android unverified.
+
+**Buttons**
+- Main buttons use `PressableScale` (`src/components/PressableScale.tsx`, press-scale feedback)
+  instead of `TouchableOpacity`. Its `style` is split: placement/size props (`alignSelf`, `flex*`,
+  width/height/min/max, margins, `position`, `display`) go to the outer `Pressable`, everything
+  else to the inner `Animated.View`.
+- Not yet migrated (`TouchableOpacity`): WordsScreen per-card "Изменить"/"Удалить" links (intentional),
+  search clear button and empty-state "Добавить слово"; LearnScreen session close button;
+  FlipCard speak buttons; WordFormModal "Сохранить"/"Отмена".
 
 **Edge fades**
-- `src/components/TopFade.tsx` — status-bar scrim, rendered once in `src/app/_layout.tsx`.
-- `src/components/ListTopFade.tsx` — top fade over the word list (WordsScreen).
+- `TopFade` — status-bar scrim, rendered once in `src/app/_layout.tsx`.
+- `ListTopFade` — top fade over the word list (WordsScreen).
 - Both are `expo-linear-gradient` gradients built from `theme.pageBackground` (via `withAlpha`).
 
 **Native UI, icons, haptics**
 - Allowed: @expo/ui (e.g. SegmentedControl on Profile), expo-symbols, expo-haptics,
   @expo/vector-icons. RN `Alert` and `Switch` stay as they are.
-- Icons are Ionicons (e.g. `volume-high` in FlipCard's speak buttons), never emoji.
-- Haptics are fire-and-forget: `void Haptics.x().catch(() => {})`. They fire on source toggle and
-  stepper (selection), next card (light impact), session complete (success), FlipCard flip and
-  the Profile theme picker (selection).
+- Icons are Ionicons from @expo/vector-icons — never emoji or text glyphs.
+- Haptics are fire-and-forget: `void Haptics.x().catch(() => {})`. Selection: FlipCard flip,
+  Learn source toggle and session-size stepper, Profile reminder switch and theme setting.
+  Light impact: Learn next card, Review "forgot". Success: Learn session complete, Review "remembered".
 
-**Learn setup card**
-- Sliding-thumb source toggle: two labels over one `Animated.View` thumb on `theme.orangeAccent`.
-- One merged plan card: stepper (`StepperButton`, press-scale feedback) + composition bar +
+**Learn screen**
+- Setup: sliding-thumb source toggle (two labels over one `Animated.View` thumb on
+  `theme.orangeAccent`) + one merged plan card: stepper (`StepperButton`) + composition bar +
   legend + inline note ("Своих слов не хватает…", shown when `missingCustomCount > 0`).
 - The composition split mirrors what `getSessionWords()` will load — derive counts only from
   `sessionSize`, `stats` and `source`, never new queries.
+- Completion (`SessionComplete`): badge pop, `Confetti`, word count-up, success haptic.
+
+## Motion
+
+- Built-in `Animated` only (no reanimated); springs via `Animated.spring` (speed 18, bounciness 4),
+  timings ~220 ms. `useNativeDriver: true` for transform/opacity, `false` for layout props.
+- Respect reduce motion via `useReduceMotion()` (`src/hooks/useReduceMotion.ts`) or the screen's
+  existing `reduceMotion` state; when on, set values directly instead of animating.
+- `LayoutAnimation` is NOT used. Conditional UI animates its own height: the plan-card note uses an
+  `overflow: "hidden"` wrapper, measured absolutely-positioned content, opacity interpolated from
+  the height, and its row is remounted via `key` on visibility change so `onLayout` re-measures.
 
 ## Conventions observed in the codebase
 
 - UI strings and comments are in Russian; code identifiers, function names, and log messages use
   English. Match the file you are editing.
 - Async data loading uses `try/catch/finally` + local `isLoading` state (see `src/app/_layout.tsx`
-  for the DB gate pattern). ProfileScreen uses a variant: independent loads go through one
-  `Promise.all`, an `isLoaded` flag gates a ~180 ms content fade-in, and derived values are
-  computed from already-loaded stats (totalCount = totalNew + review + learned from
-  `getWordsStats()`; `getAllWords()` no longer exists).
+  for the DB gate pattern). ProfileScreen: independent loads go through one `Promise.all`, an
+  `isLoaded` flag gates a ~180 ms content fade-in, and derived values come from
+  `getWordsStats()` (totalCount = totalNew + review + learned).
 - Word lifecycle is a 3-state machine: `new` → `review` → `learned`, stored in
   `words.status`. Progress resets go through `resetProgressOnly()` / `resetDatabase()`.
 - Comments in this repo are numbered section headers (`// 1. Инициализация базы данных`) — keep that
   style when adding functions to `src/db/database.ts`.
-- Screen-local subcomponents (e.g. `StepperButton` at the bottom of `LearnScreen.tsx`) may live in
-  the screen file; only components shared across screens go to `src/components/`.
-- Motion conventions:
-  - Built-in `Animated` only; springs via `Animated.spring` (speed 18, bounciness 4), timings
-    ~220 ms. `useNativeDriver: true` for transform/opacity, `false` for layout props (width/height).
-  - Honor `AccessibilityInfo.isReduceMotionEnabled()` — one check per screen, shared
-    `reduceMotion` state — and set values directly on first layout and when it is on.
-  - `LayoutAnimation` is NOT used. Conditional UI animates its own height instead (the
-    plan-card note: `overflow: "hidden"` wrapper, measured absolutely-positioned content,
-    opacity interpolated from the height).
 
 ## Context protection
 

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-screens/experimental";
@@ -12,6 +12,7 @@ import {
   Word,
 } from "../db/database";
 import { FlipCard } from "../components/FlipCard";
+import { PressableScale } from "../components/PressableScale";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 
@@ -104,18 +105,18 @@ export const ReviewScreen = () => {
             На данный момент нет слов, требующих повторения. Изучите новые слова
             во вкладке «Учить».
           </Text>
-          <TouchableOpacity
+          <PressableScale
             style={styles.emptyButton}
             onPress={handleResetProgress}
           >
             <Text style={styles.emptyButtonText}>Сбросить прогресс</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          </PressableScale>
+          <PressableScale
             style={styles.secondaryButton}
             onPress={() => router.push("/")}
           >
             <Text style={styles.secondaryButtonText}>Учить новые слова</Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </SafeAreaView>
     );
@@ -156,21 +157,19 @@ export const ReviewScreen = () => {
         <View style={styles.actionsContainer}>
           {isFlipped ? (
             <View style={styles.buttonRow}>
-              <TouchableOpacity
+              <PressableScale
                 style={[styles.actionBtn, styles.forgotBtn]}
                 onPress={handleForgot}
-                activeOpacity={0.8}
               >
                 <Text style={styles.forgotBtnText}>Не вспомнил</Text>
-              </TouchableOpacity>
+              </PressableScale>
 
-              <TouchableOpacity
+              <PressableScale
                 style={[styles.actionBtn, styles.rememberedBtn]}
                 onPress={handleRemembered}
-                activeOpacity={0.8}
               >
                 <Text style={styles.rememberedBtnText}>Вспомнил</Text>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           ) : (
             <Text style={styles.flipHintText}>

@@ -12,6 +12,7 @@ import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteCustomWord, getCustomWords, Word } from "../db/database";
+import { PressableScale } from "../components/PressableScale";
 import { WordFormModal } from "../components/WordFormModal";
 import ListTopFade from "../components/ListTopFade";
 import { Theme } from "../theme/tokens";
@@ -137,9 +138,9 @@ export const WordsScreen = () => {
           <Text style={styles.title}>Мои слова</Text>
           <Text style={styles.subtitle}>Только слова, добавленные вами</Text>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={openAddForm}>
+        <PressableScale style={styles.addButton} onPress={openAddForm}>
           <Text style={styles.addButtonText}>+ Добавить</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       {/* Поле поиска */}
@@ -171,7 +172,7 @@ export const WordsScreen = () => {
       {/* Фильтры */}
       <View style={styles.filterRow}>
         {filters.map((item) => (
-          <TouchableOpacity
+          <PressableScale
             key={item.value}
             style={[
               styles.filterButton,
@@ -187,7 +188,7 @@ export const WordsScreen = () => {
             >
               {item.label}
             </Text>
-          </TouchableOpacity>
+          </PressableScale>
         ))}
         {/* Шторка у верхнего края списка */}
         <ListTopFade />

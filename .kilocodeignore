@@ -53,3 +53,6 @@ build/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Python venv for the dictionary pipeline
+scripts/.venv/

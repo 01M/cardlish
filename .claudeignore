@@ -60,3 +60,5 @@ Thumbs.db
 # Agent / editor scratch space
 .kilo/
 .claude/settings.local.json
+# Python venv for the dictionary pipeline
+scripts/.venv/

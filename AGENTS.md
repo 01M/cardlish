@@ -41,6 +41,24 @@ npx expo install --fix      # fix incompatible package versions
 
 Run lint and typecheck before declaring any task done.
 
+### Dictionary pipeline (Python, build-time only)
+
+`src/assets/dictionary.json` is generated — never edit it by hand. Run from the repo root; on
+Windows use the `py` launcher (bare `python` may hit the WindowsApps alias). The venv lives in
+`scripts/.venv` (gitignored); dependencies are pinned in `scripts/requirements.txt`.
+
+```bash
+py -V:3.14 -m venv scripts/.venv                                        # once
+scripts/.venv/Scripts/python.exe -m pip install -r scripts/requirements.txt
+scripts/.venv/Scripts/python.exe scripts/convert_freedict.py <path>/freedict-eng-rus-2025.11.23.src.tar.xz src/assets/dictionary.json
+scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python tests
+```
+
+JSON shape: array of `{ term, translation, transcription, example, rank }` in source order
+(never reorder — fresh-install ids depend on it); `rank` is 1..N by wordfreq frequency.
+`src/assets/dictionary.test.ts` guards the shape. Every data source must be listed in
+`src/data/sources.json` before its data ships.
+
 ## Navigation & Routing
 
 - Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.

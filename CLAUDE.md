@@ -23,8 +23,11 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
   animations use the built-in `Animated` API (react-native-reanimated is NOT used)
 - **EAS Build/Submit** — profiles `development`, `preview`, `production` (see `eas.json`);
   all Android builds are APKs, `appVersionSource: "remote"`
-- **Python helper** `scripts/convert-freedict.py` converts FreeDict TEI archives into
-  `src/assets/dictionary.json` (build-time only, not part of the app runtime)
+- **Dictionary pipeline (Python, build-time only)** `scripts/convert_freedict.py` converts the
+  FreeDict eng-rus TEI archive into `src/assets/dictionary.json` and adds a wordfreq frequency
+  `rank`; venv in `scripts/.venv` (gitignored), deps pinned in `scripts/requirements.txt`
+  (`wordfreq==3.1.1`), stdlib `unittest` tests in `scripts/test_convert_freedict.py`. See
+  "Dictionary pipeline" under Commands.
 - Lint: `eslint` 9 + `eslint-config-expo` (`eslint.config.js`)
 - Tests: `jest` 29 + `jest-expo` preset (`"jest"` key in `package.json`); jest types come from
   `"types": ["jest"]` in `tsconfig.json` (TS 6 no longer auto-includes `@types/*`)
@@ -51,8 +54,8 @@ src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); pure, no Rea
                   reviewQueue.ts (mergeReviewQueue(prev, fresh)), sessionPlan.ts (getSessionPlan),
                   sources.ts (DataSource, parseSources, formatUrlForDisplay)
 *.test.ts         Unit tests live next to the code they test (never under src/app/)
-src/assets/       dictionary.json (large, git-tracked, never read it)
-scripts/          Python tooling
+src/assets/       dictionary.json (large, generated, git-tracked, never read it) + dictionary.test.ts
+scripts/          Python dictionary pipeline (convert_freedict.py, its tests, requirements.txt, .venv/)
 assets/           App icons / splash
 ```
 
@@ -74,14 +77,34 @@ npx eas-cli@latest build --profile development --platform android   # dev client
 npx eas-cli@latest submit --profile production
 ```
 
+**Dictionary pipeline** (run from the repo root; Python via the `py` launcher, not bare `python`):
+
+```bash
+py -V:3.14 -m venv scripts/.venv                                        # once
+scripts/.venv/Scripts/python.exe -m pip install -r scripts/requirements.txt
+scripts/.venv/Scripts/python.exe scripts/convert_freedict.py <path>/freedict-eng-rus-2025.11.23.src.tar.xz src/assets/dictionary.json
+scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python tests
+```
+
+- Source archive: `freedict-eng-rus-2025.11.23.src.tar.xz` from https://freedict.org/downloads/
+  (not in the repo). The output is deterministic (LF line endings) — regenerating must not change
+  the file unless the converter or its inputs changed.
+- JSON shape: array of `{ term, translation, transcription, example, rank }`, one entry per
+  lowercase `term`, entry order = source order (fresh-install ids depend on it — never reorder).
+  `translation`: up to 5 Russian translations joined with ", " (wiki links resolved);
+  `transcription`: first IPA or ""; `example`: always ""; `rank`: 1..N unique, by wordfreq
+  frequency (`large` list) descending, ties by lowercase term, unknown words last.
+  `src/assets/dictionary.test.ts` guards this shape.
+
 `expo-notifications` needs a **development build** — Expo Go on Android crashes on import
 (Since SDK 53 push notifications are stripped from Expo Go). `src/services/notifications.ts`
 already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that guard.
 
 **Windows dev environment**
 - If PowerShell blocks `npx.ps1`, call `npx.cmd` instead.
-- Do not use Python for file edits (`python` resolves to the Windows Store stub); edit files with
-  the editor tools.
+- Python 3.14 is installed via the Python install manager: use `py -V:3.14 …` or the venv's
+  `scripts/.venv/Scripts/python.exe`. Bare `python` in PowerShell may hit the WindowsApps alias
+  and print nothing. Do not use Python for file edits; edit files with the editor tools.
 
 ## Workflow rules
 
@@ -130,7 +153,8 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
      `upgrade-v1`, `current`, `too-new` (throws `DatabaseTooNewError`; the DB is not touched and
      the error screen says to update the app) or `unknown` (error screen).
    - Seeding: `dictionary.json` is `require`d lazily, only on the seeding path (fresh install, or
-     an empty v1 table), and inserted with batched multi-row INSERTs (`buildSeedBatches`).
+     an empty v1 table), and inserted with batched multi-row INSERTs (`buildSeedBatches`). The
+     JSON's `rank` is not stored yet (`buildSeedBatches` ignores it; tested).
    - v1 → v2: first `VACUUM INTO` `english_cards.v1-backup.db` next to the DB (failure aborts the
      upgrade); then one exclusive transaction keeps ids, statuses and custom words, merges
      duplicate dictionary keys into the lowest id with the most advanced status, keeps the
@@ -148,7 +172,8 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
      `resetProgressOnly()` sets every word to `'new'` and keeps custom words.
    - Known limitation: the schema is versioned and dictionary words have a stable `dict_key`, but
      dictionary *content* updates (upsert by `dict_key` for existing installs) are not implemented
-     yet — changing `dictionary.json` only affects fresh installs.
+     yet — changing `dictionary.json` only affects fresh installs (existing installs still show
+     the old translations with `[[…]]` markup until that sync lands).
 4. **React Native primitives only.** No HTML tags (`div`, `span`, `p`, `button`), no DOM APIs, no
    `tailwindcss`/`react-native-web` shortcuts. Use `View`/`Text`/`Pressable`/`FlatList`/
    `ScrollView`/`Modal` + `StyleSheet.create`. Keep list rendering virtualized (`FlatList`).

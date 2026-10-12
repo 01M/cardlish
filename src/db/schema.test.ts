@@ -406,6 +406,12 @@ describe("fresh install seeding", () => {
     ]);
   });
 
+  it("ignores fields it does not store, such as rank", () => {
+    const withRank = items.map((item, index) => ({ ...item, rank: index + 1 }));
+
+    expect(buildSeedBatches(withRank, 2)).toEqual(buildSeedBatches(items, 2));
+  });
+
   it("splits items into batches of the given size", () => {
     const batches = buildSeedBatches(items, 2);
 

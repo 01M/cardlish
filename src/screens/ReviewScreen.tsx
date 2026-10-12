@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-screens/experimental";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import {
   getReviewWords,
   markWordAsLearned,
@@ -37,11 +39,15 @@ export const ReviewScreen = () => {
   );
 
   const handleForgot = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     // Слово остаётся в статусе 'review'. Переходим к следующему
     nextCard();
   };
 
   const handleRemembered = async () => {
+    void Haptics.notificationAsync(
+      Haptics.NotificationFeedbackType.Success,
+    ).catch(() => {});
     if (reviewWords.length === 0) return;
 
     // Переводим слово в статус 'learned'
@@ -88,7 +94,11 @@ export const ReviewScreen = () => {
             },
           ]}
         >
-          <Text style={styles.emptyIcon}>🎉</Text>
+          <Ionicons
+            name="checkmark-circle"
+            size={64}
+            style={styles.emptyIcon}
+          />
           <Text style={styles.emptyTitle}>Всё повторено!</Text>
           <Text style={styles.emptySubText}>
             На данный момент нет слов, требующих повторения. Изучите новые слова
@@ -267,7 +277,7 @@ const createStyles = (theme: Theme) =>
     alignItems: "center",
     backgroundColor: theme.pageBackground,
   },
-  emptyIcon: { fontSize: 64, marginBottom: 16 },
+  emptyIcon: { color: theme.successIcon, marginBottom: 16 },
   emptyTitle: {
     fontSize: 24,
     fontWeight: "900",

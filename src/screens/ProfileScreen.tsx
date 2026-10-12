@@ -179,7 +179,7 @@ export const ProfileScreen = () => {
   };
 
   const handleReminderToggle = async (enabled: boolean) => {
-  Haptics.selectionAsync();
+    void Haptics.selectionAsync().catch(() => {});
     if (enabled) {
       const scheduled = await enableDailyReminder();
       if (!scheduled) {

@@ -152,6 +152,7 @@ export const LearnScreen = () => {
   };
 
   const handleStart = async () => {
+    lastSessionLengthRef.current = 0;
     const words = await getSessionWords(source, sessionSize);
     if (words.length === 0) {
       setShowCompletion(true);
@@ -299,12 +300,13 @@ export const LearnScreen = () => {
         setCurrentIndex((prev) => prev + 1);
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       } else {
-        // Сессия завершена
-        setSessionWords(null);
-        setCurrentIndex(0);
+        // Сессия завершена. Статистику грузим до смены экрана, чтобы переход
+        // сессия -> завершение прошёл одним рендером (без кадра с настройкой)
         const data = await getWordsStats();
         setStats(data);
         setShowCompletion(true);
+        setSessionWords(null);
+        setCurrentIndex(0);
         void Haptics.notificationAsync(
           Haptics.NotificationFeedbackType.Success,
         ).catch(() => {});
@@ -1090,6 +1092,8 @@ const SessionComplete = ({
     reduceMotion ? wordCount : 0,
   );
   const [confettiOriginY, setConfettiOriginY] = useState<number | null>(null);
+  // Пустая сессия: без счётчика, пульса кольца и конфетти
+  const hasWords = wordCount > 0;
 
   const groupStyles = useMemo(
     () =>
@@ -1196,7 +1200,7 @@ const SessionComplete = ({
     <>
       <View style={styles.completionContent} onLayout={handleContentLayout}>
         <Animated.View style={[styles.badgeWrap, groupStyles[0]]}>
-          {!reduceMotion && (
+          {!reduceMotion && hasWords && (
             <Animated.View style={[styles.badgePulse, pulseStyle]} />
           )}
           <Animated.View
@@ -1207,9 +1211,11 @@ const SessionComplete = ({
         </Animated.View>
         <Animated.View style={[styles.completionGroup, groupStyles[1]]}>
           <Text style={styles.emptyTitle}>Сессия завершена</Text>
-          <Text style={styles.completionCount}>
-            Слов в сессии: {displayCount}
-          </Text>
+          {hasWords && (
+            <Text style={styles.completionCount}>
+              Слов в сессии: {displayCount}
+            </Text>
+          )}
         </Animated.View>
         <Animated.View style={[styles.completionGroup, groupStyles[2]]}>
           <Text style={styles.emptyText}>
@@ -1226,7 +1232,7 @@ const SessionComplete = ({
           </TouchableOpacity>
         </Animated.View>
       </View>
-      {!reduceMotion && confettiOriginY !== null && (
+      {!reduceMotion && hasWords && confettiOriginY !== null && (
         <Confetti originY={confettiOriginY} />
       )}
     </>

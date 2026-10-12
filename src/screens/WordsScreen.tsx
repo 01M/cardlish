@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { deleteCustomWord, getCustomWords, Word } from "../db/database";
 import { WordFormModal } from "../components/WordFormModal";
@@ -156,8 +157,13 @@ export const WordsScreen = () => {
           <TouchableOpacity
             style={styles.clearSearchButton}
             onPress={() => setSearchQuery("")}
+            hitSlop={12}
           >
-            <Text style={styles.clearSearchText}>✕</Text>
+            <Ionicons
+              name="close-circle"
+              size={18}
+              style={styles.clearSearchIcon}
+            />
           </TouchableOpacity>
         )}
       </View>
@@ -289,10 +295,8 @@ const createStyles = (theme: Theme) =>
   clearSearchButton: {
     padding: 4,
   },
-  clearSearchText: {
+  clearSearchIcon: {
     color: theme.textMutedSoft,
-    fontSize: 14,
-    fontWeight: "700",
   },
   filterRow: { flexDirection: "row", gap: 8, marginBottom: 0, zIndex: 1 },
   filterButton: {

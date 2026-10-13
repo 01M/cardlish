@@ -115,7 +115,7 @@ section `topic:<slug>`. Update the topic-decision counts in the `manual-correcti
 `src/data/sources.json` after editing the overrides (a Python test checks them).
 
 To add a topic: add it to `TOPICS` in `build_topics.py`, curate and rebuild, then add
-`[slug, Russian title]` to `TOPICS` in `src/utils/categories.ts` at the same position. A jest test
+`[slug, Russian title, emoji]` (the emoji must be non-empty) to `TOPICS` in `src/utils/categories.ts` at the same position. A jest test
 ties the registry to `topics.json` (same slugs, same order) — it also fails when a topic drops
 out of the file, and then its registry entry must go.
 

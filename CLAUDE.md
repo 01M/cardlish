@@ -3,7 +3,8 @@
 ## App overview
 
 "Cardlish" (`english-cards`) — an Expo/React Native English-vocabulary flashcard app
-with spaced repetition. Users flip cards, grade them (`new` → `review` → `learned`), manage a
+with a three-state word flow (`new` → `review` → `learned`) and a simple review queue (no
+intervals or due dates yet). Users flip cards, move words through those states, manage a
 custom word list on top of a bundled FreeDict dictionary, get up to three daily study reminders, and track
 per-status statistics. UI copy is Russian; identifiers and code are English.
 
@@ -226,7 +227,7 @@ scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.j
   guards it: every key exists in dictionary.json (the sync would silently skip an unknown key),
   no duplicates, sorted, ≥ 40 keys per topic, unique slugs — no hard-coded counts.
 - **Adding a topic:** add it to `TOPICS` in `build_topics.py` (roots, Russian working title),
-  curate, rebuild; then add `[slug, title]` to the `TOPICS` table in `src/utils/categories.ts`
+  curate, rebuild; then add `[slug, title, emoji]` (the tie test requires a non-empty emoji) to the `TOPICS` table in `src/utils/categories.ts`
   at the same position. The tie test in `src/utils/categories.test.ts` fails until the registry
   and `topics.json` list the same slugs in the same order — also when a topic drops out of the
   file (under `MIN_TOPIC_SIZE`): then remove its registry entry (saved selections simply drop
@@ -405,7 +406,7 @@ are final — do not regenerate or edit them)
      seed path): runs when `app_settings.dictionary_version` differs from
      `src/assets/dictionary.version.json` (the data version over `dictionary.json` + `topics.json`;
      the hash formula changed in v5, so every upgraded install syncs once and fills
-     `word_topics`). Only then are the 5.5 MB `dictionary.json` and `topics.json` `require`d
+     `word_topics`). Only then are the large (~6 MB) `dictionary.json` and `topics.json` `require`d
      (lazily). One exclusive transaction runs `planDictionarySync()`: upsert in 500-row batches,
      matched **only by `dict_key`** (ids differ between installs) — `term`, `translation`,
      `transcription`, `example`, `rank` are updated, **`id`, `status` and `is_custom` never**;
@@ -510,11 +511,13 @@ are final — do not regenerate or edit them)
   ("Сбросить прогресс изучения" secondary, "Сбросить всё до начала" danger), Profile
   "Добавить время" (secondary) and the iOS time picker sheet ("Готово" primary, "Отмена"
   secondary). Learn "Далее" does
-  NOT pass `disabled`: the `isProcessing` guard in `handleNextWord` blocks double taps, and
+  NOT pass `disabled`: the `isProcessingRef` guard (a ref, set synchronously) in `handleNextWord` blocks double taps, and
   dimming would flash on every tap.
 - Not migrated — deliberate exceptions, keep them as they are:
   - WordFormModal "Сохранить" (`TouchableOpacity`): the only indigo button (`indigoAccent`,
-    dims to 0.6 while saving); its color is a separate design decision.
+    dims to 0.6 while saving; double taps are blocked by `isSavingRef`, a ref set synchronously at
+    the start of `handleSave`, since `disabled={saving}` only applies after a re-render); its
+    color is a separate design decision.
   - WordFormModal "Отмена" (`TouchableOpacity`): a text button with no fill or border.
   - Review "Не вспомнил"/"Вспомнил" (`PressableScale`): a matched grading pair laid out two
     across (flex 1, padding 10, 14/800); the success look has no other user.

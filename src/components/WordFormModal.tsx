@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -42,6 +42,9 @@ export const WordFormModal = ({
   const [transcription, setTranscription] = useState("");
   const [example, setExample] = useState("");
   const [saving, setSaving] = useState(false);
+  // Защита «Сохранить» от двойного нажатия: ref меняется сразу, а saving (и
+  // disabled) — только после перерисовки, и второе нажатие до неё прошло бы
+  const isSavingRef = useRef(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -52,16 +55,19 @@ export const WordFormModal = ({
   }, [visible, word]);
 
   const handleSave = async () => {
-    const trimmedTerm = term.trim();
-    const trimmedTranslation = translation.trim();
-
-    if (!trimmedTerm || !trimmedTranslation) {
-      Alert.alert("Заполните поля", "Слово и перевод обязательны.");
-      return;
-    }
-
-    setSaving(true);
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
     try {
+      const trimmedTerm = term.trim();
+      const trimmedTranslation = translation.trim();
+
+      // Ранний выход тоже проходит через finally и снимает защиту
+      if (!trimmedTerm || !trimmedTranslation) {
+        Alert.alert("Заполните поля", "Слово и перевод обязательны.");
+        return;
+      }
+
+      setSaving(true);
       const extra = {
         transcription: transcription.trim() || undefined,
         example: example.trim() || undefined,
@@ -89,6 +95,7 @@ export const WordFormModal = ({
       console.error("Ошибка сохранения слова:", e);
       showErrorAlert("Не удалось сохранить слово. Попробуйте ещё раз.");
     } finally {
+      isSavingRef.current = false;
       setSaving(false);
     }
   };

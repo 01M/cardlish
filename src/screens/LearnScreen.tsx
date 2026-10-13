@@ -104,7 +104,9 @@ export const LearnScreen = () => {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [sessionSize, setSessionSize] = useState<number>(10);
-  const [isProcessing, setIsProcessing] = useState(false);
+  // Защита «Далее» от двойного нажатия: ref меняется сразу, а состояние —
+  // только после перерисовки, и второе нажатие до неё прошло бы проверку
+  const isProcessingRef = useRef(false);
   const [stats, setStats] = useState<WordsStats>({
     totalNew: 0,
     review: 0,
@@ -382,9 +384,9 @@ export const LearnScreen = () => {
   };
 
   const handleNextWord = async () => {
-    if (!sessionWords || isProcessing) return;
+    if (!sessionWords || isProcessingRef.current) return;
 
-    setIsProcessing(true);
+    isProcessingRef.current = true;
     try {
       // Переводим пройденное слово в 'review'
       const currentWord = sessionWords[currentIndex];
@@ -409,7 +411,7 @@ export const LearnScreen = () => {
       // Ошибка до смены экрана: карточка остаётся на месте
       showErrorAlert();
     } finally {
-      setIsProcessing(false);
+      isProcessingRef.current = false;
     }
   };
 

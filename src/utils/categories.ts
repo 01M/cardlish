@@ -10,69 +10,68 @@ export type Category =
       kind: "custom";
       key: typeof CUSTOM_CATEGORY_KEY;
       title: string;
-      description: string;
     }
   | {
       kind: "band";
       key: string;
       title: string;
-      description: string;
       // Границы rank включительно; to = null — полоса без верхней границы
       from: number;
       to: number | null;
     }
   | {
-      // Без строки описания: в выборе разделов у темы только счётчик
       kind: "topic";
       key: string;
       title: string;
       // slug из src/assets/topics.json — значение word_topics.topic
       slug: string;
+      // Значок плитки в выборе разделов; диктору не читается
+      emoji: string;
     };
 
 export type CategoryKind = Category["kind"];
 
 export const CUSTOM_CATEGORY_KEY = "custom";
 
-// 1. Полосы частотности: [от, до (null — без границы), описание]. Должны
-// начинаться с 1, идти подряд без пропусков и пересечений, последняя — без
-// верхней границы (проверяет validateCategories, тест — на настоящей таблице)
-const BANDS: [number, number | null, string][] = [
-  [1, 500, "Самые частые слова"],
-  [501, 1000, "Частые слова"],
-  [1001, 2000, "Повседневная лексика"],
-  [2001, 3000, "Расширенная лексика"],
-  [3001, 5000, "Менее частые слова"],
-  [5001, 10000, "Редкие слова"],
-  [10001, 20000, "Очень редкие слова"],
-  [20001, null, "Узкая лексика, составные слова и имена"],
+// 1. Полосы частотности: [от, до (null — без границы)]. Должны начинаться с
+// 1, идти подряд без пропусков и пересечений, последняя — без верхней
+// границы (проверяет validateCategories, тест — на настоящей таблице)
+const BANDS: [number, number | null][] = [
+  [1, 500],
+  [501, 1000],
+  [1001, 2000],
+  [2001, 3000],
+  [3001, 5000],
+  [5001, 10000],
+  [10001, 20000],
+  [20001, null],
 ];
 
-// 1a. Темы: [slug, название] в порядке src/assets/topics.json (его пишет
-// scripts/build_topics.py). Тест сверяет эту таблицу с файлом: у каждой темы
-// файла есть строка здесь, и наоборот
-const TOPICS: [string, string][] = [
-  ["food", "Еда и напитки"],
-  ["animal", "Животные"],
-  ["plant", "Растения"],
-  ["body", "Части тела"],
-  ["clothing", "Одежда и украшения"],
-  ["home", "Дом и быт"],
-  ["transport", "Транспорт и дороги"],
-  ["occupation", "Профессии"],
-  ["family", "Семья"],
-  ["colour", "Цвета"],
-  ["time", "Время"],
-  ["weather", "Погода"],
-  ["emotion", "Чувства и эмоции"],
-  ["health", "Здоровье и медицина"],
-  ["school", "Школа и учёба"],
-  ["sport", "Спорт и игры"],
-  ["music", "Музыка и танцы"],
-  ["money", "Деньги и покупки"],
-  ["technology", "Техника и компьютеры"],
-  ["nature", "Природа и ландшафт"],
-  ["travel", "Путешествия"],
+// 1a. Темы: [slug, название, эмодзи] в порядке src/assets/topics.json (его
+// пишет scripts/build_topics.py). Тест сверяет эту таблицу с файлом: у каждой
+// темы файла есть строка здесь, и наоборот
+const TOPICS: [string, string, string][] = [
+  ["food", "Еда и напитки", "🍎"],
+  ["animal", "Животные", "🦊"],
+  ["plant", "Растения", "🌿"],
+  ["body", "Части тела", "🖐️"],
+  ["clothing", "Одежда и украшения", "👕"],
+  ["home", "Дом и быт", "🏠"],
+  ["transport", "Транспорт и дороги", "🚗"],
+  ["occupation", "Профессии", "💼"],
+  ["family", "Семья", "👨‍👩‍👧"],
+  ["colour", "Цвета", "🎨"],
+  ["time", "Время", "⏰"],
+  ["weather", "Погода", "⛅"],
+  ["emotion", "Чувства и эмоции", "😊"],
+  ["health", "Здоровье и медицина", "🩺"],
+  ["school", "Школа и учёба", "🎓"],
+  ["sport", "Спорт и игры", "⚽"],
+  ["music", "Музыка и танцы", "🎵"],
+  ["money", "Деньги и покупки", "💰"],
+  ["technology", "Техника и компьютеры", "💻"],
+  ["nature", "Природа и ландшафт", "🏔️"],
+  ["travel", "Путешествия", "✈️"],
 ];
 
 export const topicKey = (slug: string) => `topic:${slug}`;
@@ -84,34 +83,37 @@ export const formatNumber = (value: number) =>
 export const bandKey = (from: number, to: number | null) =>
   `band:${from}-${to ?? ""}`;
 
-const bandTitle = (from: number, to: number | null) =>
+// Диапазон полосы: «1–500», «10 001–20 000», «20 001+» — подпись чипа
+export const formatBandRange = (from: number, to: number | null) =>
   to === null
-    ? `Слова ${formatNumber(from)}+`
-    : `Слова ${formatNumber(from)}–${formatNumber(to)}`;
+    ? `${formatNumber(from)}+`
+    : `${formatNumber(from)}–${formatNumber(to)}`;
+
+const bandTitle = (from: number, to: number | null) =>
+  `Слова ${formatBandRange(from, to)}`;
 
 export const CATEGORIES: Category[] = [
   {
     kind: "custom",
     key: CUSTOM_CATEGORY_KEY,
     title: "Свои слова",
-    description: "Слова, которые вы добавили сами",
   },
   ...BANDS.map(
-    ([from, to, description]): Category => ({
+    ([from, to]): Category => ({
       kind: "band",
       key: bandKey(from, to),
       title: bandTitle(from, to),
-      description,
       from,
       to,
     }),
   ),
   ...TOPICS.map(
-    ([slug, title]): Category => ({
+    ([slug, title, emoji]): Category => ({
       kind: "topic",
       key: topicKey(slug),
       title,
       slug,
+      emoji,
     }),
   ),
 ];
@@ -220,7 +222,7 @@ export interface CategoryGroup {
 
 const GROUP_TITLES: Record<CategoryKind, string> = {
   custom: "Свои слова",
-  band: "Словарь по частотности",
+  band: "Частота",
   topic: "Темы",
 };
 
@@ -354,17 +356,66 @@ export const formatNewWords = (count: number) => {
   return `${formatNumber(count)} ${words}`;
 };
 
-export const formatSelectionSummary = (selection: readonly string[]) =>
-  isAllSelected(selection)
-    ? "Все разделы"
-    : `Выбрано: ${normalizeSelection(selection).length}`;
+// Выбор словами, в порядке реестра: «Свои слова», полосы (соседние
+// выбранные полосы слиты в одну: 1–500 и 501–1 000 → «Слова 1–1 000»; все
+// полосы — «Весь словарь»), темы по названию (все темы — «Все темы»)
+export const getSelectionParts = (selection: readonly string[]): string[] => {
+  const selected = CATEGORIES.filter((category) =>
+    selection.includes(category.key),
+  );
+  const parts: string[] = [];
+  if (selected.some((category) => category.kind === "custom")) {
+    parts.push("Свои слова");
+  }
 
-// Счётчик строки раздела: для своих слов — сколько новых, для полос и тем —
-// сколько новых осталось из всех слов раздела
-export const formatCategoryCount = (
+  const allBands = CATEGORIES.filter((category) => category.kind === "band");
+  const bands = selected.filter((category) => category.kind === "band");
+  if (bands.length > 0 && bands.length === allBands.length) {
+    parts.push("Весь словарь");
+  } else {
+    let run: { from: number; to: number | null } | null = null;
+    for (const band of bands) {
+      if (run !== null && run.to !== null && run.to + 1 === band.from) {
+        run.to = band.to;
+        continue;
+      }
+      if (run !== null) parts.push(bandTitle(run.from, run.to));
+      run = { from: band.from, to: band.to };
+    }
+    if (run !== null) parts.push(bandTitle(run.from, run.to));
+  }
+
+  const allTopics = CATEGORIES.filter((category) => category.kind === "topic");
+  const topics = selected.filter((category) => category.kind === "topic");
+  if (topics.length > 0 && topics.length === allTopics.length) {
+    parts.push("Все темы");
+  } else {
+    parts.push(...topics.map((topic) => topic.title));
+  }
+  return parts;
+};
+
+// Короткая сводка для строки «Разделы»: первые maxParts частей и «ещё N»
+export const formatSelectionSummary = (
+  selection: readonly string[],
+  maxParts = 2,
+) => {
+  if (isAllSelected(selection)) return "Все разделы";
+  const parts = getSelectionParts(normalizeSelection(selection));
+  const shown = parts.slice(0, maxParts);
+  const rest = parts.length - shown.length;
+  return rest > 0
+    ? `${shown.join(" · ")} · ещё ${rest}`
+    : shown.join(" · ");
+};
+
+// Подпись раздела для диктора: «Еда и напитки, 464 новых слова»,
+// «Слова 10 001–20 000, осталось 9 884 из 10 001». На экране у чипа и плитки
+// только число оставшихся новых слов
+export const formatCategoryAccessibilityLabel = (
   category: Category,
   count: CategoryCount,
 ) =>
-  category.kind === "custom"
-    ? formatNewWords(count.remaining)
-    : `осталось ${formatNumber(count.remaining)} из ${formatNumber(count.total)}`;
+  category.kind === "band"
+    ? `${category.title}, осталось ${formatNumber(count.remaining)} из ${formatNumber(count.total)}`
+    : `${category.title}, ${formatNewWords(count.remaining)}`;

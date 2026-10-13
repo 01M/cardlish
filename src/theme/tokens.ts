@@ -71,6 +71,7 @@ export interface Theme {
   // Бейджи и кнопки FlipCard
   badgeAmberBackground: string; // бейдж «СЛОВО» и кнопка озвучки на лицевой стороне
   badgeAmberText: string; // текст бейджа «СЛОВО» и иконка озвучки на лицевой стороне
+  selectedTint: string; // фон выбранного чипа/плитки в выборе разделов: рамка orangeAccent, текст amberAccent (≥ 4.5:1 на этом фоне в обеих темах)
   exampleBackground: string; // блок примера употребления
   exampleLabel: string; // подпись «ПРИМЕР»
   exampleText: string; // текст примера
@@ -154,6 +155,7 @@ export const lightTheme: Theme = {
 
   badgeAmberBackground: "#FCE7C2",
   badgeAmberText: "#B45309",
+  selectedTint: "#FFF7E8",
   exampleBackground: "#F1F7F2",
   exampleLabel: "#6E8376",
   exampleText: "#31443A",
@@ -223,6 +225,7 @@ export const darkTheme: Theme = {
 
   badgeAmberBackground: "#3A2E18",
   badgeAmberText: "#E8A34D",
+  selectedTint: "#3A2E18",
   exampleBackground: "#1C2B24",
   exampleLabel: "#7FA38E",
   exampleText: "#C3D2C8",

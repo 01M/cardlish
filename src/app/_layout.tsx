@@ -109,7 +109,7 @@ export default function RootLayout() {
             name="sources"
             options={{
               title: "Источники и лицензии",
-              headerBackTitle: "Профиль",
+              headerBackButtonDisplayMode: "minimal",
               headerStyle: { backgroundColor: theme.pageBackground },
               headerTintColor: theme.textPrimary,
               headerShadowVisible: false,

@@ -393,7 +393,8 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Non-scrolling Learn states (session, completion, empty) set their own bottom padding from
   `insets.bottom` (`useSafeAreaInsets()`). Checked on iPhone; Android unverified.
 - `/sources` (SourcesScreen) is the only screen with a native Stack header (configured in
-  `src/app/_layout.tsx`: title, back title "Профиль", `pageBackground`/`textPrimary`, no shadow).
+  `src/app/_layout.tsx`: title, `headerBackButtonDisplayMode: "minimal"` (chevron only),
+  `pageBackground`/`textPrimary`, no shadow).
   It is opened from Profile's "О ПРИЛОЖЕНИИ" row (placed above "УПРАВЛЕНИЕ ДАННЫМИ" so the
   destructive buttons stay last); its ScrollView sets bottom padding from `insets.bottom`.
   Links there use `PressableScale` with `accessibilityRole="link"` and `Linking.openURL`
@@ -428,9 +429,11 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
     session size and Profile daily goal): icon-only, own sizes, labelled via `accessibilityLabel`.
   - Words filter chips (`PressableScale`): selectable controls with
     `accessibilityState={{ selected }}`.
-  - Section picker rows (`PressableScale`, `accessibilityRole="checkbox"`), its close button
-    (`TouchableOpacity`, same look as the Learn session close) and its group-header actions
-    "Все" / "Нет" (`PressableScale`, amber text, ≥ 44 pt, 0.35 dimming when disabled).
+  - Section picker chips and topic tiles (`PressableScale`, `accessibilityRole="checkbox"`),
+    its close button (`TouchableOpacity`, same look as the Learn session close) and its
+    group-header actions "Все" / "Нет" (`PressableScale`, amber text, ≥ 44 pt, 0.35 dimming
+    when disabled). Its bottom-bar "Готово" IS a primary `Button` (own size via placement
+    style, closes like "Закрыть").
   - Words per-card "Изменить"/"Удалить" (`TouchableOpacity`): inline links with tuned `hitSlop`.
 - Other pressables use `PressableScale` (`src/components/PressableScale.tsx`, press-scale
   feedback; `Button` is built on it). Its `style` is split: placement/size props (`alignSelf`,
@@ -457,8 +460,11 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   Warning: tapping the last selected section in the picker.
 
 **Learn screen**
-- Setup: a "Разделы" row (summary "Все разделы" / "Выбрано: N" + new words left in the
-  selection; opens `/categories`) + one merged plan card: stepper (`StepperButton`) +
+- Setup: a "Разделы" row (opens `/categories`): the selection by name from
+  `formatSelectionSummary()` — "Все разделы", or up to two parts of `getSelectionParts()`
+  ("Свои слова", adjacent selected bands merged into one range such as "Слова 1–1 000", "Весь
+  словарь" for all bands, topic titles or "Все темы") + "ещё N" — and below it the new words
+  left in the selection; the accessibility label lists every part) + one merged plan card: stepper (`StepperButton`) +
   composition bar + legend + inline note ("Своих слов не хватает…", shown when the plan's
   `isOwnShort` — the custom section is selected and has new words, but fewer than the session
   size; never with 0 own words, so never in an exhausted selection, where only the exhausted
@@ -470,11 +476,14 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   the selection, > 0 globally): "Начать сессию" is a disabled `Button` (Pressable reports
   `disabled` to screen readers) and a note under the plan card says "В выбранных разделах не
   осталось новых слов. Выберите другие разделы."
-- "Сегодня" block (above the "Разделы" row): `formatDailyProgress()` — "Новых слов сегодня: N из
-  G", from N >= G "Цель на день выполнена: N из G" — over a bar in the plan-bar style
-  (`planBar` + `planBarEmpty` track, `planBarSegment` fill) that is full at N >= G; the width
-  animates like the composition bar (first value instant, then 220 ms, instant with Reduce
-  Motion). The block is one accessible element: role `progressbar`, label = the text,
+- "Сегодня" block (above the "Разделы" row): a header row from `getDailyProgressParts()` —
+  title left ("Новых слов сегодня", from N >= G a check icon + "Цель выполнена"), count right
+  ("N из G", from N >= G "G из G" plus an amber "+(N − G)" when over the goal) — over a bar in
+  the plan-bar style (`planBar` + `planBarEmpty` track, `planBarSegment` fill) that is full at
+  N >= G; the width animates like the composition bar (first value instant, then 220 ms,
+  instant with Reduce Motion). The block is one accessible element: role `progressbar`, label =
+  `formatDailyProgress()` ("Новых слов сегодня: N из G" / "Цель на день выполнена: G из G[, ещё
+  K сверх цели]"),
   `accessibilityValue` `{ min: 0, max: G, now: min(N, G) }`. The goal never changes the session
   size or the plan.
 - The composition split mirrors what `getSessionWords(selection, size)` will load — computed by
@@ -491,14 +500,14 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - New words come only from the selected sections, three kinds: "custom" (`is_custom = 1`,
   "Свои слова"), frequency bands over `words.rank` (dictionary rows only; rank NULL is in no
   band) and topics (`word_topics`, dictionary rows only). The band table `BANDS` and the topic
-  table `TOPICS` (`[slug, Russian title]`, in `topics.json` order) live in
+  table `TOPICS` (`[slug, Russian title, emoji]`, in `topics.json` order; the emoji is the
+  tile icon only, hidden from screen readers; the tie test requires a non-empty one) live in
   `src/utils/categories.ts` (sections themselves are not stored): bands 1–500, 501–1000,
   1001–2000, 2001–3000, 3001–5000, 5001–10000, 10001–20000, 20001+ (open-ended); 21 topics
   (food "Еда и напитки" … travel "Путешествия"). Keys: `"custom"`, `band:<from>-<to>`,
   `band:<from>-` for the open band, `topic:<slug>`; band titles are generated
-  ("Слова 10 001–20 000", NBSP digit groups via `formatNumber`) with one frequency-only
-  description per band (no level/CEFR claims); topics have no description (the row shows the
-  count only).
+  ("Слова 10 001–20 000", NBSP digit groups via `formatNumber`; the chip shows only the range,
+  `formatBandRange()`: "10 001–20 000", "20 001+"). Sections have no descriptions.
 - **Union semantics:** the selected sections combine by OR in ONE `WHERE` (`selectionFilter`),
   so a word in several selected sections (a band and a topic, two topics) appears once. A topic
   filter is `words.dict_key IN (SELECT t.dict_key FROM word_topics t WHERE t.topic = ?)` — same
@@ -525,22 +534,38 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Picker (`src/screens/CategoriesScreen.tsx`, route `src/app/categories.tsx`): root Stack screen
   with `presentation: "fullScreenModal"`, `animation: "slide_from_bottom"`, no header — the same
   full-screen slide-up look as `WordFormModal` (top padding `max(insets.top, 24)`); closed by
-  its "Закрыть" icon button or Android back. Header stays fixed, list below (a plain
-  `ScrollView`, ~30 rows). Rows are grouped (`CATEGORY_GROUPS`) under headers "Свои слова",
-  "Словарь по частотности", "Темы" (role `header`; the header row wraps, so at large font sizes
-  the actions move under the title; `minHeight` 44 so a header without actions keeps the same
-  spacing). A header of a group with more than one row (`hasGroupActions(group)`, derived from
-  the row count — so not "Свои слова") has "Все" (selects every section of the group;
-  disabled when all are selected) and "Нет" (deselects the group; disabled when none of it is
-  selected or when nothing would remain — then its hint says "Должен быть выбран хотя бы один
-  раздел"); labels "Выбрать все разделы группы <title>" / "Снять все разделы группы <title>",
-  `accessibilityState={{ disabled }}`. Every toggle and group action is saved first and applied
-  on success (`showErrorAlert()` and the old state on failure; one save at a time). Rows: role
-  checkbox, `accessibilityState={{ checked }}`, label = title + description (bands, custom) +
-  count; the last selected row has a hint, and tapping it announces "Должен быть выбран хотя бы
-  один раздел" (also stated in the intro text, which also explains the union). Loading:
-  background only, then `FadeInView`; a failed load shows the icon + "Не удалось загрузить
-  данные" + "Повторить".
+  its "Закрыть" icon button, "Готово" or Android back. Layout (one visual language — chips and
+  tiles share the selected look): fixed title row; a `ScrollView` with a one-line muted
+  subtitle "Новые слова берутся из выбранных разделов." (its accessibility label adds the union
+  and last-section rules — not visible), one chip "Свои слова" (no header — the custom group of
+  `CATEGORY_GROUPS` is rendered outside the groups), group "Частота" with 8 band chips (label =
+  range, then the remaining new-word count), group "Темы" with a 2-column grid of tiles
+  (emoji 24 pt in a 30 pt box, name 14/600 wrapping, count below; min height 64, grows with
+  the font; check icon top-right with reserved right padding). Below the ScrollView, in the
+  normal layout flow (so nothing is hidden under it), a bottom bar: opaque `pageBackground`,
+  hairline top border, padding 16 + `insets.bottom`: "N новых слов" (`formatNewWords`) +
+  muted "из выбранных разделов" (one accessible element, `accessibilityLiveRegion="polite"`),
+  and the "Готово" `Button`. N = `getSelectionAvailability(selection)` own + dictionary —
+  the same union count as Learn's plan; reloaded after every saved change, the previous number
+  stays until the answer arrives, stale answers are dropped (request counter), a failed
+  recount keeps the old number (`console.error`). Dimension constants (chip 40 pt + hitSlop 2,
+  tile 64, emoji, check sizes, gaps) live at the top of the file. Selected chip/tile:
+  `selectedTint` background, `orangeAccent` border, `amberAccent` label and count (the count is
+  dimmed by weight, not opacity, to keep 4.5:1), `checkmark-circle` icon (chips: left of the
+  label). Unselected: `surface`, 1 px `border`, normal text, `textMuted` count. Group headers
+  (role `header`, uppercase tracked; the row wraps at large font sizes; `minHeight` 44) of a
+  group with more than one section (`hasGroupActions(group)`) have "Все" (selects every section
+  of the group; disabled when all are selected) and "Нет" (deselects the group; disabled when
+  none of it is selected or when nothing would remain — then its hint says "Должен быть выбран
+  хотя бы один раздел"); labels "Выбрать все разделы группы <title>" / "Снять все разделы
+  группы <title>", `accessibilityState={{ disabled }}`. Every toggle and group action is saved
+  first and applied on success (`showErrorAlert()` and the old state on failure; one save at a
+  time). Chips and tiles: role checkbox, `accessibilityState={{ checked }}`, label from
+  `formatCategoryAccessibilityLabel()` ("Еда и напитки, 464 новых слова", "Слова 10 001–20 000,
+  осталось 9 884 из 10 001"; no emoji); the last selected one has a hint, and tapping it
+  announces "Должен быть выбран хотя бы один раздел". Loading: background only, then
+  `FadeInView`; a failed load shows the icon + "Не удалось загрузить данные" + "Повторить"
+  (no bottom bar).
 - Completion (`SessionComplete`): badge pop, `Confetti`, word count-up, success haptic.
 - Empty state ("Новые слова закончились"): "Добавить слова" is a primary `Button`, "Сбросить
   прогресс" a secondary `Button` below it (goes through `confirmResetProgress()`).
@@ -572,7 +597,7 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 **Accessibility**
 - `PressableScale` defaults to `accessibilityRole="button"`. Icon-only buttons need a Russian
   `accessibilityLabel`. Selectable controls (Words filter chips) set
-  `accessibilityState={{ selected }}`; section picker rows are checkboxes
+  `accessibilityState={{ selected }}`; section picker chips and tiles are checkboxes
   (`accessibilityState={{ checked }}`). Small touch targets use `hitSlop` to reach 44pt.
 - `FlipCard`: only the visible face is exposed to screen readers; each face has an invisible
   full-size button with the label and an `activate` action; speak buttons stay separately
@@ -635,9 +660,13 @@ asks: `node_modules/`, `.git/`, `.expo/`, generated `ios/`+`android/`, `dist/`, 
   contrast on the dark surfaces).
 - An element using `buttonInk` as its background uses `textOnButtonInk` for its text.
 - `orangeAccent` is `#D97706` in both themes and is only for fills (buttons, the plan bar
-  segment and legend dot), the tab bar tint and confetti. Orange TEXT or icons
+  segment and legend dot), the tab bar tint, confetti and the border of a selected section
+  chip/tile. Orange TEXT or icons
   on surfaces use `amberAccent`. `textMutedHint` and `statAmber` no longer exist — use
   `textMuted` / `amberAccent`.
+- `selectedTint` (light `#FFF7E8`, dark `#3A2E18`) is the selected section chip/tile fill;
+  `amberAccent` on it is ≥ 4.5:1 in both themes (light 4.72, dark 6.17) — keep that when
+  changing either.
 - White text on `#D97706` is ~3.2:1 — accepted consciously for bold button labels; do not "fix" it
   without asking.
 - The scheme is decided in one place: `useColorSchemeName()` (`src/theme/useTheme.ts`).

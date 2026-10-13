@@ -47,6 +47,8 @@ import {
   ALL_CATEGORY_KEYS,
   formatNewWords,
   formatSelectionSummary,
+  getSelectionParts,
+  isAllSelected,
   SelectionAvailability,
 } from "../utils/categories";
 import {
@@ -186,6 +188,10 @@ export const LearnScreen = () => {
   // слова из выбранных разделов (см. getSessionPlan)
   const availableNew = available.ownNew + available.dictionaryNew;
   const selectionSummary = formatSelectionSummary(selection);
+  // Для диктора — весь выбор, без «ещё N»
+  const selectionSpoken = isAllSelected(selection)
+    ? "Все разделы"
+    : getSelectionParts(selection).join(", ");
   const availableNewText = formatNewWords(availableNew);
   const isExhausted = isSelectionExhausted(availableNew, stats.totalNew);
   const {
@@ -652,14 +658,15 @@ export const LearnScreen = () => {
         style={styles.sectionsRow}
         onPress={() => router.push("/categories")}
         pressedScale={0.98}
-        accessibilityLabel={`Разделы: ${selectionSummary}, ${availableNewText}`}
+        accessibilityLabel={`Разделы: ${selectionSpoken}. ${availableNewText}`}
         accessibilityHint="Открывает выбор разделов"
       >
         <View style={styles.sectionsText}>
           <Text style={styles.sectionsTitle}>Разделы</Text>
-          <Text style={styles.sectionsSummary}>
-            {selectionSummary} · {availableNewText}
+          <Text style={styles.sectionsSummary} numberOfLines={2}>
+            {selectionSummary}
           </Text>
+          <Text style={styles.sectionsCount}>{availableNewText}</Text>
         </View>
         <Ionicons
           name="chevron-forward"
@@ -918,10 +925,17 @@ const createStyles = (theme: Theme) =>
     fontWeight: "600",
   },
   sectionsSummary: {
+    color: theme.textSecondary,
+    fontSize: 14,
+    lineHeight: 19,
+    marginTop: 2,
+  },
+  sectionsCount: {
     color: theme.textMuted,
     fontSize: 13,
     lineHeight: 18,
     marginTop: 2,
+    fontVariant: ["tabular-nums"],
   },
   sectionsChevron: {
     color: theme.textMuted,

@@ -9,8 +9,10 @@ import {
   CATEGORY_GROUPS,
   categoryFilter,
   deselectGroup,
-  formatCategoryCount,
+  formatBandRange,
+  formatCategoryAccessibilityLabel,
   formatNewWords,
+  getSelectionParts,
   formatNumber,
   formatSelectionSummary,
   hasGroupActions,
@@ -31,7 +33,6 @@ const band = (from: number, to: number | null): Category => ({
   kind: "band",
   key: bandKey(from, to),
   title: "",
-  description: "",
   from,
   to,
 });
@@ -40,7 +41,6 @@ const custom: Category = {
   kind: "custom",
   key: "custom",
   title: "",
-  description: "",
 };
 
 const topic = (slug: string): Category => ({
@@ -48,6 +48,7 @@ const topic = (slug: string): Category => ({
   key: topicKey(slug),
   title: "",
   slug,
+  emoji: "",
 });
 
 const TOPIC_SLUGS = [
@@ -96,15 +97,21 @@ describe("category registry", () => {
     expect(formatNumber(1234567)).toBe("1 234 567");
   });
 
-  it("gives own words and every band a one-line description and topics none", () => {
-    for (const category of CATEGORIES) {
-      if (category.kind === "topic") {
-        expect(category).not.toHaveProperty("description");
-        continue;
-      }
-      expect(category.description).toMatch(/^\S.*\S$/);
-      expect(category.description).not.toMatch(/\n/);
-    }
+  it("labels the band chips with the range only", () => {
+    expect(
+      CATEGORIES.flatMap((category) =>
+        category.kind === "band" ? [formatBandRange(category.from, category.to)] : [],
+      ),
+    ).toEqual([
+      "1–500",
+      "501–1 000",
+      "1 001–2 000",
+      "2 001–3 000",
+      "3 001–5 000",
+      "5 001–10 000",
+      "10 001–20 000",
+      "20 001+",
+    ]);
   });
 
   it("titles the topics in Russian", () => {
@@ -135,12 +142,15 @@ describe("category registry", () => {
     ]);
   });
 
-  it("has a topic for every slug of topics.json and nothing else, in the file's order", () => {
+  it("has a topic with an emoji for every slug of topics.json and nothing else, in the file's order", () => {
     const registrySlugs = CATEGORIES.flatMap((category) =>
       category.kind === "topic" ? [category.slug] : [],
     );
 
     expect(registrySlugs).toEqual(Object.keys(topics));
+    for (const category of CATEGORIES) {
+      if (category.kind === "topic") expect(category.emoji.trim()).not.toBe("");
+    }
   });
 });
 
@@ -188,7 +198,7 @@ describe("validateCategories", () => {
         topic("food"),
         topic("food"),
         topic("Food"),
-        { kind: "topic", key: "plant", title: "", slug: "plant" },
+        { kind: "topic", key: "plant", title: "", slug: "plant", emoji: "" },
       ]),
     ).toEqual([
       "duplicate keys: topic:food",
@@ -259,7 +269,7 @@ describe("groups", () => {
       ]),
     ).toEqual([
       ["custom", "Свои слова", ["custom"]],
-      ["band", "Словарь по частотности", BAND_KEYS],
+      ["band", "Частота", BAND_KEYS],
       ["topic", "Темы", TOPIC_KEYS],
     ]);
     expect(CATEGORY_GROUPS.flatMap((group) => group.categories)).toEqual(CATEGORIES);
@@ -354,19 +364,45 @@ describe("labels", () => {
     ]);
   });
 
-  it("summarises the selection", () => {
+  it("summarises the selection by name", () => {
+    const allBands = ALL_CATEGORY_KEYS.filter((key) => key.startsWith("band:"));
+    const allTopics = ALL_CATEGORY_KEYS.filter((key) => key.startsWith("topic:"));
     expect(formatSelectionSummary(ALL_CATEGORY_KEYS)).toBe("Все разделы");
-    expect(formatSelectionSummary(["custom", "band:1-500"])).toBe("Выбрано: 2");
-    expect(formatSelectionSummary(["custom", "topic:food", "topic:time"])).toBe("Выбрано: 3");
+    expect(formatSelectionSummary(["custom", "band:1-500"])).toBe(
+      "Свои слова · Слова 1–500",
+    );
+    // соседние полосы сливаются, несоседние — нет
+    expect(
+      getSelectionParts(["band:1-500", "band:501-1000", "band:2001-3000"]),
+    ).toEqual(["Слова 1–1 000", "Слова 2 001–3 000"]);
+    expect(getSelectionParts(["band:10001-20000", "band:20001-"])).toEqual([
+      "Слова 10 001+",
+    ]);
+    expect(getSelectionParts([...allBands, ...allTopics])).toEqual([
+      "Весь словарь",
+      "Все темы",
+    ]);
+    expect(
+      formatSelectionSummary(["custom", "topic:food", "topic:time", "topic:family"]),
+    ).toBe("Свои слова · Еда и напитки · ещё 2");
   });
 
-  it("formats a section's count", () => {
-    expect(formatCategoryCount(custom, { total: 9, remaining: 1 })).toBe("1 новое слово");
-    expect(formatCategoryCount(topic("food"), { total: 477, remaining: 470 })).toBe(
-      "осталось 470 из 477",
-    );
-    expect(formatCategoryCount(band(10001, 20000), { total: 10000, remaining: 9876 })).toBe(
-      "осталось 9 876 из 10 000",
-    );
+  it("formats a section's accessibility label", () => {
+    const named = <T extends Category>(category: T, title: string): T => ({ ...category, title });
+    expect(
+      formatCategoryAccessibilityLabel(named(custom, "Свои слова"), { total: 9, remaining: 1 }),
+    ).toBe("Свои слова, 1 новое слово");
+    expect(
+      formatCategoryAccessibilityLabel(named(topic("food"), "Еда и напитки"), {
+        total: 483,
+        remaining: 464,
+      }),
+    ).toBe("Еда и напитки, 464 новых слова");
+    expect(
+      formatCategoryAccessibilityLabel(named(band(10001, 20000), "Слова 10 001–20 000"), {
+        total: 10001,
+        remaining: 9884,
+      }),
+    ).toBe("Слова 10 001–20 000, осталось 9 884 из 10 001");
   });
 });

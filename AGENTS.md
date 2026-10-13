@@ -146,7 +146,8 @@ Sections are defined in code, not in the database: `"custom"` (own words, `is_cu
 frequency bands over `words.rank` from the `BANDS` table in `src/utils/categories.ts`
 (1–500, 501–1000, 1001–2000, 2001–3000, 3001–5000, 5001–10000, 10001–20000, 20001+; keys
 `band:<from>-<to>`, the open last band `band:<from>-`) and 21 topics from its `TOPICS` table
-(keys `topic:<slug>`, Russian titles, no description; membership from `word_topics`). Rows with
+(keys `topic:<slug>`, Russian titles, an emoji per topic for its tile; membership from
+`word_topics`; no section has a description). Rows with
 rank NULL belong to no band. Selected sections combine by **union (OR)** in one `WHERE`, so a
 word in several sections appears once; a topic filter is `words.dict_key IN (SELECT t.dict_key
 FROM word_topics t WHERE t.topic = ?)` (equivalent to a correlated `EXISTS`, ~50× faster on the
@@ -160,11 +161,20 @@ section alone) and `buildSelectionAvailabilityQuery` — the DISTINCT new words 
 and dictionary apart (never a sum of section counts: topics overlap). The plan card numbers
 come from `getSessionPlan(sessionSize, await getSelectionAvailability(selection))`.
 
-The picker groups its rows under headers "Свои слова", "Словарь по частотности" and "Темы"
-(`CATEGORY_GROUPS`, role `header`). A header of a group with more than one row
-(`hasGroupActions`; so not "Свои слова") has "Все" (select the whole group) and "Нет"
-(deselect it — disabled when nothing would remain, with a hint why), ≥ 44 pt, labelled
-"Выбрать все разделы группы …" / "Снять все разделы группы …", saved immediately like a row tap.
+The picker (`CategoriesScreen`) uses one visual language for everything selectable: a one-line
+subtitle, one "Свои слова" chip (outside any group), group "Частота" with band chips (label =
+range via `formatBandRange`, then the remaining new-word count) and group "Темы" with a
+2-column grid of tiles (emoji, name, count; min height 64, grows with the font). Selected
+chip/tile: `selectedTint` fill, `orangeAccent` border, `amberAccent` text and a
+`checkmark-circle`. A fixed bottom bar (in the layout flow under the ScrollView) shows
+"N новых слов · из выбранных разделов" — the union count from `getSelectionAvailability`,
+recomputed after every saved tap (the old number stays meanwhile) — and a "Готово" `Button`
+that closes the screen. Group headers (`CATEGORY_GROUPS`, role `header`) of groups with more
+than one section (`hasGroupActions`) have "Все" (select the whole group) and "Нет" (deselect
+it — disabled when nothing would remain, with a hint why), ≥ 44 pt, labelled "Выбрать все
+разделы группы …" / "Снять все разделы группы …", saved immediately like a tap. Chips and
+tiles are checkboxes labelled by `formatCategoryAccessibilityLabel` (no emoji; emoji are
+hidden from screen readers).
 
 When the selected sections have no new words left but other sections do
 (`isSelectionExhausted`), "Начать сессию" is disabled and a note asks to pick other sections.
@@ -186,7 +196,8 @@ deletions never count. `local_day` is `toLocalDay(new Date())` — local date co
 UTC — passed as a parameter (no SQLite `'localtime'`). Both resets clear `daily_progress` in their
 transaction; the dictionary sync never touches it. The goal is `app_settings.daily_goal`
 (integer text, 5–50 step 5, default 10, anything else reads as 10). Learn shows a "Сегодня" block
-("Новых слов сегодня: N из G" / "Цель на день выполнена: N из G", progressbar role) and reloads it
+(title left, count right from `getDailyProgressParts`: "Новых слов сегодня · N из G" /
+"✓ Цель выполнена · G из G +K"; progressbar role, spoken label from `formatDailyProgress`) and reloads it
 on focus and when the app returns to the foreground; Profile has a "Цель на день" stepper
 (adjustable role). The goal does not change the session size or the plan. SQL lives in
 `src/db/progressQueries.ts`, pure helpers in `src/utils/dailyGoal.ts`; both are tested.

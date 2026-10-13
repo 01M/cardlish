@@ -13,6 +13,10 @@ import {
   toLocalDay,
 } from "../utils/dailyGoal";
 import {
+  parseReminderTimes,
+  serializeReminderTimes,
+} from "../utils/reminderTimes";
+import {
   buildCategoryCountsQuery,
   buildNewWordsQuery,
   buildSelectionAvailabilityQuery,
@@ -425,6 +429,8 @@ export const setDailyGoal = async (goal: number) => {
   await db.runAsync(SET_DAILY_GOAL, [String(goal)]);
 };
 
+// 10b. Напоминания: включены ли и в какое время (app_settings.reminder_times —
+// JSON-массив "HH:MM", 1–3 штуки; правила в utils/reminderTimes.ts)
 export const getReminderEnabled = async (): Promise<boolean> => {
   const db = await getDb();
   const setting = await db.getFirstAsync<{ value: string }>(
@@ -439,6 +445,26 @@ export const setReminderEnabled = async (enabled: boolean) => {
     `INSERT INTO app_settings (key, value) VALUES ('daily_reminder_enabled', ?)
      ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
     [enabled ? "true" : "false"],
+  );
+};
+
+export const getReminderTimes = async (): Promise<string[]> => {
+  const db = await getDb();
+  const setting = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM app_settings WHERE key = 'reminder_times';",
+  );
+  return parseReminderTimes(setting?.value);
+};
+
+// Недопустимый список (пустой, больше трёх, повторы, не "HH:MM") не
+// записывается — serializeReminderTimes бросает ошибку
+export const setReminderTimes = async (times: readonly string[]) => {
+  const value = serializeReminderTimes(times);
+  const db = await getDb();
+  await db.runAsync(
+    `INSERT INTO app_settings (key, value) VALUES ('reminder_times', ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
+    [value],
   );
 };
 

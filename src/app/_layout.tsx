@@ -16,6 +16,7 @@ import {
 import { Theme } from "@/theme/tokens";
 import TopFade from "@/components/TopFade";
 import { Button } from "@/components/Button";
+import { useReminderReplan } from "@/hooks/useReminderReplan";
 
 export default function RootLayout() {
   const scheme = useColorSchemeName();
@@ -25,6 +26,7 @@ export default function RootLayout() {
   const [initFailed, setInitFailed] = useState(false);
   // База от более новой версии приложения: повтор не поможет, нужно обновиться
   const [isDbTooNew, setIsDbTooNew] = useState(false);
+  useReminderReplan(isReady);
 
   // Тема навигации: фон совпадает с фоном экрана, чтобы не было белой вспышки
   const navTheme = useMemo(

@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   Alert,
   Animated,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -22,12 +23,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getDailyGoal,
   getReminderEnabled,
+  getReminderTimes,
   getThemePreference,
   getWordsStats,
   resetDatabase,
   resetProgressOnly,
   setDailyGoal,
   setReminderEnabled,
+  setReminderTimes,
   setThemePreference,
   WordsStats,
 } from "../db/database";
@@ -35,6 +38,7 @@ import { Button } from "../components/Button";
 import { FadeInView } from "../components/FadeInView";
 import { PressableScale } from "../components/PressableScale";
 import { StepperButton } from "../components/StepperButton";
+import { TimePickerModal } from "../components/TimePickerModal";
 import { formatNewWords } from "../utils/categories";
 import {
   DAILY_GOAL_DEFAULT,
@@ -42,12 +46,24 @@ import {
   DAILY_GOAL_MIN,
   stepDailyGoal,
 } from "../utils/dailyGoal";
+import {
+  addReminderTime,
+  canAddReminderTime,
+  canRemoveReminderTime,
+  dateToReminderTime,
+  DEFAULT_REMINDER_TIMES,
+  formatRemindersPerDay,
+  reminderTimeToDate,
+  removeReminderTime,
+  replaceReminderTime,
+  suggestReminderTime,
+} from "../utils/reminderTimes";
 import { useReduceMotion } from "../hooks/useReduceMotion";
 import {
-  disableDailyReminder,
-  enableDailyReminder,
-  getDailyReminderTime,
-  isDailyReminderActive,
+  getNotificationPermission,
+  NotificationPermission,
+  replanReminders,
+  requestNotificationPermission,
 } from "../services/notifications";
 import { SegmentedControl } from "@expo/ui/community/segmented-control";
 import { Theme } from "../theme/tokens";
@@ -63,6 +79,9 @@ import { confirmResetProgress, showErrorAlert } from "../utils/alerts";
 // размером шрифта не больше чем в 1.2 раза — иначе ломают раскладку
 const BIG_DIGITS_MAX_FONT_SCALE = 1.2;
 
+// Открытый выбор времени: editing — время, которое меняем; null — новое
+type TimePickerState = { editing: string | null; initialValue: Date };
+
 export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -76,6 +95,13 @@ export const ProfileScreen = () => {
   });
   const [totalCount, setTotalCount] = useState(0);
   const [reminderEnabled, setReminderEnabledState] = useState(false);
+  const [reminderTimes, setReminderTimesState] = useState<readonly string[]>(
+    DEFAULT_REMINDER_TIMES,
+  );
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermission>("askable");
+  const [timePicker, setTimePicker] = useState<TimePickerState | null>(null);
+  const isSavingTimesRef = useRef(false);
   const [themePreference, setThemePreferenceState] =
     useState<ThemePreference>("system");
   const [dailyGoal, setDailyGoalState] = useState(DAILY_GOAL_DEFAULT);
@@ -95,17 +121,20 @@ export const ProfileScreen = () => {
       const [
         currentStats,
         isReminderEnabled,
+        storedReminderTimes,
         storedThemePreference,
         storedDailyGoal,
       ] = await Promise.all([
         getWordsStats(),
         getReminderEnabled(),
+        getReminderTimes(),
         getThemePreference(),
         getDailyGoal(),
       ]);
       setStats(currentStats);
       setTotalCount(currentStats.totalNew + currentStats.review + currentStats.learned);
       setReminderEnabledState(isReminderEnabled);
+      setReminderTimesState(storedReminderTimes);
       setThemePreferenceState(storedThemePreference);
       setDailyGoalState(storedDailyGoal);
     } catch {
@@ -120,14 +149,17 @@ export const ProfileScreen = () => {
   };
 
   // Флаг напоминаний мог разойтись с системой: разрешение отозвано в
-  // настройках устройства или уведомление больше не запланировано. Тогда
-  // выключаем его — без запроса разрешения, планирования и алерта
+  // настройках устройства. Тогда выключаем его — без запроса разрешения и
+  // алерта — и снимаем запланированное. Само расписание не проверяем: его
+  // в любой момент может переставлять replanReminders
   const syncReminderWithSystem = async () => {
     try {
+      const permission = await getNotificationPermission();
+      setNotificationPermission(permission);
+      if (permission === "granted") return;
       if (!(await getReminderEnabled())) return;
-      if (await isDailyReminderActive()) return;
-      await disableDailyReminder();
       await setReminderEnabled(false);
+      void replanReminders();
     } catch (error) {
       console.error("Failed to sync reminder state:", error);
     }
@@ -203,28 +235,81 @@ export const ProfileScreen = () => {
     );
   };
 
+  // Включение запрашивает разрешение; расписание ставит replanReminders
+  // (выключение там же снимает все напоминания)
   const handleReminderToggle = async (enabled: boolean) => {
     void Haptics.selectionAsync().catch(() => {});
     try {
       if (enabled) {
-        const scheduled = await enableDailyReminder();
-        if (!scheduled) {
+        const granted = await requestNotificationPermission();
+        if (!granted) {
+          setNotificationPermission(await getNotificationPermission());
           Alert.alert(
             "Напоминания отключены",
             "Разрешите уведомления в настройках устройства, чтобы включить напоминания.",
+            [
+              { text: "Не сейчас", style: "cancel" },
+              {
+                text: "Открыть настройки",
+                onPress: () => {
+                  void Linking.openSettings().catch(() => showErrorAlert());
+                },
+              },
+            ],
           );
           return;
         }
-      } else {
-        await disableDailyReminder();
+        setNotificationPermission("granted");
       }
 
       await setReminderEnabled(enabled);
       setReminderEnabledState(enabled);
+      void replanReminders();
     } catch {
       showErrorAlert();
     }
   };
+
+  // Время напоминаний сохраняется сразу; при ошибке остаётся прежний список.
+  // Повтор существующего времени просто ничего не меняет
+  const saveReminderTimes = async (next: readonly string[]) => {
+    if (next === reminderTimes || isSavingTimesRef.current) return;
+    isSavingTimesRef.current = true;
+    try {
+      await setReminderTimes(next);
+      setReminderTimesState(next);
+      void Haptics.selectionAsync().catch(() => {});
+      void replanReminders();
+    } catch {
+      showErrorAlert();
+    } finally {
+      isSavingTimesRef.current = false;
+    }
+  };
+
+  const openTimePicker = (editing: string | null) => {
+    const time = editing ?? suggestReminderTime(reminderTimes);
+    setTimePicker({ editing, initialValue: reminderTimeToDate(time, new Date()) });
+  };
+
+  const handleTimePicked = (value: Date) => {
+    if (!timePicker) return;
+    setTimePicker(null);
+    const time = dateToReminderTime(value);
+    void saveReminderTimes(
+      timePicker.editing === null
+        ? addReminderTime(reminderTimes, time)
+        : replaceReminderTime(reminderTimes, timePicker.editing, time),
+    );
+  };
+
+  const canAddTime = canAddReminderTime(reminderTimes);
+  const canRemoveTime = canRemoveReminderTime(reminderTimes);
+  const reminderSubtitle = reminderEnabled
+    ? formatRemindersPerDay(reminderTimes.length)
+    : notificationPermission === "blocked"
+      ? "Уведомления запрещены в настройках устройства"
+      : "Выключены";
 
   // Цель сохраняется сразу; при ошибке остаётся прежняя. Пока одно
   // нажатие сохраняется, следующие не принимаем
@@ -373,25 +458,75 @@ export const ProfileScreen = () => {
         </View>
       </View>
 
+      {/* Переключатель, под ним (когда включено) — список времени: касание
+          строки открывает выбор времени, корзина удаляет (не у последнего) */}
       <Text style={styles.sectionLabel}>НАПОМИНАНИЯ</Text>
-      <View style={styles.reminderRow}>
-        <View style={styles.reminderText}>
-          <Text style={styles.rowTitle}>Ежедневные напоминания</Text>
-          <Text style={styles.reminderSubtitle}>
-            Каждый день в {getDailyReminderTime()}
+      <View
+        style={[styles.reminderCard, !reminderEnabled && styles.reminderCardLast]}
+      >
+        <View style={styles.reminderSwitchRow}>
+          <View style={styles.reminderText}>
+            <Text style={styles.rowTitle}>Ежедневные напоминания</Text>
+            <Text style={styles.reminderSubtitle}>{reminderSubtitle}</Text>
+          </View>
+          <Switch
+            accessibilityLabel="Ежедневные напоминания"
+            accessibilityHint={reminderSubtitle}
+            value={reminderEnabled}
+            onValueChange={handleReminderToggle}
+            trackColor={{
+              false: theme.switchTrackFalse,
+              true: theme.switchTrackTrue,
+            }}
+            thumbColor={reminderEnabled ? theme.switchThumbOn : theme.switchThumbOff}
+          />
+        </View>
+        {reminderEnabled &&
+          reminderTimes.map((time) => (
+            <View key={time} style={styles.timeRow}>
+              <PressableScale
+                onPress={() => openTimePicker(time)}
+                accessibilityLabel={`Напоминание в ${time}`}
+                accessibilityHint="Открывает выбор времени"
+                style={styles.timeButton}
+              >
+                <Ionicons name="alarm-outline" size={20} color={theme.amberAccent} />
+                <Text style={styles.timeText}>{time}</Text>
+              </PressableScale>
+              {canRemoveTime && (
+                <PressableScale
+                  onPress={() =>
+                    void saveReminderTimes(removeReminderTime(reminderTimes, time))
+                  }
+                  accessibilityLabel={`Удалить напоминание в ${time}`}
+                  style={styles.removeTimeButton}
+                >
+                  <Ionicons name="trash-outline" size={20} color={theme.textMuted} />
+                </PressableScale>
+              )}
+            </View>
+          ))}
+      </View>
+      {reminderEnabled && (
+        <View style={styles.reminderFooter}>
+          <Button
+            label="Добавить время"
+            variant="secondary"
+            onPress={() => openTimePicker(null)}
+            disabled={!canAddTime}
+          />
+          {!canAddTime && (
+            <Text style={styles.reminderHint}>
+              Можно задать не больше трёх напоминаний в день.
+            </Text>
+          )}
+          <Text style={styles.reminderHint}>
+            Если цель на день выполнена, остальные напоминания сегодня не
+            придут. Если не заходить в приложение неделю, напоминания
+            прекратятся.
           </Text>
         </View>
-        <Switch
-          accessibilityLabel="Ежедневные напоминания"
-          value={reminderEnabled}
-          onValueChange={handleReminderToggle}
-          trackColor={{
-            false: theme.switchTrackFalse,
-            true: theme.switchTrackTrue,
-          }}
-          thumbColor={reminderEnabled ? theme.switchThumbOn : theme.switchThumbOff}
-        />
-      </View>
+      )}
 
       <Text style={styles.sectionLabel}>ОФОРМЛЕНИЕ</Text>
       <View style={styles.themeRow}>
@@ -437,6 +572,18 @@ export const ProfileScreen = () => {
         style={styles.actionButtonGap}
       />
       </FadeInView>
+      )}
+      {timePicker && (
+        <TimePickerModal
+          title={
+            timePicker.editing === null
+              ? "Новое напоминание"
+              : "Время напоминания"
+          }
+          initialValue={timePicker.initialValue}
+          onConfirm={handleTimePicked}
+          onCancel={() => setTimePicker(null)}
+        />
       )}
     </ScrollView>
   );
@@ -521,18 +668,58 @@ const createStyles = (theme: Theme) =>
     color: theme.textMuted,
     fontWeight: "600",
   },
-  reminderRow: {
+  reminderCard: {
     backgroundColor: theme.surface,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: theme.border,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  reminderCardLast: { marginBottom: 28 },
+  reminderSwitchRow: {
     padding: 16,
-    marginBottom: 28,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   reminderText: { flex: 1, paddingRight: 16 },
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.border,
+    paddingRight: 6,
+  },
+  timeButton: {
+    flex: 1,
+    minHeight: 52,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    columnGap: 10,
+  },
+  timeText: {
+    color: theme.textPrimary,
+    fontSize: 18,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+  },
+  removeTimeButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reminderFooter: { marginBottom: 28 },
+  reminderHint: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 10,
+  },
   goalRow: {
     backgroundColor: theme.surface,
     borderRadius: 18,

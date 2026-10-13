@@ -1,5 +1,12 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
+import {
+  getDailyProgress,
+  getReminderEnabled,
+  getReminderTimes,
+  getWordsStats,
+} from "../db/database";
+import { createReminderReplanner } from "./reminders";
 
 const isExpoGoAndroid =
   Constants.executionEnvironment === "storeClient" && Platform.OS === "android";
@@ -14,9 +21,7 @@ if (!isExpoGoAndroid) {
   Notifications = require("expo-notifications");
 }
 
-const DAILY_REMINDER_ID = "daily-study-reminder";
-const DAILY_REMINDER_HOUR = 20;
-const DAILY_REMINDER_MINUTE = 0;
+const ANDROID_CHANNEL = { id: "study-reminders", name: "Напоминания об учебе" };
 
 Notifications?.setNotificationHandler({
   handleNotification: async () => ({
@@ -27,80 +32,62 @@ Notifications?.setNotificationHandler({
   }),
 });
 
-const getScheduledReminders = async () => {
-  if (!Notifications) return [];
-
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  return scheduled.filter(
-    (request) => request.content.data?.type === DAILY_REMINDER_ID,
-  );
-};
-
-const cancelDailyReminder = async () => {
-  if (!Notifications) return;
-
-  const reminders = await getScheduledReminders();
-
-  await Promise.all(
-    reminders.map((request) =>
-      Notifications!.cancelScheduledNotificationAsync(request.identifier),
-    ),
-  );
-};
-
-export const enableDailyReminder = async (): Promise<boolean> => {
+// Запрос разрешения при включении напоминаний. На Android 13+ системный
+// запрос появляется только после создания канала, поэтому канал — первым
+export const requestNotificationPermission = async (): Promise<boolean> => {
   if (!Notifications) return false; // Expo Go на Android — напоминания недоступны
 
   if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("study-reminders", {
-      name: "Напоминания об учебе",
+    await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL.id, {
+      name: ANDROID_CHANNEL.name,
       importance: Notifications.AndroidImportance.DEFAULT,
     });
   }
 
   const permissions = await Notifications.getPermissionsAsync();
-  const result = permissions.granted
-    ? permissions
-    : await Notifications.requestPermissionsAsync();
-
-  if (!result.granted) return false;
-
-  await cancelDailyReminder();
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Время повторить слова",
-      body: "Откройте тренажер и закрепите английскую лексику.",
-      data: { type: DAILY_REMINDER_ID },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: DAILY_REMINDER_HOUR,
-      minute: DAILY_REMINDER_MINUTE,
-      ...(Platform.OS === "android" ? { channelId: "study-reminders" } : {}),
-    },
-  });
-
-  return true;
+  if (permissions.granted) return true;
+  const result = await Notifications.requestPermissionsAsync();
+  return result.granted;
 };
 
-export const disableDailyReminder = async () => {
-  await cancelDailyReminder();
-};
+// Состояние разрешения — только проверка, без запроса: "blocked" — система
+// больше не покажет запрос, включить можно лишь в настройках устройства;
+// "unavailable" — Expo Go на Android
+export type NotificationPermission =
+  | "granted"
+  | "askable"
+  | "blocked"
+  | "unavailable";
 
-// Напоминание реально работает: уведомления разрешены и оно запланировано.
-// Только проверка — разрешение здесь не запрашивается
-export const isDailyReminderActive = async (): Promise<boolean> => {
-  if (!Notifications) return false; // Expo Go на Android — напоминания недоступны
+export const getNotificationPermission =
+  async (): Promise<NotificationPermission> => {
+    if (!Notifications) return "unavailable";
+    const permissions = await Notifications.getPermissionsAsync();
+    if (permissions.granted) return "granted";
+    return permissions.canAskAgain ? "askable" : "blocked";
+  };
 
-  const permissions = await Notifications.getPermissionsAsync();
-  if (!permissions.granted) return false;
-
-  const reminders = await getScheduledReminders();
-  return reminders.length > 0;
-};
-
-export const getDailyReminderTime = () =>
-  `${DAILY_REMINDER_HOUR.toString().padStart(2, "0")}:${DAILY_REMINDER_MINUTE.toString().padStart(
-    2,
-    "0",
-  )}`;
+// Перепланировать напоминания по текущим настройкам и прогрессу (см.
+// services/reminders.ts). Никогда не бросает; вызовы идут по очереди.
+// Вызывается при запуске, при возврате в приложение и уходе в фон
+// (useReminderReplan) и после изменения настроек в «Профиле»
+export const replanReminders = createReminderReplanner({
+  notifications: Notifications,
+  androidChannel: Platform.OS === "android" ? ANDROID_CHANNEL : null,
+  now: () => new Date(),
+  loadState: async (localDay) => {
+    const [enabled, times, progress, stats] = await Promise.all([
+      getReminderEnabled(),
+      getReminderTimes(),
+      getDailyProgress(localDay),
+      getWordsStats(),
+    ]);
+    return {
+      enabled,
+      times,
+      dailyGoal: progress.goal,
+      introducedToday: progress.introduced,
+      reviewCount: stats.review,
+    };
+  },
+});

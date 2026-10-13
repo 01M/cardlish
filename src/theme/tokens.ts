@@ -16,6 +16,7 @@ export interface Theme {
   surface: string; // фон карточек, строк, инфо-блоков
   surfaceElevated: string; // приподнятая поверхность: кнопки-счётчики, поля ввода
   backdrop: string; // фон модального окна
+  scrim: string; // затемнение под нижней панелью (выбор времени напоминания)
   border: string; // основная рамка карточек
   borderSubtle: string; // рамка кнопок-счётчиков (LearnScreen)
   inputBackground: string; // фон полей ввода
@@ -105,6 +106,7 @@ export const lightTheme: Theme = {
   surface: "#FFFDF8",
   surfaceElevated: "#FFFFFF",
   backdrop: "#FAFAFA",
+  scrim: "rgba(20, 16, 8, 0.4)",
   border: "#E8E3D7",
   borderSubtle: "#E4E1D8",
   inputBackground: "#FFFFFF",
@@ -175,6 +177,7 @@ export const darkTheme: Theme = {
   surface: "#1A242C",
   surfaceElevated: "#242F38",
   backdrop: "#0F1519",
+  scrim: "rgba(0, 0, 0, 0.6)",
   border: "#33404A",
   borderSubtle: "#33404A",
   inputBackground: "#1A242C",

@@ -5,6 +5,8 @@
 // нескольких разделов попадает в сессию один раз.
 // Чистый модуль: без React и без базы
 
+import { pluralRu } from "./plural";
+
 export type Category =
   | {
       kind: "custom";
@@ -344,17 +346,8 @@ export interface SelectionAvailability {
 // 6. Подписи для экрана «Учить» и выбора разделов
 
 // «1 новое слово», «3 новых слова», «12 новых слов»
-export const formatNewWords = (count: number) => {
-  const lastTwo = count % 100;
-  const last = count % 10;
-  const words =
-    last === 1 && lastTwo !== 11
-      ? "новое слово"
-      : last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)
-        ? "новых слова"
-        : "новых слов";
-  return `${formatNumber(count)} ${words}`;
-};
+export const formatNewWords = (count: number) =>
+  `${formatNumber(count)} ${pluralRu(count, "новое слово", "новых слова", "новых слов")}`;
 
 // Выбор словами, в порядке реестра: «Свои слова», полосы (соседние
 // выбранные полосы слиты в одну: 1–500 и 501–1 000 → «Слова 1–1 000»; все

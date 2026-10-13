@@ -202,6 +202,30 @@ on focus and when the app returns to the foreground; Profile has a "Цель н�
 (adjustable role). The goal does not change the session size or the plan. SQL lives in
 `src/db/progressQueries.ts`, pure helpers in `src/utils/dailyGoal.ts`; both are tested.
 
+### Reminders
+
+Study reminders are a **rolling window of one-shot local notifications** — no repeating
+(DAILY) trigger anywhere. Settings: `app_settings.daily_reminder_enabled` and
+`app_settings.reminder_times`, a JSON array of local `"HH:MM"` strings (sorted, unique, 1–3;
+absent or broken → `["20:00"]`; helpers and validation in `src/utils/reminderTimes.ts`).
+The pure planner `planReminders` (`src/utils/reminderPlan.ts`) builds today + the next 6 days at
+each time from local date components (DST-safe, never + 24 h), keeps only strictly future
+times, drops all of today's when today's goal is reached (`introduced >= goal`), sorts and caps
+at 21 items (3 × 7; iOS allows 64 pending). Texts are Russian without emoji: the title "Время
+повторить слова" and one of 3 bodies with the number of words in `'review'` (or, with none, 3
+bodies about the daily goal), rotated by local day of year + time index. The adapter
+`createReminderReplanner` (`src/services/reminders.ts`, deps injected, tested with a fake
+notifications API) cancels ALL scheduled notifications first (this also removes the DAILY
+trigger of older builds), then — only if enabled and permission is already granted, never
+prompting — schedules one `DATE` trigger per item (Android channel `study-reminders`). Calls are
+serialised and never throw (`console.error`). `replanReminders` (wired in
+`src/services/notifications.ts`) runs at start and on AppState `active` / `background` /
+`inactive` — all in `useReminderReplan`, used only by the root layout — and after every
+reminder change in Profile. If the app is not opened, the window runs out and reminders stop
+after about a week. Profile shows the switch, the list of times (tap to edit with
+`TimePickerModal` from `@expo/ui`, a 44 pt remove button when more than one), "Добавить время"
+(disabled at 3) and a note about the goal and the one-week stop.
+
 ## Navigation & Routing
 
 - Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.

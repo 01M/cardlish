@@ -4,7 +4,7 @@
 
 "Английские карточки" (`english-cards`) — an Expo/React Native English-vocabulary flashcard app
 with spaced repetition. Users flip cards, grade them (`new` → `review` → `learned`), manage a
-custom word list on top of a bundled FreeDict dictionary, get a daily study reminder, and track
+custom word list on top of a bundled FreeDict dictionary, get up to three daily study reminders, and track
 per-status statistics. UI copy is Russian; identifiers and code are English.
 
 ## Tech stack
@@ -19,7 +19,7 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 - **TypeScript ~6** with `strict: true`, path alias `@/* → ./src/*`
 - **Package manager: npm** (`package-lock.json` present, no `bun.lock`)
 - **expo-sqlite ~57** for the local on-device database (`english_cards.db`)
-- **expo-notifications** for the daily reminder, **expo-speech** for pronunciation,
+- **expo-notifications** for the study reminders (one-shot local notifications, see "Reminders"), **expo-speech** for pronunciation,
   **expo-constants**, **expo-font**, **expo-linking**, **expo-status-bar**
 - **expo-system-ui** is installed so that `userInterfaceStyle: "automatic"` works on Android —
   no imports, but do not remove it
@@ -54,20 +54,25 @@ src/app/          Expo Router routes — THIN wrappers only
 src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen, SourcesScreen,
                   CategoriesScreen)
 src/data/         sources.json — attribution/licences of every shipped data source
-src/components/   Shared UI (Button, PressableScale, StepperButton, FlipCard, FadeInView, WordFormModal, Confetti, TopFade, ListTopFade)
-src/hooks/        Shared hooks (useReduceMotion)
+src/components/   Shared UI (Button, PressableScale, StepperButton, FlipCard, FadeInView, WordFormModal, Confetti, TopFade, ListTopFade,
+                  TimePickerModal)
+src/hooks/        Shared hooks (useReduceMotion, useReminderReplan)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts), schema/migration SQL + planMigration (schema.ts),
                   dictionary + topic sync SQL + pure helpers (dictionarySync.ts), Learn section
                   SQL (categoryQueries.ts), status changes + daily progress + goal + reset SQL
                   (progressQueries.ts)
-src/services/     Side-effectful services (notifications.ts)
+src/services/     Side-effectful services: notifications.ts (expo-notifications behind the Expo Go
+                  guard, permission, the wired `replanReminders`), reminders.ts (replan adapter
+                  factory `createReminderReplanner(deps)`, no runtime expo/DB imports, tested)
 src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); pure, no React/DB:
                   reviewQueue.ts (mergeReviewQueue(prev, fresh)), sessionPlan.ts (getSessionPlan),
                   sources.ts (DataSource, parseSources, formatUrlForDisplay),
                   categories.ts (section registry: band + topic tables, groups, selection, SQL
                   filters, labels),
-                  dailyGoal.ts (toLocalDay, goal parse/clamp/step, "Сегодня" labels)
+                  dailyGoal.ts (toLocalDay, goal parse/clamp/step, "Сегодня" labels),
+                  plural.ts (pluralRu), reminderTimes.ts (reminder_times parse/validate/serialise,
+                  list edits), reminderPlan.ts (planReminders: rolling window + texts)
 *.test.ts         Unit tests live next to the code they test (never under src/app/)
 src/assets/       dictionary.json (large, generated, git-tracked, never read it), topics.json
                   (generated topic membership, synced into word_topics) + topics.test.ts (guard),
@@ -230,6 +235,36 @@ scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.j
 (Since SDK 53 push notifications are stripped from Expo Go). `src/services/notifications.ts`
 already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that guard.
 
+**Reminders** (rolling window of one-shot local notifications — NO repeating triggers anywhere)
+- Settings: `app_settings.daily_reminder_enabled` (`"true"`/`"false"`) and
+  `app_settings.reminder_times` — JSON array of local `"HH:MM"` strings, sorted, unique, 1–3
+  items (`src/utils/reminderTimes.ts`: `parseReminderTimes` drops garbage, dedupes, sorts, keeps
+  the earliest 3 and falls back to `["20:00"]` when absent or empty; `serializeReminderTimes` /
+  `setReminderTimes()` refuse an invalid list). There is no other reminder setting.
+- Planner (pure, `src/utils/reminderPlan.ts`, tested): `planReminders({ now, times, windowDays,
+  goalReachedToday, reviewCount, dailyGoal })` → `{ at, title, body }[]`: today + the next
+  `windowDays − 1` days (`REMINDER_WINDOW_DAYS` = 7) at every time, built from LOCAL date
+  components (`new Date(y, m, d + offset, hh, mm)`, never + 24 h — DST-safe); only strictly
+  future; none today when today's goal is reached; ascending; capped at `REMINDER_PLAN_MAX` = 21
+  (iOS keeps at most 64 pending notifications per app). Title `REMINDER_TITLE` ("Время
+  повторить слова"); body: 3 review variants with the review count (`pluralRu`) or, with 0 words
+  to review, 3 new-word variants with the daily goal; variant = (local day of year + time index)
+  mod 3, so a slot always gets the same text. No emoji.
+- Adapter (`src/services/reminders.ts`): `createReminderReplanner({ notifications, loadState,
+  androidChannel, now })`. One run: load state for `toLocalDay(now)` → **cancel ALL scheduled
+  notifications** (also removes the old DAILY trigger of earlier builds; done even when disabled
+  or without permission) → stop if disabled → check permission (never prompts) → plan →
+  Android channel → one `DATE` trigger per item. Runs are serialised (a promise chain; calls
+  made while one runs share one queued run, which reads fresh state); errors never reach the UI
+  (`console.error`). The real instance is `replanReminders` in `notifications.ts` (state =
+  enabled flag, times, `getDailyProgress(localDay)` → goal reached = introduced >= goal,
+  `getWordsStats().review` = Learn's "Повторить").
+- `replanReminders()` is called: at start, on AppState `active`, `background` and `inactive`
+  (all three in `useReminderReplan(isReady)`, used once by `src/app/_layout.tsx` — not in
+  screens), and from Profile after any reminder setting change (switch, time added / changed /
+  removed) and after a granted permission. Because the window only moves when the app runs,
+  reminders stop by themselves about a week after the app was last opened.
+
 **Windows dev environment**
 - If PowerShell blocks `npx.ps1`, call `npx.cmd` instead.
 - Python 3.14 is installed via the Python install manager: use `py -V:3.14 …` or the venv's
@@ -256,6 +291,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Tests only for pure logic (no React rendering, no snapshots, no component tests, no hand-written
   mocks of expo-sqlite or React Native internals). To make logic testable, extract it into a pure
   function (`src/utils/`, or an exported helper such as `splitStyle` in `PressableScale.tsx`).
+  The one adapter test, `src/services/reminders.test.ts`, injects a `jest.fn()` stand-in for the
+  expo-notifications API and a `loadState` function into `createReminderReplanner` (no module
+  mocks, no DB).
 - Schema/migration SQL (`src/db/schema.ts`), dictionary-sync SQL (`src/db/dictionarySync.ts`),
   section SQL (`src/db/categoryQueries.ts`) and progress SQL (`src/db/progressQueries.ts`) are
   tested against real SQLite via `node:sqlite` (`schema.test.ts`, `dictionarySync.test.ts`,
@@ -411,8 +449,10 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   Do not add variants or sizes for one call site.
 - Uses `Button`: all LearnScreen CTAs ("Начать сессию", "Далее" (ink), "Повторить", empty-state
   and completion buttons), the ReviewScreen empty state, the Words empty-state "Добавить слово",
-  the root DB-error "Повторить" (`src/app/_layout.tsx`) and the Profile reset buttons
-  ("Сбросить прогресс изучения" secondary, "Сбросить всё до начала" danger). Learn "Далее" does
+  the root DB-error "Повторить" (`src/app/_layout.tsx`), the Profile reset buttons
+  ("Сбросить прогресс изучения" secondary, "Сбросить всё до начала" danger), Profile
+  "Добавить время" (secondary) and the iOS time picker sheet ("Готово" primary, "Отмена"
+  secondary). Learn "Далее" does
   NOT pass `disabled`: the `isProcessing` guard in `handleNextWord` blocks double taps, and
   dimming would flash on every tap.
 - Not migrated — deliberate exceptions, keep them as they are:
@@ -455,7 +495,7 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Icons are Ionicons from @expo/vector-icons — never emoji or text glyphs.
 - Haptics are fire-and-forget: `void Haptics.x().catch(() => {})`. Selection: FlipCard flip,
   Learn session-size stepper, section picker toggle and group "Все" / "Нет", Profile daily-goal
-  stepper, reminder switch and theme setting.
+  stepper, reminder switch, reminder time added / changed / removed and theme setting.
   Light impact: Learn next card, Review "forgot". Success: Learn session complete, Review "remembered".
   Warning: tapping the last selected section in the picker.
 
@@ -578,9 +618,25 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 
 **Profile screen**
 - On focus, before loading data, the reminders flag is synced with the OS
-  (`isDailyReminderActive()`: permission granted + reminder scheduled). A stale flag is turned off
-  silently (`console.error` on failure) and leftover scheduled reminders are cancelled; nothing is
-  scheduled and no permission is requested.
+  (`getNotificationPermission()`: `granted` / `askable` / `blocked` (no system prompt any more) /
+  `unavailable` (Expo Go Android)). Without permission an enabled flag is turned off silently
+  (`console.error` on failure) and `replanReminders()` cancels what is scheduled; no permission
+  is requested. The schedule itself is not checked (a replan may be rewriting it).
+- "НАПОМИНАНИЯ": one card — the "Ежедневные напоминания" switch (subtitle "N раз(а) в день";
+  off: "Выключены", or "Уведомления запрещены в настройках устройства" when `blocked`); turning
+  it on asks for permission (`requestNotificationPermission()`, channel first on Android), a
+  refusal shows an alert with "Открыть настройки" (`Linking.openSettings()`). While on, the card
+  lists the times (hairline-separated rows: tap opens `TimePickerModal`, label "Напоминание в
+  HH:MM"; a 44 pt trash button "Удалить напоминание в HH:MM", hidden when one time is left),
+  then a secondary `Button` "Добавить время" (disabled at 3 with the visible note "Можно задать
+  не больше трёх напоминаний в день."; the picker starts at `suggestReminderTime()`, the nearest
+  free whole hour around 20:00) and a muted note on the goal and the one-week stop. A picked time
+  that already exists changes nothing, silently. Every change is saved first (`setReminderTimes`),
+  then shown and replanned; `showErrorAlert()` and the old list on failure.
+- `TimePickerModal` (`src/components/`, `@expo/ui/community/datetime-picker`, 24 h): shown while
+  mounted. Android — the Material 3 time dialog ("Готово" / "Отмена"); iOS — a bottom sheet over
+  the `scrim` token with a wheel (`locale="ru_RU"`, `amberAccent` tint), "Готово" and "Отмена";
+  tapping the scrim cancels.
 - "ОБУЧЕНИЕ" section (before "НАПОМИНАНИЯ"): "Цель на день" row with − / + `StepperButton`s
   (5–50, step 5, `stepDailyGoal`), disabled at the limits. The row is one accessible element:
   role `adjustable`, value text "N новых слов", `increment` / `decrement` actions. Each step is

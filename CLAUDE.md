@@ -75,7 +75,7 @@ src/assets/       dictionary.json (large, generated, git-tracked, never read it)
                   (shape + version guard)
 scripts/          Python pipelines: convert_freedict.py, build_topics.py, data_version.py (shared
                   version writer), their tests, requirements.txt, data/ (card_overrides.json,
-                  topic_overrides.json), .venv/ and .wn_data/ (gitignored)
+                  excluded_terms.json, topic_overrides.json), .venv/ and .wn_data/ (gitignored)
 assets/           App icons / splash
 ```
 
@@ -136,8 +136,20 @@ scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python
   tied (`t͡ʃ`, `d͡ʒ`) as in most generated entries. Ranks 1–300 conform (via overrides); the rest
   of the dictionary still has mixed source notation (dots, parentheses, length marks, British
   vowels) — a converter-level normalisation is not implemented.
-- Order of the build: cards → `assign_ranks` → `apply_overrides`. Rank is computed from the
-  generated cards, so an override (even a `term` change such as i → I) never changes a rank.
+- Order of the build: cards → `apply_exclusions` → `assign_ranks` → `apply_overrides`. Rank is
+  computed from the generated cards that survive the exclusions, so ranks stay unique and dense
+  1..N, and an override (even a `term` change such as i → I) never changes a rank.
+- **Excluded terms** (offensive vocabulary, removed from the dictionary entirely — no opt-in
+  section) live in `scripts/data/excluded_terms.json` (UTF-8, LF, one `{ "key", "reason" }` per
+  line; 154 keys: profanity, slurs, abusive insults, explicit sexual acts / sex toys / porn,
+  obsolete racial typology). Ordinary words whose translation only had a crude item keep the
+  card and get a `card_overrides.json` entry without it. The build fails loudly, listing every
+  problem, on: unknown key (not produced by the converter), duplicate key, empty reason, unknown
+  fields, a key that is also in `card_overrides.json`. A removed key must also disappear from
+  `topic_overrides.json` (`build_topics.py` fails on unknown keys); `src/assets/topics.test.ts`
+  checks that no excluded key is in `dictionary.json` or `topics.json`. Update the removed-word
+  count in the `manual-corrections` entry of `src/data/sources.json` (a Python test checks it).
+  Installed apps lose a removed word on the next sync only if it is still `'new'`.
 - **Hand corrections** live in `scripts/data/card_overrides.json` (UTF-8, LF, one object per
   line): `{ "key", "translations"?, "transcription"?, "term"?, "reason" }`. To correct a card,
   add an object keyed by the lowercase `term`, giving only the fields to replace: `translations`
@@ -198,8 +210,11 @@ scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.j
   `OVERRIDE_REASONS` (`wrong-sense`, `translation-mismatch`, `slang`, `rare-jargon`, `off-topic`,
   `vulgar`, `missed-member`, `calendar`). Policy: a word belongs to a topic only if both its
   commonly used sense and the Russian translation on its card fit the topic; vulgar, sexual,
-  offensive or slur items (including cards whose translation shows such terms) never belong to
-  any topic. Overrides are applied after the automatic mapping; an explicit `add` may bring in a
+  offensive or slur items never belong to any topic (offensive words are not in the dictionary
+  at all, crude translation items are removed by card overrides; neutral anatomical terms such
+  as penis, vagina, breast belong to `body`). A shift of ranks (e.g. after excluding cards)
+  moves cards across `RANK_CUTOFF` and the rank-dependent sense rule: rebuild, review the new
+  automatic members and fix stale overrides the build reports. Overrides are applied after the automatic mapping; an explicit `add` may bring in a
   card above the rank cutoff. The build fails loudly, listing every problem, on: unknown topic,
   key not in dictionary.json, duplicate decision, `remove` of a key not in the automatic set,
   `add` of a key already in it (both stale), unknown reason or fields. `--review` writes the

@@ -1,7 +1,9 @@
 """Convert the FreeDict eng-rus TEI archive into the app's dictionary JSON.
 
-Hand-written corrections live in scripts/data/card_overrides.json and are applied last, after
-the ranks (see apply_overrides). At the end of a run the data version
+Build order: cards -> exclusions -> ranks -> hand corrections. Offensive vocabulary listed in
+scripts/data/excluded_terms.json is dropped before the ranks are assigned (see apply_exclusions),
+so ranks stay dense. Hand-written corrections live in scripts/data/card_overrides.json and are
+applied last, after the ranks (see apply_overrides). At the end of a run the data version
 (dictionary.version.json, see data_version.py) is rewritten from the new dictionary and the
 topics.json next to it.
 
@@ -272,6 +274,58 @@ def load_overrides(path=OVERRIDES_PATH):
     return json.loads(Path(path).read_text(encoding='utf-8'))
 
 
+EXCLUSIONS_PATH = Path(__file__).parent / 'data' / 'excluded_terms.json'
+EXCLUSION_FIELDS = {'key', 'reason'}
+
+
+def exclusion_problems(exclusions, card_keys, override_keys):
+    """Every problem of the excluded-terms list: not an object, unknown fields, missing key,
+    empty reason, duplicate key, a key the converter does not produce, a key that also has a
+    card override."""
+    if not isinstance(exclusions, list):
+        return ['excluded terms must be a list']
+    problems = []
+    seen = set()
+    for index, item in enumerate(exclusions):
+        if not isinstance(item, dict):
+            problems.append(f'#{index}: must be an object')
+            continue
+        key = item.get('key')
+        label = f'#{index} ({key!r})'
+        unknown = set(item) - EXCLUSION_FIELDS
+        if unknown:
+            problems.append(f'{label}: unknown fields {sorted(unknown)}')
+        reason = item.get('reason')
+        if not isinstance(reason, str) or not reason.strip():
+            problems.append(f'{label}: empty reason')
+        if not isinstance(key, str) or not key:
+            problems.append(f'{label}: missing key')
+            continue
+        if key in seen:
+            problems.append(f'{label}: duplicate key')
+        seen.add(key)
+        if key not in card_keys:
+            problems.append(f'{label}: unknown key (not produced by the converter)')
+        if key in override_keys:
+            problems.append(f'{label}: also in card_overrides.json')
+    return problems
+
+
+def apply_exclusions(cards, exclusions, override_keys=frozenset()):
+    """Drop the cards listed in scripts/data/excluded_terms.json (offensive vocabulary), looked
+    up by lowercase key. Runs before assign_ranks, so ranks stay unique and dense 1..N. Every
+    problem is collected first and reported together; nothing is dropped when there is any."""
+    problems = exclusion_problems(exclusions, {card['term'].lower() for card in cards}, override_keys)
+    if problems:
+        raise ValueError('Invalid excluded terms:\n' + '\n'.join(problems))
+    excluded = {item['key'] for item in exclusions}
+    return [card for card in cards if card['term'].lower() not in excluded]
+
+
+def load_exclusions(path=EXCLUSIONS_PATH):
+    return json.loads(Path(path).read_text(encoding='utf-8'))
+
+
 def read_tei(archive_path):
     with tarfile.open(archive_path, 'r:xz') as archive:
         xml_member = next(
@@ -309,9 +363,15 @@ def read_entries(tree):
 
 
 def convert(archive_path):
+    overrides = load_overrides()
     words = build_cards(read_entries(read_tei(archive_path)))
+    words = apply_exclusions(
+        words,
+        load_exclusions(),
+        {override.get('key') for override in overrides if isinstance(override, dict)},
+    )
     assign_ranks(words, frequency_of)
-    apply_overrides(words, load_overrides())
+    apply_overrides(words, overrides)
     return words
 
 

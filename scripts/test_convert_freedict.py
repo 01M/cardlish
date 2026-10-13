@@ -17,7 +17,10 @@ from convert_freedict import (
     choose_transcription,
     clean_transcription,
     clean_translation,
+    apply_exclusions,
     dedupe_translations,
+    exclusion_problems,
+    load_exclusions,
     load_overrides,
     merge_translations,
     override_problems,
@@ -352,6 +355,94 @@ class RealOverridesFileTest(unittest.TestCase):
             f' транскрипции — {count("transcription")}, написание — {count("term")})',
             entry['changesRu'],
         )
+        self.assertIn(
+            f'Число удалённых из словаря нецензурных и оскорбительных слов: {len(load_exclusions())};',
+            entry['changesRu'],
+        )
+
+
+class ApplyExclusionsTest(unittest.TestCase):
+    CARDS = [card(term, 'перевод') for term in ['cat', 'Rude', 'bee', 'slur']]
+
+    def test_drops_the_listed_cards_keeping_the_order(self):
+        result = apply_exclusions(
+            self.CARDS, [{'key': 'rude', 'reason': 'profanity'}, {'key': 'slur', 'reason': 'slur'}]
+        )
+
+        self.assertEqual([item['term'] for item in result], ['cat', 'bee'])
+        self.assertEqual(len(self.CARDS), 4)
+
+    def test_runs_before_ranks_so_they_stay_dense_and_unique(self):
+        frequencies = {'cat': 0.5, 'rude': 0.4, 'bee': 0.3, 'slur': 0.2}
+        words = apply_exclusions([dict(item) for item in self.CARDS], [{'key': 'rude', 'reason': 'profanity'}])
+
+        assign_ranks(words, lambda term: frequencies[term.lower()])
+
+        self.assertEqual(
+            [(word['term'], word['rank']) for word in words], [('cat', 1), ('bee', 2), ('slur', 3)]
+        )
+
+    def test_an_empty_list_changes_nothing(self):
+        self.assertEqual(apply_exclusions(self.CARDS, []), self.CARDS)
+
+    def test_reports_every_problem_at_once(self):
+        exclusions = [
+            {'key': 'unknown', 'reason': 'profanity'},
+            {'key': 'cat', 'reason': ' '},
+            {'key': 'bee', 'reason': 'slur', 'note': 'x'},
+            {'key': 'slur', 'reason': 'slur'},
+            {'key': 'slur', 'reason': 'slur'},
+            {'reason': 'slur'},
+            'not an object',
+            {'key': 'rude', 'reason': 'profanity'},
+        ]
+
+        with self.assertRaises(ValueError) as caught:
+            apply_exclusions(self.CARDS, exclusions, override_keys={'rude'})
+
+        message = str(caught.exception)
+        for expected in [
+            "#0 ('unknown'): unknown key (not produced by the converter)",
+            "#1 ('cat'): empty reason",
+            "#2 ('bee'): unknown fields ['note']",
+            "#4 ('slur'): duplicate key",
+            '#5 (None): missing key',
+            '#6: must be an object',
+            "#7 ('rude'): also in card_overrides.json",
+        ]:
+            self.assertIn(expected, message)
+        self.assertNotIn('#3', message)
+
+    def test_rejects_a_non_list(self):
+        self.assertEqual(exclusion_problems({}, set(), set()), ['excluded terms must be a list'])
+
+
+class RealExclusionsFileTest(unittest.TestCase):
+    def test_every_exclusion_is_well_formed_unique_and_not_overridden(self):
+        exclusions = load_exclusions()
+        keys = [item.get('key') for item in exclusions if isinstance(item, dict)]
+        override_keys = {item['key'] for item in load_overrides()}
+
+        # Unknown keys are checked by the build (it needs the FreeDict archive)
+        self.assertEqual(exclusion_problems(exclusions, set(keys), override_keys), [])
+        self.assertGreater(len(exclusions), 0)
+
+    def test_file_has_one_exclusion_per_line(self):
+        lines = (Path(__file__).parent / 'data' / 'excluded_terms.json').read_text(encoding='utf-8').splitlines()
+
+        self.assertEqual(lines[0], '[')
+        self.assertEqual(lines[-1], ']')
+        for line in lines[1:-1]:
+            self.assertRegex(line, r'^  \{"key": "[^"]+", "reason": "[^"]+"\},?$')
+
+    def test_no_excluded_key_is_in_the_shipped_dictionary(self):
+        dictionary = json.loads(
+            (Path(__file__).parent.parent / 'src' / 'assets' / 'dictionary.json').read_text(encoding='utf-8')
+        )
+        shipped = {item['term'].lower() for item in dictionary}
+
+        self.assertEqual(sorted(shipped & {item['key'] for item in load_exclusions()}), [])
+        self.assertEqual(sorted(item['rank'] for item in dictionary), list(range(1, len(dictionary) + 1)))
 
 
 class AssignRanksTest(unittest.TestCase):

@@ -65,7 +65,15 @@ labelled GA/GenAm, else the first one). Hand-written transcriptions are General 
 phonemic `/…/`: `ɹ`, `ɡ`, no length marks, `oʊ`, `ɑ`, `ɝ`/`ɚ`, `ʌ`, `ɛ`, `ˈ` only on
 multi-syllable words, no dots/parentheses/off-glide marks, tied affricates (`t͡ʃ`, `d͡ʒ`).
 
-Build order: cards → ranks → hand corrections, so corrections never change a rank. Corrections
+Build order: cards → exclusions → ranks → hand corrections, so ranks stay dense and corrections
+never change a rank. Offensive vocabulary (profanity, slurs, abusive insults, explicit sexual
+acts / sex toys / porn, obsolete racial typology — 154 keys) is removed from the dictionary
+entirely via `scripts/data/excluded_terms.json`, one `{ "key", "reason" }` per line; the build
+fails loudly on an unknown or duplicate key, an empty reason, unknown fields or a key that is
+also in `card_overrides.json`. Remove such keys from `topic_overrides.json` too; a jest test
+checks that no excluded key is in `dictionary.json` or `topics.json`, and the removed-word count
+in the `manual-corrections` source entry is checked by a Python test. Ordinary words whose
+translation only had a crude item keep the card, cleaned by a hand correction. Corrections
 live in `scripts/data/card_overrides.json`, one object per line:
 `{ "key", "translations"?, "transcription"?, "term"?, "reason" }` keyed by the lowercase term,
 replacing only the given fields (translations: 1..5 items, no duplicates). After editing, update

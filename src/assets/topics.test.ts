@@ -57,6 +57,21 @@ describe("src/assets/topics.json", () => {
     expect(unknown.slice(0, 20)).toEqual([]);
   });
 
+  it("contains no word excluded from the dictionary", () => {
+    // Нецензурные и оскорбительные слова, которые scripts/convert_freedict.py
+    // исключает до вычисления ранга (scripts/data/excluded_terms.json)
+    const excluded = (
+      JSON.parse(
+        readFileSync(join(__dirname, "../../scripts/data/excluded_terms.json"), "utf8"),
+      ) as { key: string }[]
+    ).map((item) => item.key);
+    const topicKeys = new Set(entries.flatMap(([, keys]) => keys as string[]));
+
+    expect(excluded.length).toBeGreaterThan(0);
+    expect(excluded.filter((key) => dictionaryKeys.has(key))).toEqual([]);
+    expect(excluded.filter((key) => topicKeys.has(key))).toEqual([]);
+  });
+
   it("has no duplicate keys within a topic and keeps keys sorted", () => {
     for (const [slug, keys] of entries) {
       const list = keys as string[];

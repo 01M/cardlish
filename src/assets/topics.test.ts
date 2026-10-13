@@ -2,8 +2,10 @@
  * @jest-environment node
  */
 /// <reference types="node" />
-// Проверки тематических разделов (генерирует scripts/build_topics.py; приложение
-// их пока не читает). Ключи — dict_key карточек словаря
+// Проверки тематических разделов (генерирует scripts/build_topics.py;
+// синхронизация словаря переносит их в таблицу word_topics). Ключи — dict_key
+// карточек словаря: ключ, которого нет в dictionary.json, синхронизация
+// пропустила бы молча, поэтому здесь он — ошибка
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import dictionary from "./dictionary.json";

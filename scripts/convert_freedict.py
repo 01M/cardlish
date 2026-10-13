@@ -1,14 +1,15 @@
 """Convert the FreeDict eng-rus TEI archive into the app's dictionary JSON.
 
 Hand-written corrections live in scripts/data/card_overrides.json and are applied last, after
-the ranks (see apply_overrides).
+the ranks (see apply_overrides). At the end of a run the data version
+(dictionary.version.json, see data_version.py) is rewritten from the new dictionary and the
+topics.json next to it.
 
 Run from the repository root with the pipeline venv (see scripts/requirements.txt):
     scripts/.venv/Scripts/python.exe scripts/convert_freedict.py \
         path/to/freedict-eng-rus-2025.11.23.src.tar.xz src/assets/dictionary.json
 """
 import argparse
-import hashlib
 import json
 import re
 import tarfile
@@ -17,6 +18,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from wordfreq import word_frequency
+
+from data_version import write_data_version
 
 NAMESPACE = {'tei': 'http://www.tei-c.org/ns/1.0'}
 # Parts of speech as the TEI names them. Excluded: pn (proper nouns), prefix, suffix,
@@ -312,35 +315,20 @@ def convert(archive_path):
     return words
 
 
-def dictionary_version(json_bytes):
-    """Version of a dictionary JSON: the first 16 hex chars of sha256 over its bytes with CRLF
-    normalised to LF, so a Windows checkout with CRLF line endings hashes the same."""
-    return hashlib.sha256(json_bytes.replace(b'\r\n', b'\n')).hexdigest()[:16]
-
-
-def version_path(output_path):
-    """dictionary.json -> dictionary.version.json in the same directory."""
-    output = Path(output_path)
-    return output.with_name(f'{output.stem}.version.json')
-
-
 def write_json(words, output_path):
-    """Write the dictionary and, next to it, its version file (read by the app to decide
-    whether installed dictionaries need a sync)."""
+    """Write the dictionary JSON."""
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     # LF on every OS, so the generated files are byte-identical everywhere
-    content = (json.dumps(words, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
-    output.write_bytes(content)
-    version = json.dumps({'version': dictionary_version(content)}, indent=2) + '\n'
-    version_path(output).write_bytes(version.encode('utf-8'))
+    output.write_bytes((json.dumps(words, ensure_ascii=False, indent=2) + '\n').encode('utf-8'))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Convert FreeDict eng-rus TEI into English Cards JSON.')
     parser.add_argument('archive', help='Path to the FreeDict .src.tar.xz archive')
-    parser.add_argument('output', help='Output JSON path')
+    parser.add_argument('output', help='Output JSON path (topics.json must already exist next to it)')
     args = parser.parse_args()
     words = convert(args.archive)
     write_json(words, args.output)
-    print(f'Created {args.output}: {len(words)} entries, and {version_path(args.output)}')
+    version = write_data_version(args.output, Path(args.output).with_name('topics.json'))
+    print(f'Created {args.output}: {len(words)} entries, and {version}')

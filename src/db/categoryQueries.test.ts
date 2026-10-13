@@ -6,24 +6,30 @@
 // SQL-строками, что выполняет database.ts
 import { DatabaseSync } from "node:sqlite";
 import realDictionary from "../assets/dictionary.json";
+import realTopics from "../assets/topics.json";
 import {
   ALL_CATEGORY_KEYS,
   CATEGORIES,
   CategoryCounts,
-  getSelectionAvailability,
   parseSelection,
   serializeSelection,
 } from "../utils/categories";
 import {
   buildCategoryCountsQuery,
   buildNewWordsQuery,
+  buildSelectionAvailabilityQuery,
   DELETE_LEARN_CATEGORIES,
   parseCategoryCounts,
+  parseSelectionAvailability,
   SELECT_LEARN_CATEGORIES,
   SET_LEARN_CATEGORIES,
 } from "./categoryQueries";
-import { DictionaryCard, planDictionarySync } from "./dictionarySync";
-import { CREATE_SCHEMA_V4, SET_SCHEMA_VERSION } from "./schema";
+import {
+  DictionaryCard,
+  planDictionarySync,
+  TopicMembership,
+} from "./dictionarySync";
+import { CREATE_SCHEMA_V5, SET_SCHEMA_VERSION } from "./schema";
 
 type Status = "new" | "review" | "learned";
 
@@ -51,9 +57,23 @@ const CUSTOM: [string, Status][] = [
   ["Gamma", "review"],
 ];
 
+// Состав тем: темы пересекаются с полосами и друг с другом; near (food) уже
+// выучено, be (time) на повторении; ключ alpha совпадает с term своего слова
+// в нижнем регистре, но у своих слов dict_key NULL — в тему оно не попадает
+const TOPICS: [string, string][] = [
+  ["food", "the"],
+  ["food", "edge"],
+  ["food", "near"],
+  ["food", "far"],
+  ["food", "alpha"],
+  ["time", "edge"],
+  ["time", "after"],
+  ["time", "be"],
+];
+
 const createFixture = () => {
   const db = new DatabaseSync(":memory:");
-  db.exec(CREATE_SCHEMA_V4);
+  db.exec(CREATE_SCHEMA_V5);
   db.exec(SET_SCHEMA_VERSION);
   const insertDict = db.prepare(
     `INSERT INTO words (dict_key, term, translation, is_custom, status, rank)
@@ -68,6 +88,12 @@ const createFixture = () => {
   );
   for (const [term, status] of CUSTOM) {
     insertCustom.run(term, status);
+  }
+  const insertTopic = db.prepare(
+    "INSERT INTO word_topics (topic, dict_key) VALUES (?, ?);",
+  );
+  for (const [topic, key] of TOPICS) {
+    insertTopic.run(topic, key);
   }
   return db;
 };
@@ -88,6 +114,15 @@ const countsOf = (db: DatabaseSync): CategoryCounts => {
   const query = buildCategoryCountsQuery();
   return parseCategoryCounts(
     db.prepare(query.sql).get(...query.params) as Record<string, number>,
+  );
+};
+
+// Как getSelectionAvailability
+const availabilityOf = (db: DatabaseSync, selection: readonly string[]) => {
+  const query = buildSelectionAvailabilityQuery(selection);
+  return parseSelectionAvailability(
+    selection,
+    db.prepare(query.sql).get(...query.params) as { own_new: number; dictionary_new: number },
   );
 };
 
@@ -144,11 +179,40 @@ describe("buildNewWordsQuery", () => {
       expect(termsOf(rows)).not.toContain(term);
     }
   });
+
+  it("picks a topic's new dictionary words in ascending rank, never own words", () => {
+    expect(termsOf(pick(createFixture(), ["topic:food"]))).toEqual(["the", "edge", "far"]);
+    expect(termsOf(pick(createFixture(), ["topic:time"]))).toEqual(["edge", "after"]);
+  });
+
+  it("merges a band and a topic without duplicates", () => {
+    // the и edge — и в полосе 1–500, и в теме food
+    const rows = pick(createFixture(), ["band:1-500", "topic:food"]);
+
+    expect(termsOf(rows)).toEqual(["the", "of", "edge", "far"]);
+    expect(new Set(termsOf(rows)).size).toBe(rows.length);
+  });
+
+  it("merges overlapping topics without duplicates, own words first", () => {
+    const rows = pick(createFixture(), ["custom", "topic:food", "topic:time"]);
+
+    expect(rows.slice(0, 2).map((row) => row.is_custom)).toEqual([1, 1]);
+    expect(termsOf(rows.slice(2))).toEqual(["the", "edge", "after", "far"]);
+    expect(new Set(termsOf(rows)).size).toBe(rows.length);
+  });
 });
 
 describe("buildCategoryCountsQuery", () => {
   it("counts all and remaining new words per section", () => {
+    const empty = Object.fromEntries(
+      CATEGORIES.filter((category) => category.kind === "topic").map((category) => [
+        category.key,
+        { total: 0, remaining: 0 },
+      ]),
+    );
+
     expect(countsOf(createFixture())).toEqual({
+      ...empty,
       custom: { total: 3, remaining: 2 },
       "band:1-500": { total: 5, remaining: 3 },
       "band:501-1000": { total: 3, remaining: 3 },
@@ -158,6 +222,9 @@ describe("buildCategoryCountsQuery", () => {
       "band:5001-10000": { total: 0, remaining: 0 },
       "band:10001-20000": { total: 1, remaining: 1 },
       "band:20001-": { total: 2, remaining: 2 },
+      // alpha — не слово словаря; near выучено, be на повторении
+      "topic:food": { total: 4, remaining: 3 },
+      "topic:time": { total: 3, remaining: 2 },
     });
   });
 
@@ -166,19 +233,30 @@ describe("buildCategoryCountsQuery", () => {
     const counts = countsOf(db);
 
     for (const category of CATEGORIES) {
-      expect(pick(db, [category.key])).toHaveLength(counts[category.key].remaining);
+      expect({ key: category.key, picked: pick(db, [category.key]).length }).toEqual({
+        key: category.key,
+        picked: counts[category.key].remaining,
+      });
     }
-    const selection = ["custom", "band:1-500", "band:20001-"];
-    const { ownNew, dictionaryNew } = getSelectionAvailability(selection, counts);
-    expect(pick(db, selection)).toHaveLength(ownNew + dictionaryNew);
   });
 
-  it("splits the real dictionary into full bands", () => {
+  it("drops a word from a topic's remaining once it is learned", () => {
+    const db = createFixture();
+    expect(countsOf(db)["topic:time"]).toEqual({ total: 3, remaining: 2 });
+
+    db.exec("UPDATE words SET status = 'learned' WHERE dict_key = 'after';");
+
+    expect(countsOf(db)["topic:time"]).toEqual({ total: 3, remaining: 1 });
+    expect(termsOf(pick(db, ["topic:time"]))).toEqual(["edge"]);
+  });
+
+  it("splits the real dictionary into full bands and full topics", () => {
     const cards = realDictionary as DictionaryCard[];
+    const topics = realTopics as TopicMembership;
     const db = new DatabaseSync(":memory:");
-    db.exec(CREATE_SCHEMA_V4);
+    db.exec(CREATE_SCHEMA_V5);
     db.exec("BEGIN");
-    for (const step of planDictionarySync(cards, [], "real")) {
+    for (const step of planDictionarySync(cards, topics, [], "real")) {
       db.prepare(step.sql).run(...step.params);
     }
     db.exec("COMMIT");
@@ -186,18 +264,83 @@ describe("buildCategoryCountsQuery", () => {
     const counts = countsOf(db);
     for (const category of CATEGORIES) {
       if (category.kind === "custom") continue;
-      const size = (category.to ?? cards.length) - category.from + 1;
-      expect(counts[category.key]).toEqual({ total: size, remaining: size });
+      const size =
+        category.kind === "topic"
+          ? topics[category.slug].length
+          : (category.to ?? cards.length) - category.from + 1;
+      expect({ key: category.key, ...counts[category.key] }).toEqual({
+        key: category.key,
+        total: size,
+        remaining: size,
+      });
     }
   });
 
   it("returns zeros for an empty table", () => {
     const db = new DatabaseSync(":memory:");
-    db.exec(CREATE_SCHEMA_V4);
+    db.exec(CREATE_SCHEMA_V5);
 
     expect(Object.values(countsOf(db))).toEqual(
       CATEGORIES.map(() => ({ total: 0, remaining: 0 })),
     );
+  });
+});
+
+describe("buildSelectionAvailabilityQuery", () => {
+  it("counts the distinct new words of the union, own words apart", () => {
+    const db = createFixture();
+    const selection = ["custom", "band:1-500", "topic:food", "topic:time"];
+
+    // Сумма счётчиков разделов была бы 2 + 3 + 3 + 2 = 10: the и edge
+    // входят в три раздела сразу
+    expect(availabilityOf(db, selection)).toEqual({
+      includesCustom: true,
+      ownNew: 2,
+      dictionaryNew: 5,
+    });
+    expect(pick(db, selection)).toHaveLength(7);
+  });
+
+  it("matches the session query for any selection", () => {
+    const db = createFixture();
+    const selections = [
+      ALL_CATEGORY_KEYS,
+      ["custom"],
+      ["topic:food"],
+      ["band:1-500", "topic:food"],
+      ["topic:food", "topic:time"],
+      ["band:20001-", "topic:time"],
+      ["custom", "band:501-1000", "topic:time"],
+    ];
+
+    for (const selection of selections) {
+      const { ownNew, dictionaryNew } = availabilityOf(db, selection);
+      const rows = pick(db, selection);
+      expect({ selection, ownNew, dictionaryNew }).toEqual({
+        selection,
+        ownNew: rows.filter((row) => row.is_custom === 1).length,
+        dictionaryNew: rows.filter((row) => row.is_custom === 0).length,
+      });
+    }
+  });
+
+  it("counts no own words when the custom section is not selected", () => {
+    expect(availabilityOf(createFixture(), ["topic:food"])).toEqual({
+      includesCustom: false,
+      ownNew: 0,
+      dictionaryNew: 3,
+    });
+  });
+
+  it("returns zeros for an empty table", () => {
+    const db = new DatabaseSync(":memory:");
+    db.exec(CREATE_SCHEMA_V5);
+
+    expect(availabilityOf(db, ["custom", "topic:food"])).toEqual({
+      includesCustom: true,
+      ownNew: 0,
+      dictionaryNew: 0,
+    });
   });
 });
 

@@ -18,7 +18,7 @@ import {
   SELECT_DAILY_PROGRESS,
   SET_DAILY_GOAL,
 } from "./progressQueries";
-import { CREATE_SCHEMA_V4, SET_SCHEMA_VERSION } from "./schema";
+import { CREATE_SCHEMA_V5, SET_SCHEMA_VERSION } from "./schema";
 
 const DAY = "2026-10-13";
 const NEXT_DAY = "2026-10-14";
@@ -26,7 +26,7 @@ const NEXT_DAY = "2026-10-14";
 // Слова: id 1–3 словаря, 4–5 свои
 const createFixture = () => {
   const db = new DatabaseSync(":memory:");
-  db.exec(CREATE_SCHEMA_V4);
+  db.exec(CREATE_SCHEMA_V5);
   db.exec(SET_SCHEMA_VERSION);
   db.exec(`
     INSERT INTO words (id, dict_key, term, translation, is_custom, status, rank) VALUES

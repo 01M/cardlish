@@ -81,10 +81,12 @@ therefore differ from upgraded installs — match dictionary rows by `dict_key`,
 group by frequency, then term. `src/assets/dictionary.test.ts` guards the shape. Every data
 source must be listed in `src/data/sources.json` before its data ships.
 
-The converter also writes `src/assets/dictionary.version.json` (first 16 hex chars of sha256
-over `dictionary.json`, CRLF normalised to LF). Commit `dictionary.json` and
-`dictionary.version.json` together; a jest guard recomputes the hash and fails ("rerun the
-converter") when they diverge.
+`src/assets/dictionary.version.json` is the data version: the first 16 hex chars of sha256 over
+the bytes of `dictionary.json`, a single `"\n"`, then the bytes of `topics.json` (CRLF normalised
+to LF in both). One shared writer, `scripts/data_version.py`, runs at the end of BOTH
+`convert_freedict.py` and `build_topics.py`, each using the other file as it currently exists.
+Commit `dictionary.json`, `topics.json` and `dictionary.version.json` together; a jest guard and
+a Python test recompute the hash and fail ("rerun …") when they diverge.
 
 ### Topic pipeline (Python, build-time only)
 
@@ -99,43 +101,67 @@ vulgar, missed-member, calendar); the build fails loudly on unknown topics, unkn
 duplicates, stale adds/removes or unknown reasons. A word belongs to a topic only if its common
 sense and its card translation both fit; vulgar, sexual, offensive or slur items are never
 included. Topics under `MIN_TOPIC_SIZE` (40) are not written. Output `src/assets/topics.json`
-(slug → sorted keys, LF, deterministic) is guarded by `src/assets/topics.test.ts` and is **not
-read by the app yet**. Update the topic-decision counts in the `manual-corrections` entry of
+(slug → sorted keys, LF, deterministic) is guarded by `src/assets/topics.test.ts` (every key
+exists in dictionary.json) and synced by the app into `word_topics`; each topic is a Learn
+section `topic:<slug>`. Update the topic-decision counts in the `manual-corrections` entry of
 `src/data/sources.json` after editing the overrides (a Python test checks them).
 
-### Database schema v4 and dictionary sync
+To add a topic: add it to `TOPICS` in `build_topics.py`, curate and rebuild, then add
+`[slug, Russian title]` to `TOPICS` in `src/utils/categories.ts` at the same position. A jest test
+ties the registry to `topics.json` (same slugs, same order) — it also fails when a topic drops
+out of the file, and then its registry entry must go.
 
-`PRAGMA user_version` = 4; `words.rank` (INTEGER, NULL for custom words) defines the Learn
+### Database schema v5 and dictionary sync
+
+`PRAGMA user_version` = 5; `words.rank` (INTEGER, NULL for custom words) defines the frequency
 sections and the order of new dictionary words (see below); `daily_progress` (v4) counts new
-words per local day (see "Daily goal"). On start the app migrates the schema (`planMigration`:
-fresh / v1 → v4 / v2 → v4 / v3 → v4, each in one exclusive transaction; newer than 4 →
-`DatabaseTooNewError`), then syncs the dictionary when `app_settings.dictionary_version` differs from
-`dictionary.version.json` — a fresh install is filled by the same sync. Sync rules, one
-exclusive transaction (`src/db/dictionarySync.ts`): match rows **only by `dict_key`**, update
+words per local day (see "Daily goal"); `word_topics (topic, dict_key)` (v5, `PRIMARY KEY (topic,
+dict_key) WITHOUT ROWID`) holds topic membership of dictionary words. On start the app migrates
+the schema (`planMigration`: fresh / v1 → v5 / v2 → v5 / v3 → v5 / v4 → v5, each in one
+exclusive transaction; v4 → v5 is a plain `CREATE TABLE word_topics`; newer than 5 →
+`DatabaseTooNewError`), then syncs when `app_settings.dictionary_version` differs from
+`dictionary.version.json` — a fresh install is filled by the same sync, and since the version
+now covers `topics.json` too, every upgraded install syncs once. Sync rules, one exclusive
+transaction (`src/db/dictionarySync.ts`): match rows **only by `dict_key`**, update
 term/translation/transcription/example/rank, never touch `id`, `status`, `is_custom` or custom
 words; rows absent from the new JSON are deleted only if `status = 'new'`, rows with progress
-are kept; the version is written last, so a failed sync stores nothing and shows the DB error
-screen with retry. Re-running the sync changes nothing.
+are kept; then `word_topics` is rewritten completely from `topics.json` (DELETE all rows, insert
+in batches; a key without a dictionary row is skipped — none with the shipped files); the
+version is written last, so a failed sync stores nothing and shows the DB error screen with
+retry. Re-running the sync leaves the same content. Both JSON files are `require`d lazily, only
+when a sync is needed.
 
 ### Learn sections
 
 New words for a Learn session come only from the sections the user selected on `/categories`.
-Sections are defined in code, not in the database: `"custom"` (own words, `is_custom = 1`) and
+Sections are defined in code, not in the database: `"custom"` (own words, `is_custom = 1`),
 frequency bands over `words.rank` from the `BANDS` table in `src/utils/categories.ts`
 (1–500, 501–1000, 1001–2000, 2001–3000, 3001–5000, 5001–10000, 10001–20000, 20001+; keys
-`band:<from>-<to>`, the open last band `band:<from>-`). Rows with rank NULL belong to no band.
-The selection is `app_settings.learn_categories`, a JSON array of keys; no row means all
-sections (choosing all deletes the row), unknown keys are dropped, empty or broken values mean
-all, and the last section can never be deselected. A session takes own new words first (random
-order), then dictionary new words by ascending rank, never from outside the selection. SQL lives
-in `src/db/categoryQueries.ts` (pure, tested on `node:sqlite`); the plan card numbers come from
-`getSessionPlan(sessionSize, getSelectionAvailability(selection, counts))`.
+`band:<from>-<to>`, the open last band `band:<from>-`) and 21 topics from its `TOPICS` table
+(keys `topic:<slug>`, Russian titles, no description; membership from `word_topics`). Rows with
+rank NULL belong to no band. Selected sections combine by **union (OR)** in one `WHERE`, so a
+word in several sections appears once; a topic filter is `words.dict_key IN (SELECT t.dict_key
+FROM word_topics t WHERE t.topic = ?)` (equivalent to a correlated `EXISTS`, ~50× faster on the
+real data). The selection is `app_settings.learn_categories`, a JSON array of keys; no row means
+all sections — custom + all bands + all topics (choosing all deletes the row), unknown keys are
+dropped, empty or broken values mean all, and the last section can never be deselected. A
+session takes own new words first (random order), then dictionary new words by ascending rank,
+never from outside the selection. SQL lives in `src/db/categoryQueries.ts` (pure, tested on
+`node:sqlite`): per-section counts (`remaining` equals what the session query picks for that
+section alone) and `buildSelectionAvailabilityQuery` — the DISTINCT new words of the union, own
+and dictionary apart (never a sum of section counts: topics overlap). The plan card numbers
+come from `getSessionPlan(sessionSize, await getSelectionAvailability(selection))`.
+
+The picker groups its rows under headers "Свои слова", "Словарь по частотности" and "Темы"
+(`CATEGORY_GROUPS`, role `header`). Each header has "Все" (select the whole group) and "Нет"
+(deselect it — disabled when nothing would remain, with a hint why), ≥ 44 pt, labelled
+"Выбрать все разделы группы …" / "Снять все разделы группы …", saved immediately like a row tap.
 
 When the selected sections have no new words left but other sections do
 (`isSelectionExhausted`), "Начать сессию" is disabled and a note asks to pick other sections.
 
-To add a section, add a row to `BANDS`; the bands must start at 1, stay contiguous and end with an
-open band (`validateCategories`, checked by a test). The picker route is a root Stack screen with
+To add a band, add a row to `BANDS`; the bands must start at 1, stay contiguous and end with an
+open band (`validateCategories`, checked by a test). To add a topic, see "Topic pipeline". The picker route is a root Stack screen with
 `presentation: "fullScreenModal"` and no header; after adding a route, regenerate the gitignored
 typed routes (`.expo/types/router.d.ts`, command in CLAUDE.md) so tsc knows the new href.
 

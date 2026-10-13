@@ -1,7 +1,7 @@
-// Синхронизация встроенного словаря (src/assets/dictionary.json) с базой —
-// только SQL-строки и чистые функции, без expo-sqlite, чтобы их можно было
-// проверять в тестах на node:sqlite. Новая установка заполняет словарь этой
-// же синхронизацией.
+// Синхронизация встроенного словаря (src/assets/dictionary.json) и состава
+// тем (src/assets/topics.json) с базой — только SQL-строки и чистые функции,
+// без expo-sqlite, чтобы их можно было проверять в тестах на node:sqlite.
+// Новая установка заполняет словарь и темы этой же синхронизацией.
 // Правила (всё — одной эксклюзивной транзакцией, вместе с записью версии):
 // - строки словаря сопоставляются ТОЛЬКО по dict_key (id у разных установок
 //   разные); у существующих обновляются term, translation, transcription,
@@ -10,7 +10,10 @@
 //   ключом словаря;
 // - строки словаря, которых нет в новом JSON, удаляются, только если слово
 //   ещё не изучалось (status 'new'); слова с прогрессом остаются как есть;
-// - повторный запуск ничего не меняет
+// - word_topics после слов переписывается целиком из src/assets/topics.json
+//   (DELETE всех строк, затем вставка пачками), так что изменённый или
+//   убранный состав темы применяется полностью; своих слов там нет;
+// - повторный запуск не меняет содержимого базы
 
 // Карточка словаря — как её пишет scripts/convert_freedict.py
 export interface DictionaryCard {
@@ -21,12 +24,15 @@ export interface DictionaryCard {
   rank: number;
 }
 
+// Темы — как их пишет scripts/build_topics.py: slug → dict_key слов словаря
+export type TopicMembership = Record<string, string[]>;
+
 export interface SqlBatch {
   sql: string;
   params: (string | number | null)[];
 }
 
-// 6 параметров на строку — далеко от лимита переменных SQLite
+// До 6 параметров на строку — далеко от лимита переменных SQLite
 export const SYNC_BATCH_SIZE = 500;
 
 const DICTIONARY_VERSION_KEY = "dictionary_version";
@@ -115,12 +121,41 @@ export const buildDeleteBatches = (
     params: part,
   }));
 
-// 5. Все шаги синхронизации по порядку — выполняются одной транзакцией.
+// 5. Состав тем: старые строки удаляются целиком, новые вставляются пачками
+// (2 параметра на строку). Ключ без строки словаря в words пропускается —
+// при поставляемых файлах таких нет: тест src/assets/topics.test.ts требует,
+// чтобы каждый ключ topics.json был в dictionary.json, а вставка идёт после
+// upsert всех карточек в той же транзакции
+const DELETE_WORD_TOPICS = "DELETE FROM word_topics;";
+
+export const buildTopicInsertBatches = (
+  topics: TopicMembership,
+  batchSize = SYNC_BATCH_SIZE,
+): SqlBatch[] =>
+  chunk(
+    Object.entries(topics).flatMap(([topic, keys]) =>
+      keys.map((key) => [topic, key]),
+    ),
+    batchSize,
+  ).map((part) => ({
+    sql: `
+      INSERT INTO word_topics (topic, dict_key)
+      SELECT incoming.column1, incoming.column2
+      FROM (VALUES ${part.map(() => "(?, ?)").join(", ")}) AS incoming
+      WHERE EXISTS (
+        SELECT 1 FROM words WHERE words.dict_key = incoming.column2
+      );
+    `,
+    params: part.flat(),
+  }));
+
+// 6. Все шаги синхронизации по порядку — выполняются одной транзакцией.
 // existingNewKeys — результат SELECT_NEW_DICTIONARY_KEYS в той же транзакции.
 // Версия записывается последней: она сохранится, только если вся
 // синхронизация зафиксирована
 export const planDictionarySync = (
   cards: DictionaryCard[],
+  topics: TopicMembership,
   existingNewKeys: string[],
   version: string,
   batchSize = SYNC_BATCH_SIZE,
@@ -130,5 +165,7 @@ export const planDictionarySync = (
     findKeysToDelete(existingNewKeys, cards.map((card) => toDictKey(card.term))),
     batchSize,
   ),
+  { sql: DELETE_WORD_TOPICS, params: [] },
+  ...buildTopicInsertBatches(topics, batchSize),
   { sql: SET_DICTIONARY_VERSION, params: [version] },
 ];

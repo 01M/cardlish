@@ -29,9 +29,9 @@ import { PressableScale } from "../components/PressableScale";
 import { StepperButton } from "../components/StepperButton";
 import {
   DailyProgress,
-  getCategoryCounts,
   getDailyProgress,
   getLearnSelection,
+  getSelectionAvailability,
   getSessionWords,
   getWordsStats,
   markWordAsReview,
@@ -45,10 +45,9 @@ import { useTheme } from "../theme/useTheme";
 import { confirmResetProgress, showErrorAlert } from "../utils/alerts";
 import {
   ALL_CATEGORY_KEYS,
-  CategoryCounts,
   formatNewWords,
   formatSelectionSummary,
-  getSelectionAvailability,
+  SelectionAvailability,
 } from "../utils/categories";
 import {
   DAILY_GOAL_DEFAULT,
@@ -62,16 +61,23 @@ import {
   isSelectionExhausted,
 } from "../utils/sessionPlan";
 
-// Статистика, счётчики разделов, выбор разделов и прогресс сегодняшнего
-// локального дня — одной загрузкой (день считается в момент загрузки)
+// Выбор разделов и сколько в нём новых слов (различные слова объединения
+// разделов — считаются по самому выбору)
+const loadSelection = async () => {
+  const selection = await getLearnSelection();
+  return { selection, available: await getSelectionAvailability(selection) };
+};
+
+// Статистика, выбор разделов с числом новых слов в нём и прогресс
+// сегодняшнего локального дня — одной загрузкой (день считается в момент
+// загрузки)
 const loadLearnData = async () => {
-  const [stats, counts, selection, daily] = await Promise.all([
+  const [stats, { selection, available }, daily] = await Promise.all([
     getWordsStats(),
-    getCategoryCounts(),
-    getLearnSelection(),
+    loadSelection(),
     getDailyProgress(toLocalDay(new Date())),
   ]);
-  return { stats, counts, selection, daily };
+  return { stats, selection, available, daily };
 };
 
 // Диапазон высоты, за который прозрачность примечания доходит до 1
@@ -101,9 +107,13 @@ export const LearnScreen = () => {
     learned: 0,
   });
   // Разделы, из которых берутся новые слова (выбираются на /categories),
-  // и сколько слов в каждом разделе
+  // и сколько в них новых слов
   const [selection, setSelection] = useState<string[]>(ALL_CATEGORY_KEYS);
-  const [counts, setCounts] = useState<CategoryCounts>({});
+  const [available, setAvailable] = useState<SelectionAvailability>({
+    includesCustom: true,
+    ownNew: 0,
+    dictionaryNew: 0,
+  });
   // Блок «Сегодня»: новых слов за локальный день и дневная цель
   const [daily, setDaily] = useState<DailyProgress>({
     introduced: 0,
@@ -114,8 +124,8 @@ export const LearnScreen = () => {
   const applyLearnData = useCallback(
     (data: Awaited<ReturnType<typeof loadLearnData>>) => {
       setStats(data.stats);
-      setCounts(data.counts);
       setSelection(data.selection);
+      setAvailable(data.available);
       setDaily(data.daily);
     },
     [],
@@ -172,7 +182,6 @@ export const LearnScreen = () => {
 
   // 7. СОСТАВ СЕССИИ: план считается так же, как getSessionWords загружает
   // слова из выбранных разделов (см. getSessionPlan)
-  const available = getSelectionAvailability(selection, counts);
   const availableNew = available.ownNew + available.dictionaryNew;
   const selectionSummary = formatSelectionSummary(selection);
   const availableNewText = formatNewWords(availableNew);

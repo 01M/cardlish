@@ -4,6 +4,7 @@ import {
   CategoryCounts,
   isAllSelected,
   parseSelection,
+  SelectionAvailability,
   serializeSelection,
 } from "../utils/categories";
 import {
@@ -14,8 +15,10 @@ import {
 import {
   buildCategoryCountsQuery,
   buildNewWordsQuery,
+  buildSelectionAvailabilityQuery,
   DELETE_LEARN_CATEGORIES,
   parseCategoryCounts,
+  parseSelectionAvailability,
   SELECT_LEARN_CATEGORIES,
   SET_LEARN_CATEGORIES,
 } from "./categoryQueries";
@@ -24,6 +27,7 @@ import {
   planDictionarySync,
   SELECT_DICTIONARY_VERSION,
   SELECT_NEW_DICTIONARY_KEYS,
+  TopicMembership,
 } from "./dictionarySync";
 import {
   CLEAR_DAILY_PROGRESS,
@@ -40,10 +44,11 @@ import {
 } from "./progressQueries";
 import {
   BACKUP_DATABASE_INTO,
-  CREATE_SCHEMA_V4,
+  CREATE_SCHEMA_V5,
   MIGRATE_V1_TO_V2,
   MIGRATE_V2_TO_V3,
   MIGRATE_V3_TO_V4,
+  MIGRATE_V4_TO_V5,
   planMigration,
   SELECT_USER_VERSION,
   SELECT_WORDS_TABLE,
@@ -91,10 +96,10 @@ export class DatabaseTooNewError extends Error {
   }
 }
 
-// Синхронизация словаря (правила — в dictionarySync.ts), когда версия
-// встроенного словаря отличается от сохранённой в app_settings. Так же
-// заполняется словарь новой установки. Большой JSON подгружаем лениво —
-// только когда синхронизация нужна, чтобы он не разбирался при каждом запуске
+// Синхронизация словаря и тем (правила — в dictionarySync.ts), когда версия
+// данных (по dictionary.json и topics.json) отличается от сохранённой в
+// app_settings. Так же заполняется новая установка. JSON подгружаем лениво —
+// только когда синхронизация нужна, чтобы они не разбирались при каждом запуске
 const syncDictionaryIfNeeded = async (db: SQLite.SQLiteDatabase) => {
   const installed = await db.getFirstAsync<{ value: string }>(
     SELECT_DICTIONARY_VERSION,
@@ -102,12 +107,14 @@ const syncDictionaryIfNeeded = async (db: SQLite.SQLiteDatabase) => {
   if (installed?.value === dictionaryVersion.version) return;
 
   const cards: DictionaryCard[] = require("../assets/dictionary.json");
+  const topics: TopicMembership = require("../assets/topics.json");
   await db.withExclusiveTransactionAsync(async (txn) => {
     const existingNewKeys = await txn.getAllAsync<{ dict_key: string }>(
       SELECT_NEW_DICTIONARY_KEYS,
     );
     const steps = planDictionarySync(
       cards,
+      topics,
       existingNewKeys.map((row) => row.dict_key),
       dictionaryVersion.version,
     );
@@ -153,7 +160,7 @@ const migrateSchema = async (db: SQLite.SQLiteDatabase) => {
     case "fresh":
       // Схема и версия — одной транзакцией; словарь заполнит синхронизация
       await db.withExclusiveTransactionAsync(async (txn) => {
-        await txn.execAsync(CREATE_SCHEMA_V4);
+        await txn.execAsync(CREATE_SCHEMA_V5);
         await txn.execAsync(SET_SCHEMA_VERSION);
       });
       return;
@@ -170,6 +177,7 @@ const migrateSchema = async (db: SQLite.SQLiteDatabase) => {
         await txn.execAsync(MIGRATE_V1_TO_V2);
         await txn.execAsync(MIGRATE_V2_TO_V3);
         await txn.execAsync(MIGRATE_V3_TO_V4);
+        await txn.execAsync(MIGRATE_V4_TO_V5);
         await txn.execAsync(SET_SCHEMA_VERSION);
       });
       return;
@@ -179,6 +187,7 @@ const migrateSchema = async (db: SQLite.SQLiteDatabase) => {
       await db.withExclusiveTransactionAsync(async (txn) => {
         await txn.execAsync(MIGRATE_V2_TO_V3);
         await txn.execAsync(MIGRATE_V3_TO_V4);
+        await txn.execAsync(MIGRATE_V4_TO_V5);
         await txn.execAsync(SET_SCHEMA_VERSION);
       });
       return;
@@ -187,6 +196,15 @@ const migrateSchema = async (db: SQLite.SQLiteDatabase) => {
       await deleteV1Backup(db);
       await db.withExclusiveTransactionAsync(async (txn) => {
         await txn.execAsync(MIGRATE_V3_TO_V4);
+        await txn.execAsync(MIGRATE_V4_TO_V5);
+        await txn.execAsync(SET_SCHEMA_VERSION);
+      });
+      return;
+    case "upgrade-v4":
+      // Копия v1 могла остаться от переноса v1 → v4 предыдущей версии
+      await deleteV1Backup(db);
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.execAsync(MIGRATE_V4_TO_V5);
         await txn.execAsync(SET_SCHEMA_VERSION);
       });
       return;
@@ -298,7 +316,21 @@ export const getCategoryCounts = async (): Promise<CategoryCounts> => {
   return parseCategoryCounts(row);
 };
 
-// 5b. Выбранные разделы «Учить». «Все разделы» храним отсутствием записи
+// 5b. Сколько новых слов в выбранных разделах (различные слова объединения;
+// свои отдельно от словаря) — для плана сессии «Учить»
+export const getSelectionAvailability = async (
+  selection: readonly string[],
+): Promise<SelectionAvailability> => {
+  const db = await getDb();
+  const query = buildSelectionAvailabilityQuery(selection);
+  const row = await db.getFirstAsync<{
+    own_new: number;
+    dictionary_new: number;
+  }>(query.sql, query.params);
+  return parseSelectionAvailability(selection, row);
+};
+
+// 5c. Выбранные разделы «Учить». «Все разделы» храним отсутствием записи
 export const getLearnSelection = async (): Promise<string[]> => {
   const db = await getDb();
   const setting = await db.getFirstAsync<{ value: string }>(

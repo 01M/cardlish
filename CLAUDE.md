@@ -33,7 +33,8 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
   `rank`; venv in `scripts/.venv` (gitignored), deps pinned in `scripts/requirements.txt`
   (`wordfreq==3.1.1`), stdlib `unittest` tests in `scripts/test_convert_freedict.py`. See
   "Dictionary pipeline" under Commands. `scripts/build_topics.py` (`wn==1.1.1`) derives topic
-  membership (`src/assets/topics.json`) from Open English WordNet — see "Topic pipeline".
+  membership (`src/assets/topics.json`) from Open English WordNet — see "Topic pipeline". Both
+  scripts end by rewriting the shared data version through `scripts/data_version.py`.
 - Lint: `eslint` 9 + `eslint-config-expo` (`eslint.config.js`)
 - Tests: `jest` 29 + `jest-expo` preset (`"jest"` key in `package.json`); jest types come from
   `"types": ["jest"]` in `tsconfig.json` (TS 6 no longer auto-includes `@types/*`)
@@ -57,21 +58,24 @@ src/components/   Shared UI (Button, PressableScale, StepperButton, FlipCard, Fa
 src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts), schema/migration SQL + planMigration (schema.ts),
-                  dictionary sync SQL + pure helpers (dictionarySync.ts), Learn section SQL
-                  (categoryQueries.ts), status changes + daily progress + goal + reset SQL
+                  dictionary + topic sync SQL + pure helpers (dictionarySync.ts), Learn section
+                  SQL (categoryQueries.ts), status changes + daily progress + goal + reset SQL
                   (progressQueries.ts)
 src/services/     Side-effectful services (notifications.ts)
 src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); pure, no React/DB:
                   reviewQueue.ts (mergeReviewQueue(prev, fresh)), sessionPlan.ts (getSessionPlan),
                   sources.ts (DataSource, parseSources, formatUrlForDisplay),
-                  categories.ts (section registry + band table, selection, SQL filters, labels),
+                  categories.ts (section registry: band + topic tables, groups, selection, SQL
+                  filters, labels),
                   dailyGoal.ts (toLocalDay, goal parse/clamp/step, "Сегодня" labels)
 *.test.ts         Unit tests live next to the code they test (never under src/app/)
-src/assets/       dictionary.json (large, generated, git-tracked, never read it), dictionary.version.json
-                  (generated with it) + dictionary.test.ts (shape + version guard); topics.json
-                  (generated topic membership, not read by the app yet) + topics.test.ts (guard)
-scripts/          Python pipelines: convert_freedict.py, build_topics.py, their tests, requirements.txt,
-                  data/ (card_overrides.json, topic_overrides.json), .venv/ and .wn_data/ (gitignored)
+src/assets/       dictionary.json (large, generated, git-tracked, never read it), topics.json
+                  (generated topic membership, synced into word_topics) + topics.test.ts (guard),
+                  dictionary.version.json (data version over both, generated) + dictionary.test.ts
+                  (shape + version guard)
+scripts/          Python pipelines: convert_freedict.py, build_topics.py, data_version.py (shared
+                  version writer), their tests, requirements.txt, data/ (card_overrides.json,
+                  topic_overrides.json), .venv/ and .wn_data/ (gitignored)
 assets/           App icons / splash
 ```
 
@@ -105,12 +109,16 @@ scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python
 - Source archive: `freedict-eng-rus-2025.11.23.src.tar.xz` from https://freedict.org/downloads/
   (not in the repo). The output is deterministic (LF line endings) — regenerating must not change
   the file unless the converter or its inputs changed.
-- The converter also writes `src/assets/dictionary.version.json` (`{ "version": … }`, the first
-  16 hex chars of sha256 over `dictionary.json` with CRLF normalised to LF). The app syncs
-  installed dictionaries when this value changes. Workflow: run the converter → commit
-  `dictionary.json` and `dictionary.version.json` together. The jest guard in
-  `src/assets/dictionary.test.ts` recomputes the hash and fails ("rerun the converter") when the
-  two diverge — never edit either file by hand.
+- **Data version** `src/assets/dictionary.version.json` (`{ "version": … }`): the first 16 hex
+  chars of sha256 over the LF-normalised bytes of `dictionary.json`, then a single `"\n"`, then
+  the LF-normalised bytes of `topics.json`. One shared writer, `scripts/data_version.py`
+  (`write_data_version`), is called at the end of BOTH `convert_freedict.py` and
+  `build_topics.py`, each using the other file as it currently exists (a missing file fails
+  loudly; `convert_freedict.py` reads the `topics.json` next to its output). The app syncs words
+  and topics when this value changes. Workflow: run the script(s) → commit `dictionary.json`,
+  `topics.json` and `dictionary.version.json` together. The jest guard in
+  `src/assets/dictionary.test.ts` (and the Python test `test_data_version.py`) recomputes the
+  hash and fails ("rerun …") when they diverge — never edit any of them by hand.
 - Converter rules: eligible entries have a single-word headword (`^[A-Za-z][A-Za-z'-]*$`), a
   TEI part of speech among `n v adj adv pronoun preposition postposition conjunction determiner
   numeral interjection particle` (excluded: `pn`, `prefix`, `suffix`, `phraseologicalunit`,
@@ -165,10 +173,17 @@ scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.j
   run: `wn.config.data_directory = 'scripts/.wn_data'; wn.download('oewn:2025');
   wn.download('omw-en:2.0')`. A build takes ~1.5 min.
 - Output `src/assets/topics.json`: `{ "<slug>": ["<dict_key>", …] }`, slugs in `TOPICS` order,
-  keys sorted, LF, one key per line; deterministic (two runs are byte-identical). The app does
-  **not** read it yet (no schema, sync or UI for topics). `src/assets/topics.test.ts` guards it:
-  every key exists in dictionary.json, no duplicates, sorted, ≥ 40 keys per topic, unique slugs —
-  no hard-coded counts.
+  keys sorted, LF, one key per line; deterministic (two runs are byte-identical). The run ends by
+  rewriting the data version (see above). The app syncs it into `word_topics` (see "Dictionary
+  sync") and offers each topic as a Learn section `topic:<slug>`. `src/assets/topics.test.ts`
+  guards it: every key exists in dictionary.json (the sync would silently skip an unknown key),
+  no duplicates, sorted, ≥ 40 keys per topic, unique slugs — no hard-coded counts.
+- **Adding a topic:** add it to `TOPICS` in `build_topics.py` (roots, Russian working title),
+  curate, rebuild; then add `[slug, title]` to the `TOPICS` table in `src/utils/categories.ts`
+  at the same position. The tie test in `src/utils/categories.test.ts` fails until the registry
+  and `topics.json` list the same slugs in the same order — also when a topic drops out of the
+  file (under `MIN_TOPIC_SIZE`): then remove its registry entry (saved selections simply drop
+  the unknown key).
 - `TOPICS` (21 slugs with Russian working titles) lists each topic's root synsets by stable
   OEWN id plus a comment label; a missing id fails the build. A card belongs to a topic when one
   of its chosen senses has a root among its hypernyms (instance hypernyms ignored; `animal`
@@ -229,7 +244,7 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   section SQL (`src/db/categoryQueries.ts`) and progress SQL (`src/db/progressQueries.ts`) are
   tested against real SQLite via `node:sqlite` (`schema.test.ts`, `dictionarySync.test.ts`,
   `categoryQueries.test.ts`, `progressQueries.test.ts` — incl. a sync of the real
-  `dictionary.json` and its band sizes; tests mirror `database.ts` flows such as "UPDATE, then
+  `dictionary.json` + `topics.json` and their band and topic sizes; tests mirror `database.ts` flows such as "UPDATE, then
   +1 only if it changed a row" in small helpers; `@jest-environment node`,
   `/// <reference types="node" />`). The rest of `src/db/database.ts` is verified by hand on a
   device.
@@ -248,13 +263,18 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    extracted once Profile needed it too.
 3. **Data access lives in `src/db/`.** All SQL, schema, migrations, and model types stay in
    `src/db/` — queries and model types in `database.ts`; schema/migration SQL strings and pure
-   helpers in `schema.ts`, dictionary-sync SQL and pure helpers in `dictionarySync.ts`, Learn
-   section SQL (selection setting, per-section counts, next new words) in `categoryQueries.ts`
+   helpers in `schema.ts`, dictionary + topic sync SQL and pure helpers in `dictionarySync.ts`,
+   Learn section SQL (selection setting, per-section counts, selection availability, next new
+   words) in `categoryQueries.ts`
    (none of them imports expo-sqlite, so all are tested on `node:sqlite`).
    Screens/services call exported async functions — never issue queries inline.
    The DB is opened once via `getDb()` (memoized promise; a failed open clears the memo so a retry
    reopens).
-   - **Schema v4, versioned by `PRAGMA user_version` (= 4; v3 was 3, v2 was 2, v1 was 0).**
+   - **Schema v5, versioned by `PRAGMA user_version` (= 5; v4 was 4, v3 was 3, v2 was 2, v1
+     was 0).** `word_topics (topic TEXT NOT NULL, dict_key TEXT NOT NULL, PRIMARY KEY (topic,
+     dict_key)) WITHOUT ROWID` (v5) holds topic membership of dictionary words (slug →
+     `dict_key`; no foreign key, custom words never appear — their dict_key is NULL); only the
+     dictionary sync writes it.
      `daily_progress (local_day TEXT PRIMARY KEY NOT NULL, introduced INTEGER NOT NULL DEFAULT 0
      CHECK (introduced >= 0))` (v4) counts words that left `'new'` per local day. `words` has
      `dict_key` (`term.trim().toLowerCase()`, UNIQUE, NULL for custom words —
@@ -263,40 +283,50 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
      until synced). `rank` defines the Learn sections (frequency bands) and the order of new
      dictionary words in a session; `Word` does not include it. `initDatabase()` = `migrateSchema()` then `syncDictionaryIfNeeded()`;
      `migrateSchema()` follows `planMigration(userVersion, hasWordsTable)`: `fresh` (create the
-     v4 schema + set version, one exclusive transaction), `upgrade-v1` (v1 → v2 → v3 → v4),
-     `upgrade-v2` (`ALTER TABLE … ADD COLUMN rank`, then v3 → v4), `upgrade-v3`
-     (`CREATE TABLE daily_progress`, empty; no backup), `current`, `too-new` (above 4; throws
-     `DatabaseTooNewError`; the DB is not touched and the error screen says to update the app)
-     or `unknown` (version 1 or negative; error screen). Every upgrade runs in one exclusive
+     v5 schema + set version, one exclusive transaction), `upgrade-v1` (v1 → v2 → v3 → v4 → v5),
+     `upgrade-v2` (`ALTER TABLE … ADD COLUMN rank`, then v3 → v4 → v5), `upgrade-v3`
+     (`CREATE TABLE daily_progress`, empty, then v4 → v5), `upgrade-v4` (`CREATE TABLE
+     word_topics`, empty — the next sync fills it; no backup), `current`, `too-new` (above 5;
+     throws `DatabaseTooNewError`; the DB is not touched and the error screen says to update the
+     app) or `unknown` (version 1 or negative; error screen). Every upgrade runs in one exclusive
      transaction that ends with `SET_SCHEMA_VERSION`.
    - **Dictionary sync** (`dictionarySync.ts`, fills a fresh install too — there is no separate
      seed path): runs when `app_settings.dictionary_version` differs from
-     `src/assets/dictionary.version.json`. Only then is the 5.5 MB `dictionary.json` `require`d
+     `src/assets/dictionary.version.json` (the data version over `dictionary.json` + `topics.json`;
+     the hash formula changed in v5, so every upgraded install syncs once and fills
+     `word_topics`). Only then are the 5.5 MB `dictionary.json` and `topics.json` `require`d
      (lazily). One exclusive transaction runs `planDictionarySync()`: upsert in 500-row batches,
      matched **only by `dict_key`** (ids differ between installs) — `term`, `translation`,
      `transcription`, `example`, `rank` are updated, **`id`, `status` and `is_custom` never**;
      custom words (dict_key NULL) are never touched, even if their term equals a dictionary key;
      dictionary rows absent from the JSON are deleted only when `status = 'new'` (pure
-     `findKeysToDelete()`, batched deletes), rows with progress are kept unchanged; the version is
+     `findKeysToDelete()`, batched deletes), rows with progress are kept unchanged; then
+     **`word_topics` is rewritten completely** (`DELETE FROM word_topics`, then batched inserts
+     from `topics.json`, `buildTopicInsertBatches()`), so a moved or removed key or a removed
+     topic is reflected; a key without a dictionary row in `words` is skipped (`WHERE EXISTS`) —
+     with the shipped files there are none (`topics.test.ts` + the upserts run first in the same
+     transaction; the real-file sync test checks row count = key count). The version is
      written as the last statement, so it is stored only if the whole sync commits. A second run
-     changes nothing (DO UPDATE skips unchanged rows). Note: SQLite allocates an AUTOINCREMENT
+     leaves the same content (DO UPDATE skips unchanged rows; the topic rows are deleted and
+     reinserted identically). Note: SQLite allocates an AUTOINCREMENT
      value even for rows that end in DO UPDATE, so every sync advances the id counter by about the
      dictionary size — harmless, ids stay unique and existing ids never change. A failed sync
      rolls back and shows the DB error screen; "Повторить" retries it.
    - v1 → v2: first `VACUUM INTO` `english_cards.v1-backup.db` next to the DB (failure aborts the
      upgrade); then one exclusive transaction keeps ids, statuses and custom words, merges
      duplicate dictionary keys into the lowest id with the most advanced status, keeps the
-     AUTOINCREMENT counter, adds `rank` (v2 → v3) and `daily_progress` (v3 → v4) and sets the
-     version. Any error rolls back to the untouched v1 DB. The backup is deleted on the next launch
-     that finds schema v2 or later.
+     AUTOINCREMENT counter, adds `rank` (v2 → v3), `daily_progress` (v3 → v4) and `word_topics`
+     (v4 → v5) and sets the version. Any error rolls back to the untouched v1 DB. The backup is
+     deleted on the next launch that finds schema v2 or later.
    - New schema changes: bump `SCHEMA_VERSION`, add a plan step + SQL in `schema.ts` with
      `node:sqlite` tests (`@jest-environment node` docblock), applied in one transaction.
    - Row type `Word`: `dict_key`/`transcription`/`example` are `string | null`; `status` is
      `"new" | "review" | "learned"`. `WordsStats` (`totalNew`, `review`, `learned`) is exported
-     and shared by Learn and Profile; Learn's own/dictionary split comes from the section counts
-     (`getCategoryCounts()`), not from `WordsStats`.
-   - `getSessionWords(selection, limit)`, `getCategoryCounts()`, `getLearnSelection()` /
-     `setLearnSelection()` — see "Sections" under UI conventions.
+     and shared by Learn and Profile; Learn's own/dictionary split comes from
+     `getSelectionAvailability(selection)`, not from `WordsStats`.
+   - `getSessionWords(selection, limit)`, `getCategoryCounts()`,
+     `getSelectionAvailability(selection)`, `getLearnSelection()` / `setLearnSelection()` — see
+     "Sections" under UI conventions.
    - `getWordsStats()` is one query (`COUNT(CASE …)`), backed by index `idx_words_is_custom_status`.
    - Status changes (SQL in `progressQueries.ts`): `markWordAsReview()` (Learn "Далее") is the
      only way a word leaves `'new'`. It only moves words that are still `'new'` (guards against a
@@ -382,8 +412,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
     session size and Profile daily goal): icon-only, own sizes, labelled via `accessibilityLabel`.
   - Words filter chips (`PressableScale`): selectable controls with
     `accessibilityState={{ selected }}`.
-  - Section picker rows (`PressableScale`, `accessibilityRole="checkbox"`) and its close button
-    (`TouchableOpacity`, same look as the Learn session close).
+  - Section picker rows (`PressableScale`, `accessibilityRole="checkbox"`), its close button
+    (`TouchableOpacity`, same look as the Learn session close) and its group-header actions
+    "Все" / "Нет" (`PressableScale`, amber text, ≥ 44 pt, 0.35 dimming when disabled).
   - Words per-card "Изменить"/"Удалить" (`TouchableOpacity`): inline links with tuned `hitSlop`.
 - Other pressables use `PressableScale` (`src/components/PressableScale.tsx`, press-scale
   feedback; `Button` is built on it). Its `style` is split: placement/size props (`alignSelf`,
@@ -404,8 +435,8 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   `resetDatabase()`, deletes custom words) has its own dedicated confirmation dialog.
 - Icons are Ionicons from @expo/vector-icons — never emoji or text glyphs.
 - Haptics are fire-and-forget: `void Haptics.x().catch(() => {})`. Selection: FlipCard flip,
-  Learn session-size stepper, section picker toggle, Profile daily-goal stepper, reminder switch
-  and theme setting.
+  Learn session-size stepper, section picker toggle and group "Все" / "Нет", Profile daily-goal
+  stepper, reminder switch and theme setting.
   Light impact: Learn next card, Review "forgot". Success: Learn session complete, Review "remembered".
   Warning: tapping the last selected section in the picker.
 
@@ -429,43 +460,67 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   `accessibilityValue` `{ min: 0, max: G, now: min(N, G) }`. The goal never changes the session
   size or the plan.
 - The composition split mirrors what `getSessionWords(selection, size)` will load — computed by
-  the pure `getSessionPlan(sessionSize, getSelectionAvailability(selection, counts))`
-  (`src/utils/sessionPlan.ts`, tested), never new queries. Stats, section counts, the selection
-  and today's progress are loaded together (`loadLearnData`) on every focus, so returning from
-  the picker refreshes the plan. Returning from the background does not fire focus, so while
+  the pure `getSessionPlan(sessionSize, available)` (`src/utils/sessionPlan.ts`, tested), where
+  `available` = `getSelectionAvailability(selection)`: one query over the same selection filter
+  as the session query, counting DISTINCT new words of the union (own / dictionary apart) —
+  never a sum of per-section counts, since topics overlap bands and each other. Stats, the
+  selection with its availability and today's progress are loaded together (`loadLearnData`) on
+  every focus, so returning from the picker refreshes the plan. Returning from the background does not fire focus, so while
   Learn is focused it also listens to `AppState` and reloads on `"active"` (the subscription
   lives in the same `useFocusEffect` and is removed on blur) — the day rolls over after midnight.
 
 **Sections (Learn → `/categories`)**
-- New words come only from the selected sections: "custom" (`is_custom = 1`, "Свои слова") and
-  frequency bands over `words.rank` (dictionary rows only; rank NULL is in no band). The band
-  table `BANDS` lives in `src/utils/categories.ts` (no schema, no table): 1–500, 501–1000,
-  1001–2000, 2001–3000, 3001–5000, 5001–10000, 10001–20000, 20001+ (open-ended). Keys:
-  `"custom"`, `band:<from>-<to>` and `band:<from>-` for the open band; titles are generated
-  ("Слова 10 001–20 000", NBSP digit groups via `formatNumber`), one frequency-only description
-  per band (no level/CEFR claims).
+- New words come only from the selected sections, three kinds: "custom" (`is_custom = 1`,
+  "Свои слова"), frequency bands over `words.rank` (dictionary rows only; rank NULL is in no
+  band) and topics (`word_topics`, dictionary rows only). The band table `BANDS` and the topic
+  table `TOPICS` (`[slug, Russian title]`, in `topics.json` order) live in
+  `src/utils/categories.ts` (sections themselves are not stored): bands 1–500, 501–1000,
+  1001–2000, 2001–3000, 3001–5000, 5001–10000, 10001–20000, 20001+ (open-ended); 21 topics
+  (food "Еда и напитки" … travel "Путешествия"). Keys: `"custom"`, `band:<from>-<to>`,
+  `band:<from>-` for the open band, `topic:<slug>`; band titles are generated
+  ("Слова 10 001–20 000", NBSP digit groups via `formatNumber`) with one frequency-only
+  description per band (no level/CEFR claims); topics have no description (the row shows the
+  count only).
+- **Union semantics:** the selected sections combine by OR in ONE `WHERE` (`selectionFilter`),
+  so a word in several selected sections (a band and a topic, two topics) appears once. A topic
+  filter is `words.dict_key IN (SELECT t.dict_key FROM word_topics t WHERE t.topic = ?)` — same
+  meaning as a correlated `EXISTS`, but SQLite builds the subquery's index once per query
+  (measured on the real data with `node:sqlite`: ~3.5 ms vs ~170 ms for custom + all 21 topics).
 - Selection: `app_settings.learn_categories` = JSON array of keys in registry order. Absent =
-  all sections — selecting everything deletes the key, so a section added later is selected
-  for those users automatically. `parseSelection` drops unknown keys and dedupes; empty,
-  unparsable or non-array → all. The picker never deselects the last section
-  (`isLastSelected` / `toggleCategory`).
+  all sections (custom + all bands + all topics) — selecting everything deletes the key, so a
+  section added later is selected for those users automatically. `parseSelection` drops unknown
+  keys and dedupes; empty, unparsable or non-array → all. The picker never deselects the last
+  section (`isLastSelected` / `toggleCategory`, `canDeselectGroup` / `deselectGroup`).
 - Session order (`buildNewWordsQuery`, `src/db/categoryQueries.ts`): own words first (random
   order, as before), then dictionary words by ascending rank; `LIMIT` = session size; no top-up
-  from outside the selection. Counts: `buildCategoryCountsQuery()` — one `COUNT(CASE …)` pass
-  with `total_<i>` / `remaining_<i>` per section; `remaining` (status `'new'`) always equals what
-  the session query can pick (tested).
-- Adding a section: add a row to `BANDS` keeping it contiguous from 1 with an open last band
+  from outside the selection. Counts: `buildCategoryCountsQuery()` — one query with
+  `total_<i>` / `remaining_<i>` per section: custom and bands as `COUNT(CASE …)` in one pass over
+  `words`, each topic as a scalar `(SELECT COUNT(*) FROM words WHERE <topic filter>)` (driven by
+  the `dict_key` index; ~30 ms in all on the real data vs ~520 ms with topic conditions in the
+  pass). Each section uses the same filter as the session query, so `remaining` (status `'new'`)
+  always equals what the session query picks for that section alone (tested). Selection
+  availability: `buildSelectionAvailabilityQuery(selection)` (see Learn screen).
+- Adding a band: add a row to `BANDS` keeping it contiguous from 1 with an open last band
   (`validateCategories` test fails otherwise). Changing a band's bounds changes its key — old keys
   in saved selections are dropped by `parseSelection` (falls back to all if nothing remains).
+  Adding a topic: see "Topic pipeline" (build_topics.py + `TOPICS` entry + the tie test).
 - Picker (`src/screens/CategoriesScreen.tsx`, route `src/app/categories.tsx`): root Stack screen
   with `presentation: "fullScreenModal"`, `animation: "slide_from_bottom"`, no header — the same
   full-screen slide-up look as `WordFormModal` (top padding `max(insets.top, 24)`); closed by
-  its "Закрыть" icon button or Android back. Header stays fixed, list below. Each toggle is
-  saved first and applied on success (`showErrorAlert()` and the old state on failure). Rows:
-  role checkbox, `accessibilityState={{ checked }}`, label = title + description + count; the
-  last selected row has a hint, and tapping it announces "Должен быть выбран хотя бы один
-  раздел" (also stated in the intro text). Loading: background only, then `FadeInView`; a failed
-  load shows the icon + "Не удалось загрузить данные" + "Повторить".
+  its "Закрыть" icon button or Android back. Header stays fixed, list below (a plain
+  `ScrollView`, ~30 rows). Rows are grouped (`CATEGORY_GROUPS`) under headers "Свои слова",
+  "Словарь по частотности", "Темы" (role `header`; the header row wraps, so at large font sizes
+  the actions move under the title). Each header has "Все" (selects every section of the group;
+  disabled when all are selected) and "Нет" (deselects the group; disabled when none of it is
+  selected or when nothing would remain — then its hint says "Должен быть выбран хотя бы один
+  раздел"); labels "Выбрать все разделы группы <title>" / "Снять все разделы группы <title>",
+  `accessibilityState={{ disabled }}`. Every toggle and group action is saved first and applied
+  on success (`showErrorAlert()` and the old state on failure; one save at a time). Rows: role
+  checkbox, `accessibilityState={{ checked }}`, label = title + description (bands, custom) +
+  count; the last selected row has a hint, and tapping it announces "Должен быть выбран хотя бы
+  один раздел" (also stated in the intro text, which also explains the union). Loading:
+  background only, then `FadeInView`; a failed load shows the icon + "Не удалось загрузить
+  данные" + "Повторить".
 - Completion (`SessionComplete`): badge pop, `Confetti`, word count-up, success haptic.
 - Empty state ("Новые слова закончились"): "Добавить слова" is a primary `Button`, "Сбросить
   прогресс" a secondary `Button` below it (goes through `confirmResetProgress()`).

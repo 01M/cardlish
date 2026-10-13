@@ -6,8 +6,10 @@
 // SQL-строками, что выполняет initDatabase
 import { DatabaseSync } from "node:sqlite";
 import realDictionary from "../assets/dictionary.json";
+import realTopics from "../assets/topics.json";
 import {
   buildDeleteBatches,
+  buildTopicInsertBatches,
   buildUpsertBatches,
   DictionaryCard,
   findKeysToDelete,
@@ -16,8 +18,9 @@ import {
   SELECT_NEW_DICTIONARY_KEYS,
   SYNC_BATCH_SIZE,
   toDictKey,
+  TopicMembership,
 } from "./dictionarySync";
-import { CREATE_SCHEMA_V4, SET_SCHEMA_VERSION } from "./schema";
+import { CREATE_SCHEMA_V5, SET_SCHEMA_VERSION } from "./schema";
 
 const card = (
   term: string,
@@ -26,9 +29,9 @@ const card = (
   transcription = "",
 ): DictionaryCard => ({ term, translation, transcription, example: "", rank });
 
-const createV4 = () => {
+const createV5 = () => {
   const db = new DatabaseSync(":memory:");
-  db.exec(CREATE_SCHEMA_V4);
+  db.exec(CREATE_SCHEMA_V5);
   db.exec(SET_SCHEMA_VERSION);
   return db;
 };
@@ -44,10 +47,10 @@ type Row = {
   rank: number | null;
 };
 
-// База после переноса v2 → v4: строки словаря со старым содержимым и без
+// База после переноса v2 → v5: строки словаря со старым содержимым и без
 // rank, свои слова, прогресс
 const createSyncedBefore = (rows: Omit<Row, "rank">[]) => {
-  const db = createV4();
+  const db = createV5();
   const insert = db.prepare(
     `INSERT INTO words (id, dict_key, term, translation, transcription, example, is_custom, status)
      VALUES (?, ?, ?, ?, ?, NULL, ?, ?);`,
@@ -72,14 +75,18 @@ const sync = (
   db: DatabaseSync,
   cards: DictionaryCard[],
   version = "v-new",
-  { batchSize = SYNC_BATCH_SIZE, failAt = -1 } = {},
+  {
+    batchSize = SYNC_BATCH_SIZE,
+    failAt = -1,
+    topics = {} as TopicMembership,
+  } = {},
 ) => {
   let changes = 0;
   db.exec("BEGIN");
   try {
     const existing = (db.prepare(SELECT_NEW_DICTIONARY_KEYS).all() as { dict_key: string }[])
       .map((row) => row.dict_key);
-    planDictionarySync(cards, existing, version, batchSize).forEach((step, index) => {
+    planDictionarySync(cards, topics, existing, version, batchSize).forEach((step, index) => {
       if (index === failAt) throw new Error("forced failure");
       changes += Number(db.prepare(step.sql).run(...step.params).changes);
     });
@@ -102,9 +109,21 @@ const rowsOf = (db: DatabaseSync) =>
 const versionOf = (db: DatabaseSync) =>
   (db.prepare(SELECT_DICTIONARY_VERSION).get() as { value: string } | undefined)?.value;
 
+// Состав тем в базе в виде topics.json: slug → отсортированные ключи
+const topicsOf = (db: DatabaseSync): TopicMembership => {
+  const membership: TopicMembership = {};
+  const rows = db
+    .prepare("SELECT topic, dict_key FROM word_topics ORDER BY topic, dict_key;")
+    .all() as { topic: string; dict_key: string }[];
+  for (const row of rows) {
+    (membership[row.topic] ??= []).push(row.dict_key);
+  }
+  return membership;
+};
+
 describe("dictionary sync", () => {
   it("fills an empty database (fresh install)", () => {
-    const db = createV4();
+    const db = createV5();
 
     sync(db, [card("apple", "я́блоко", 2, "/ˈæpəl/"), card("the", "(определённый артикль)", 1)]);
 
@@ -229,7 +248,7 @@ describe("dictionary sync", () => {
 
   it("syncs the real dictionary.json into an empty database", () => {
     const cards = realDictionary as DictionaryCard[];
-    const db = createV4();
+    const db = createV5();
 
     sync(db, cards, "real");
 
@@ -240,6 +259,122 @@ describe("dictionary sync", () => {
     expect(
       db.prepare("SELECT COUNT(*) AS count FROM words WHERE rank IS NULL OR status <> 'new';").get(),
     ).toEqual({ count: 0 });
+  });
+});
+
+describe("topic sync", () => {
+  const cards = [
+    card("apple", "я́блоко", 1),
+    card("bread", "хлеб", 2),
+    card("cat", "ко́шка", 3),
+    card("rose", "ро́за", 4),
+  ];
+  const topics: TopicMembership = {
+    food: ["apple", "bread"],
+    animal: ["cat"],
+    plant: ["apple", "rose"],
+  };
+
+  const topicCountOf = (db: DatabaseSync) =>
+    (db.prepare("SELECT COUNT(*) AS count FROM word_topics;").get() as { count: number }).count;
+
+  it("fills word_topics on the first sync", () => {
+    const db = createV5();
+
+    sync(db, cards, "v-new", { topics });
+
+    expect(topicsOf(db)).toEqual({
+      animal: ["cat"],
+      food: ["apple", "bread"],
+      plant: ["apple", "rose"],
+    });
+  });
+
+  it("leaves the same rows when run a second time", () => {
+    const db = createV5();
+    sync(db, cards, "v-new", { topics });
+    const afterFirst = topicsOf(db);
+    const wordsAfterFirst = rowsOf(db);
+
+    sync(db, cards, "v-new", { topics, batchSize: 1 });
+
+    expect(topicsOf(db)).toEqual(afterFirst);
+    expect(rowsOf(db)).toEqual(wordsAfterFirst);
+  });
+
+  it("reflects a moved key, a removed key and a removed topic", () => {
+    const db = createV5();
+    sync(db, cards, "v-old", { topics });
+
+    // cat уходит из animal в plant, apple — из food, тема animal исчезает
+    sync(db, cards, "v-new", { topics: { food: ["bread"], plant: ["apple", "cat", "rose"] } });
+
+    expect(topicsOf(db)).toEqual({ food: ["bread"], plant: ["apple", "cat", "rose"] });
+  });
+
+  it("keeps topics of a word kept for its progress and drops those of a deleted word", () => {
+    const db = createV5();
+    sync(db, cards, "v-old", { topics });
+    db.exec("UPDATE words SET status = 'review' WHERE dict_key = 'cat';");
+
+    // cat и rose пропали из словаря: у cat есть прогресс (строка остаётся),
+    // rose удаляется; topics.json их больше не упоминает
+    sync(db, cards.slice(0, 2), "v-new", { topics: { food: ["apple", "bread"] } });
+
+    expect(topicsOf(db)).toEqual({ food: ["apple", "bread"] });
+    expect(rowsOf(db).map((row) => row.dict_key)).toEqual(["apple", "bread", "cat"]);
+  });
+
+  it("skips keys that have no dictionary row and never links custom words", () => {
+    const db = createSyncedBefore([customRow(1, "bank")]);
+
+    sync(db, cards, "v-new", {
+      topics: { food: ["apple", "missing", "bank"], money: ["bank"] },
+    });
+
+    expect(topicsOf(db)).toEqual({ food: ["apple"] });
+    expect(
+      db.prepare(
+        `SELECT COUNT(*) AS count FROM word_topics t
+         JOIN words w ON w.dict_key = t.dict_key WHERE w.is_custom = 1;`,
+      ).get(),
+    ).toEqual({ count: 0 });
+  });
+
+  it("rolls back to the old table and version when a step fails", () => {
+    const db = createV5();
+    sync(db, cards, "v-old", { topics });
+    const before = topicsOf(db);
+    const steps = planDictionarySync(cards, { food: ["bread"] }, [], "v-new", 1);
+    const lastTopicStep = steps.length - 2;
+
+    // Сбой после DELETE и части вставок тем
+    expect(() =>
+      sync(db, cards, "v-new", { topics: { food: ["bread"] }, batchSize: 1, failAt: lastTopicStep }),
+    ).toThrow("forced failure");
+    expect(topicsOf(db)).toEqual(before);
+    expect(versionOf(db)).toBe("v-old");
+
+    // Дубль ключа в теме нарушает первичный ключ — откатывается всё
+    expect(() =>
+      sync(db, cards, "v-new", { topics: { food: ["bread", "bread"] } }),
+    ).toThrow(/UNIQUE constraint failed/);
+    expect(topicsOf(db)).toEqual(before);
+    expect(versionOf(db)).toBe("v-old");
+  });
+
+  it("syncs the real topics.json into an empty database with one row per key", () => {
+    const real = realTopics as TopicMembership;
+    const db = createV5();
+
+    sync(db, realDictionary as DictionaryCard[], "real", { topics: real });
+
+    const keyCount = Object.values(real).reduce((sum, keys) => sum + keys.length, 0);
+    expect(keyCount).toBeGreaterThan(0);
+    expect(topicCountOf(db)).toBe(keyCount);
+    expect(topicsOf(db)).toEqual(
+      Object.fromEntries(Object.entries(real).map(([slug, keys]) => [slug, [...keys].sort()])),
+    );
   });
 });
 
@@ -263,11 +398,28 @@ describe("dictionary sync helpers", () => {
     expect(SYNC_BATCH_SIZE * 6).toBeLessThanOrEqual(32766);
   });
 
-  it("writes the version as the last step", () => {
-    const steps = planDictionarySync([card("a", "x", 1)], ["gone"], "v-new");
+  it("splits topic rows into batches across topics", () => {
+    const batches = buildTopicInsertBatches({ food: ["apple", "bread", "cake"], plant: ["apple"] }, 3);
 
+    expect(batches.map((batch) => batch.params)).toEqual([
+      ["food", "apple", "food", "bread", "food", "cake"],
+      ["plant", "apple"],
+    ]);
+    expect(buildTopicInsertBatches({}, 3)).toEqual([]);
+    expect(buildTopicInsertBatches({ food: [] }, 3)).toEqual([]);
+  });
+
+  it("rewrites topics after the words and writes the version as the last step", () => {
+    const steps = planDictionarySync([card("a", "x", 1)], { food: ["a"] }, ["gone"], "v-new");
+
+    expect(steps.map((step) => step.sql.trim().split(/\s+/).slice(0, 3).join(" "))).toEqual([
+      "INSERT INTO words",
+      "DELETE FROM words",
+      "DELETE FROM word_topics;",
+      "INSERT INTO word_topics",
+      "INSERT INTO app_settings",
+    ]);
     expect(steps.at(-1)?.params).toEqual(["v-new"]);
-    expect(steps.at(-1)?.sql).toMatch(/app_settings/);
   });
 
   it("computes the same key in JS as lower(trim(term)) in the v1 → v2 migration", () => {

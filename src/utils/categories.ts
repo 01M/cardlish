@@ -1,6 +1,8 @@
-// Разделы для новых слов «Учить»: свои слова и полосы частотности словаря
-// по words.rank. Разделы описаны только в коде (таблица BANDS), в базе
-// хранится лишь выбор — JSON-массив ключей в app_settings.learn_categories.
+// Разделы для новых слов «Учить»: свои слова, полосы частотности словаря по
+// words.rank и темы (таблица word_topics). Разделы описаны только в коде
+// (таблицы BANDS и TOPICS), в базе хранится лишь выбор — JSON-массив ключей в
+// app_settings.learn_categories. Выбранные разделы объединяются (OR): слово из
+// нескольких разделов попадает в сессию один раз.
 // Чистый модуль: без React и без базы
 
 export type Category =
@@ -18,7 +20,17 @@ export type Category =
       // Границы rank включительно; to = null — полоса без верхней границы
       from: number;
       to: number | null;
+    }
+  | {
+      // Без строки описания: в выборе разделов у темы только счётчик
+      kind: "topic";
+      key: string;
+      title: string;
+      // slug из src/assets/topics.json — значение word_topics.topic
+      slug: string;
     };
+
+export type CategoryKind = Category["kind"];
 
 export const CUSTOM_CATEGORY_KEY = "custom";
 
@@ -35,6 +47,35 @@ const BANDS: [number, number | null, string][] = [
   [10001, 20000, "Очень редкие слова"],
   [20001, null, "Узкая лексика, составные слова и имена"],
 ];
+
+// 1a. Темы: [slug, название] в порядке src/assets/topics.json (его пишет
+// scripts/build_topics.py). Тест сверяет эту таблицу с файлом: у каждой темы
+// файла есть строка здесь, и наоборот
+const TOPICS: [string, string][] = [
+  ["food", "Еда и напитки"],
+  ["animal", "Животные"],
+  ["plant", "Растения"],
+  ["body", "Части тела"],
+  ["clothing", "Одежда и украшения"],
+  ["home", "Дом и быт"],
+  ["transport", "Транспорт и дороги"],
+  ["occupation", "Профессии"],
+  ["family", "Семья"],
+  ["colour", "Цвета"],
+  ["time", "Время"],
+  ["weather", "Погода"],
+  ["emotion", "Чувства и эмоции"],
+  ["health", "Здоровье и медицина"],
+  ["school", "Школа и учёба"],
+  ["sport", "Спорт и игры"],
+  ["music", "Музыка и танцы"],
+  ["money", "Деньги и покупки"],
+  ["technology", "Техника и компьютеры"],
+  ["nature", "Природа и ландшафт"],
+  ["travel", "Путешествия"],
+];
+
+export const topicKey = (slug: string) => `topic:${slug}`;
 
 // Разряды через неразрывный пробел: 10000 → «10 000»
 export const formatNumber = (value: number) =>
@@ -65,12 +106,21 @@ export const CATEGORIES: Category[] = [
       to,
     }),
   ),
+  ...TOPICS.map(
+    ([slug, title]): Category => ({
+      kind: "topic",
+      key: topicKey(slug),
+      title,
+      slug,
+    }),
+  ),
 ];
 
 export const ALL_CATEGORY_KEYS = CATEGORIES.map((category) => category.key);
 
-// 2. Проверка реестра: ключи уникальны, ровно один раздел своих слов,
-// полосы начинаются с 1, идут подряд без пересечений, последняя открыта.
+// 2. Проверка реестра: ключи уникальны, ровно один раздел своих слов, у тем
+// ключ topic:<slug> со slug из строчных латинских букв, полосы начинаются с 1,
+// идут подряд без пересечений, последняя открыта.
 // Возвращает список проблем (пустой — всё в порядке)
 export const validateCategories = (categories: Category[]): string[] => {
   const problems: string[] = [];
@@ -81,6 +131,14 @@ export const validateCategories = (categories: Category[]): string[] => {
   }
   if (categories.filter((category) => category.kind === "custom").length !== 1) {
     problems.push("expected exactly one custom category");
+  }
+  for (const category of categories) {
+    if (
+      category.kind === "topic" &&
+      (!/^[a-z]+$/.test(category.slug) || category.key !== topicKey(category.slug))
+    ) {
+      problems.push(`${category.key}: a topic needs the key topic:<slug> with a slug of a-z`);
+    }
   }
 
   const bands = categories.flatMap((category) =>
@@ -152,15 +210,93 @@ export const toggleCategory = (
   return selection.filter((selected) => selected !== key);
 };
 
+// 3a. Группы в выборе разделов (по виду раздела, в порядке реестра) и
+// действия заголовка группы «Все» / «Нет»
+export interface CategoryGroup {
+  kind: CategoryKind;
+  title: string;
+  categories: Category[];
+}
+
+const GROUP_TITLES: Record<CategoryKind, string> = {
+  custom: "Свои слова",
+  band: "Словарь по частотности",
+  topic: "Темы",
+};
+
+export const CATEGORY_GROUPS: CategoryGroup[] = (
+  Object.keys(GROUP_TITLES) as CategoryKind[]
+).map((kind) => ({
+  kind,
+  title: GROUP_TITLES[kind],
+  categories: CATEGORIES.filter((category) => category.kind === kind),
+}));
+
+const groupKeys = (group: CategoryGroup) =>
+  group.categories.map((category) => category.key);
+
+// «Все» выбирает каждый раздел группы; ничего не меняет, если они уже выбраны
+export const canSelectGroup = (
+  selection: readonly string[],
+  group: CategoryGroup,
+) => groupKeys(group).some((key) => !selection.includes(key));
+
+export const selectGroup = (
+  selection: readonly string[],
+  group: CategoryGroup,
+): string[] => normalizeSelection([...selection, ...groupKeys(group)]);
+
+// «Нет» снимает разделы группы — только если в группе что-то выбрано и вне
+// группы останется хотя бы один выбранный раздел
+export const canDeselectGroup = (
+  selection: readonly string[],
+  group: CategoryGroup,
+) => {
+  const keys = groupKeys(group);
+  return (
+    selection.some((key) => keys.includes(key)) &&
+    selection.some((key) => !keys.includes(key))
+  );
+};
+
+// Снятие, которое оставило бы выбор пустым, ничего не меняет
+export const deselectGroup = (
+  selection: readonly string[],
+  group: CategoryGroup,
+): string[] => {
+  if (!canDeselectGroup(selection, group)) return [...selection];
+  const keys = groupKeys(group);
+  return selection.filter((key) => !keys.includes(key));
+};
+
+// «Нет» недоступно только потому, что группа держит все выбранные разделы
+export const isGroupHoldingLastSelection = (
+  selection: readonly string[],
+  group: CategoryGroup,
+) => {
+  const keys = groupKeys(group);
+  return selection.length > 0 && selection.every((key) => keys.includes(key));
+};
+
 // 4. SQL-условие на строку words для раздела и для выбора: только строки и
-// параметры. Строки с rank NULL не попадают ни в одну полосу
+// параметры. Строки с rank NULL не попадают ни в одну полосу. Тема — через
+// некоррелированный подзапрос по первичному ключу word_topics: SQLite строит
+// по нему временный индекс один раз на запрос (коррелированный EXISTS на
+// каждой строке words на реальных данных медленнее в десятки раз). У своих
+// слов dict_key NULL, поэтому они не попадают ни в одну тему
 export interface SqlFilter {
   sql: string;
-  params: number[];
+  params: (string | number)[];
 }
 
 export const categoryFilter = (category: Category): SqlFilter => {
   if (category.kind === "custom") return { sql: "is_custom = 1", params: [] };
+  if (category.kind === "topic") {
+    return {
+      sql: "words.dict_key IN (SELECT t.dict_key FROM word_topics t WHERE t.topic = ?)",
+      params: [category.slug],
+    };
+  }
   return category.to === null
     ? { sql: "(is_custom = 0 AND rank >= ?)", params: [category.from] }
     : {
@@ -169,7 +305,8 @@ export const categoryFilter = (category: Category): SqlFilter => {
       };
 };
 
-// Разделы выбора, объединённые через OR (выбор нормализуется: пустой — все)
+// Разделы выбора, объединённые через OR в одном условии — поэтому слово из
+// нескольких разделов не повторяется (выбор нормализуется: пустой — все)
 export const selectionFilter = (selection: readonly string[]): SqlFilter => {
   const keys = normalizeSelection(selection);
   const filters = CATEGORIES.filter((category) => keys.includes(category.key))
@@ -188,28 +325,14 @@ export interface CategoryCount {
 
 export type CategoryCounts = Record<string, CategoryCount>;
 
-// Новые слова в выборе: свои отдельно от словаря (для плана сессии)
+// Новые слова в выборе: свои отдельно от словаря (для плана сессии). Разделы
+// пересекаются (тема и полоса), поэтому это не сумма счётчиков разделов, а
+// отдельный подсчёт различных слов объединения (buildSelectionAvailabilityQuery)
 export interface SelectionAvailability {
   includesCustom: boolean;
   ownNew: number;
   dictionaryNew: number;
 }
-
-export const getSelectionAvailability = (
-  selection: readonly string[],
-  counts: CategoryCounts,
-): SelectionAvailability => {
-  const keys = normalizeSelection(selection);
-  const remainingOf = (key: string) => counts[key]?.remaining ?? 0;
-  const includesCustom = keys.includes(CUSTOM_CATEGORY_KEY);
-  return {
-    includesCustom,
-    ownNew: includesCustom ? remainingOf(CUSTOM_CATEGORY_KEY) : 0,
-    dictionaryNew: keys
-      .filter((key) => key !== CUSTOM_CATEGORY_KEY)
-      .reduce((sum, key) => sum + remainingOf(key), 0),
-  };
-};
 
 // 6. Подписи для экрана «Учить» и выбора разделов
 
@@ -231,8 +354,8 @@ export const formatSelectionSummary = (selection: readonly string[]) =>
     ? "Все разделы"
     : `Выбрано: ${normalizeSelection(selection).length}`;
 
-// Счётчик строки раздела: для своих слов — сколько новых, для полос —
-// сколько новых осталось из всех слов полосы
+// Счётчик строки раздела: для своих слов — сколько новых, для полос и тем —
+// сколько новых осталось из всех слов раздела
 export const formatCategoryCount = (
   category: Category,
   count: CategoryCount,

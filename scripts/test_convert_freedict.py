@@ -18,12 +18,10 @@ from convert_freedict import (
     clean_transcription,
     clean_translation,
     dedupe_translations,
-    dictionary_version,
     load_overrides,
     merge_translations,
     override_problems,
     read_entries,
-    version_path,
     write_json,
 )
 
@@ -398,34 +396,21 @@ class WriteJsonTest(unittest.TestCase):
         write_json(self.WORDS, output)
         return output
 
-    def test_writes_lf_json_and_a_version_file_next_to_it(self):
+    def test_writes_lf_json_only(self):
         with tempfile.TemporaryDirectory() as directory:
             output = self.write(directory)
             content = output.read_bytes()
-            version = json.loads((Path(directory) / 'dictionary.version.json').read_text('utf-8'))
+            written = sorted(path.name for path in Path(directory).iterdir())
 
         self.assertNotIn(b'\r\n', content)
         self.assertEqual(json.loads(content.decode('utf-8')), self.WORDS)
-        self.assertEqual(version, {'version': dictionary_version(content)})
-        self.assertRegex(version['version'], r'^[0-9a-f]{16}$')
+        # The version file is written by data_version.write_data_version at the end of a run
+        self.assertEqual(written, ['dictionary.json'])
 
     def test_two_runs_are_byte_identical(self):
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
             outputs = [self.write(first), self.write(second)]
             self.assertEqual(outputs[0].read_bytes(), outputs[1].read_bytes())
-            self.assertEqual(
-                version_path(outputs[0]).read_bytes(), version_path(outputs[1]).read_bytes()
-            )
-
-    def test_version_ignores_crlf_line_endings(self):
-        self.assertEqual(dictionary_version(b'[\r\n  1\r\n]\r\n'), dictionary_version(b'[\n  1\n]\n'))
-        self.assertNotEqual(dictionary_version(b'[1]\n'), dictionary_version(b'[2]\n'))
-
-    def test_version_path_sits_next_to_the_output(self):
-        self.assertEqual(
-            version_path(Path('src') / 'assets' / 'dictionary.json'),
-            Path('src') / 'assets' / 'dictionary.version.json',
-        )
 
 
 if __name__ == '__main__':

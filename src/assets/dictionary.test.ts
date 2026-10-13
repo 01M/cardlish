@@ -2,7 +2,8 @@
  * @jest-environment node
  */
 /// <reference types="node" />
-// Проверки поставляемого словаря (генерируется scripts/convert_freedict.py)
+// Проверки поставляемого словаря (генерируется scripts/convert_freedict.py) и
+// версии данных, по которой приложение решает, нужна ли синхронизация
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -91,18 +92,28 @@ describe("src/assets/dictionary.json", () => {
   });
 });
 
-// Версия словаря — sha256 байтов dictionary.json (CRLF → LF), первые 16
-// hex-символов; так же её считает scripts/convert_freedict.py
+// Версия данных — первые 16 hex-символов sha256 по байтам dictionary.json,
+// одному "\n" и байтам topics.json (в обоих CRLF → LF); так же её считает
+// scripts/data_version.py, которую вызывают convert_freedict.py и build_topics.py
+const lfBytesOf = (name: string) =>
+  Buffer.from(
+    readFileSync(join(__dirname, name)).toString("latin1").replace(/\r\n/g, "\n"),
+    "latin1",
+  );
+
 describe("src/assets/dictionary.version.json", () => {
-  it("matches the current dictionary.json", () => {
-    const bytes = readFileSync(join(__dirname, "dictionary.json"));
-    const normalized = Buffer.from(bytes.toString("latin1").replace(/\r\n/g, "\n"), "latin1");
-    const actual = createHash("sha256").update(normalized).digest("hex").slice(0, 16);
+  it("matches the current dictionary.json and topics.json", () => {
+    const actual = createHash("sha256")
+      .update(lfBytesOf("dictionary.json"))
+      .update("\n")
+      .update(lfBytesOf("topics.json"))
+      .digest("hex")
+      .slice(0, 16);
 
     if (dictionaryVersion.version !== actual) {
       throw new Error(
-        `dictionary.version.json is stale (${dictionaryVersion.version}, dictionary.json hashes to ${actual}). ` +
-          "Rerun scripts/convert_freedict.py and commit dictionary.json and dictionary.version.json together.",
+        `dictionary.version.json is stale (${dictionaryVersion.version}, dictionary.json + topics.json hash to ${actual}). ` +
+          "Rerun scripts/convert_freedict.py or scripts/build_topics.py and commit the generated files together.",
       );
     }
   });

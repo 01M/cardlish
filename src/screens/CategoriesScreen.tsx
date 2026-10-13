@@ -23,11 +23,17 @@ import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 import { showErrorAlert } from "../utils/alerts";
 import {
+  canDeselectGroup,
+  canSelectGroup,
   Category,
-  CATEGORIES,
+  CATEGORY_GROUPS,
   CategoryCounts,
+  CategoryGroup,
+  deselectGroup,
   formatCategoryCount,
+  isGroupHoldingLastSelection,
   isLastSelected,
+  selectGroup,
   toggleCategory,
 } from "../utils/categories";
 
@@ -37,16 +43,10 @@ const MIN_TOP_PADDING = 24;
 
 const LAST_SECTION_MESSAGE = "Должен быть выбран хотя бы один раздел";
 
-const CUSTOM_CATEGORIES = CATEGORIES.filter(
-  (category) => category.kind === "custom",
-);
-const BAND_CATEGORIES = CATEGORIES.filter(
-  (category) => category.kind === "band",
-);
-
-// Выбор разделов для новых слов «Учить». Открывается модально с экрана
-// «Учить»; выбор применяется и сохраняется сразу, «Учить» пересчитывает план
-// при возврате (useFocusEffect)
+// Выбор разделов для новых слов «Учить»: группы «Свои слова», «Словарь по
+// частотности» и «Темы» с действиями «Все» / «Нет» в заголовке. Открывается
+// модально с экрана «Учить»; выбор применяется и сохраняется сразу, «Учить»
+// пересчитывает план при возврате (useFocusEffect)
 export const CategoriesScreen = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -81,17 +81,9 @@ export const CategoriesScreen = () => {
     load();
   }, [load]);
 
-  const handleToggle = async (key: string) => {
-    if (isSavingRef.current) return;
-    if (isLastSelected(selection, key)) {
-      void Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Warning,
-      ).catch(() => {});
-      AccessibilityInfo.announceForAccessibility(LAST_SECTION_MESSAGE);
-      return;
-    }
-
-    const next = toggleCategory(selection, key);
+  // Новый выбор сначала сохраняется, затем показывается; при ошибке остаётся
+  // прежний
+  const saveSelection = async (next: string[]) => {
     isSavingRef.current = true;
     try {
       await setLearnSelection(next);
@@ -102,6 +94,29 @@ export const CategoriesScreen = () => {
     } finally {
       isSavingRef.current = false;
     }
+  };
+
+  const handleToggle = async (key: string) => {
+    if (isSavingRef.current) return;
+    if (isLastSelected(selection, key)) {
+      void Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Warning,
+      ).catch(() => {});
+      AccessibilityInfo.announceForAccessibility(LAST_SECTION_MESSAGE);
+      return;
+    }
+    await saveSelection(toggleCategory(selection, key));
+  };
+
+  // «Все» / «Нет» в заголовке группы; выключенные кнопки сюда не доходят
+  const handleSelectGroup = async (group: CategoryGroup) => {
+    if (isSavingRef.current || !canSelectGroup(selection, group)) return;
+    await saveSelection(selectGroup(selection, group));
+  };
+
+  const handleDeselectGroup = async (group: CategoryGroup) => {
+    if (isSavingRef.current || !canDeselectGroup(selection, group)) return;
+    await saveSelection(deselectGroup(selection, group));
   };
 
   const renderRow = (category: Category) => (
@@ -175,13 +190,26 @@ export const CategoriesScreen = () => {
               <Text style={styles.intro}>
                 Новые слова для сессий берутся только из выбранных разделов:
                 сначала свои слова, затем слова словаря — от частых к редким.
-                {" " + LAST_SECTION_MESSAGE}.
+                Слово из нескольких выбранных разделов попадёт в сессию один
+                раз.{" " + LAST_SECTION_MESSAGE}.
               </Text>
-              {CUSTOM_CATEGORIES.map(renderRow)}
-              <Text style={styles.groupLabel} accessibilityRole="header">
-                Словарь по частотности
-              </Text>
-              {BAND_CATEGORIES.map(renderRow)}
+              {CATEGORY_GROUPS.map((group) => (
+                <View key={group.kind}>
+                  <GroupHeader
+                    title={group.title}
+                    canSelect={canSelectGroup(selection, group)}
+                    canDeselect={canDeselectGroup(selection, group)}
+                    holdsLastSelection={isGroupHoldingLastSelection(
+                      selection,
+                      group,
+                    )}
+                    onSelect={() => void handleSelectGroup(group)}
+                    onDeselect={() => void handleDeselectGroup(group)}
+                    styles={styles}
+                  />
+                  {group.categories.map(renderRow)}
+                </View>
+              ))}
             </ScrollView>
           )}
         </FadeInView>
@@ -189,6 +217,84 @@ export const CategoriesScreen = () => {
     </View>
   );
 };
+
+type GroupHeaderProps = {
+  title: string;
+  canSelect: boolean;
+  canDeselect: boolean;
+  // «Нет» выключено, потому что выбраны только разделы этой группы
+  holdsLastSelection: boolean;
+  onSelect: () => void;
+  onDeselect: () => void;
+  styles: ReturnType<typeof createStyles>;
+};
+
+// Заголовок группы (для VoiceOver — заголовок) и действия «Все» / «Нет».
+// При крупном шрифте действия переносятся под название
+const GroupHeader = ({
+  title,
+  canSelect,
+  canDeselect,
+  holdsLastSelection,
+  onSelect,
+  onDeselect,
+  styles,
+}: GroupHeaderProps) => (
+  <View style={styles.groupHeader}>
+    <Text style={styles.groupLabel} accessibilityRole="header">
+      {title}
+    </Text>
+    <View style={styles.groupActions}>
+      <GroupAction
+        label="Все"
+        accessibilityLabel={`Выбрать все разделы группы ${title}`}
+        disabled={!canSelect}
+        onPress={onSelect}
+        styles={styles}
+      />
+      <GroupAction
+        label="Нет"
+        accessibilityLabel={`Снять все разделы группы ${title}`}
+        accessibilityHint={holdsLastSelection ? LAST_SECTION_MESSAGE : undefined}
+        disabled={!canDeselect}
+        onPress={onDeselect}
+        styles={styles}
+      />
+    </View>
+  </View>
+);
+
+type GroupActionProps = {
+  label: string;
+  accessibilityLabel: string;
+  accessibilityHint?: string;
+  disabled: boolean;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+};
+
+// Текстовая кнопка заголовка группы, не меньше 44 pt; выключенная —
+// полупрозрачная, как у StepperButton
+const GroupAction = ({
+  label,
+  accessibilityLabel,
+  accessibilityHint,
+  disabled,
+  onPress,
+  styles,
+}: GroupActionProps) => (
+  <PressableScale
+    style={[styles.groupAction, disabled && styles.groupActionDisabled]}
+    onPress={onPress}
+    disabled={disabled}
+    pressedScale={0.92}
+    accessibilityLabel={accessibilityLabel}
+    accessibilityHint={accessibilityHint}
+    accessibilityState={{ disabled }}
+  >
+    <Text style={styles.groupActionText}>{label}</Text>
+  </PressableScale>
+);
 
 type CategoryRowProps = {
   category: Category;
@@ -215,7 +321,11 @@ const CategoryRow = ({
     pressedScale={0.98}
     accessibilityRole="checkbox"
     accessibilityState={{ checked }}
-    accessibilityLabel={`${category.title}. ${category.description}. ${countText}`}
+    accessibilityLabel={
+      category.kind === "topic"
+        ? `${category.title}. ${countText}`
+        : `${category.title}. ${category.description}. ${countText}`
+    }
     accessibilityHint={isLast ? LAST_SECTION_MESSAGE : undefined}
   >
     <Ionicons
@@ -225,7 +335,9 @@ const CategoryRow = ({
     />
     <View style={styles.rowText}>
       <Text style={styles.rowTitle}>{category.title}</Text>
-      <Text style={styles.rowDescription}>{category.description}</Text>
+      {category.kind !== "topic" && (
+        <Text style={styles.rowDescription}>{category.description}</Text>
+      )}
       <Text style={styles.rowCount}>{countText}</Text>
     </View>
   </PressableScale>
@@ -267,13 +379,43 @@ const createStyles = (theme: Theme) =>
       lineHeight: 21,
       marginBottom: 16,
     },
+    groupHeader: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      columnGap: 8,
+      marginTop: 8,
+      marginBottom: 4,
+    },
     groupLabel: {
+      flexGrow: 1,
+      flexShrink: 1,
       fontSize: 13,
       fontWeight: "700",
       color: theme.textMutedAlt,
       textTransform: "uppercase",
-      marginTop: 14,
-      marginBottom: 10,
+      paddingVertical: 4,
+    },
+    groupActions: {
+      flexDirection: "row",
+      marginLeft: "auto",
+      columnGap: 4,
+    },
+    groupAction: {
+      minWidth: 44,
+      minHeight: 44,
+      paddingHorizontal: 10,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    groupActionDisabled: {
+      opacity: 0.35,
+    },
+    groupActionText: {
+      color: theme.amberAccent,
+      fontSize: 15,
+      fontWeight: "700",
     },
     row: {
       flexDirection: "row",

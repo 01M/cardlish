@@ -4,7 +4,9 @@ Writes src/assets/topics.json: { "<slug>": ["<dict_key>", ...] } — slugs in TO
 keys sorted. Membership is computed from the WordNet hypernym hierarchy (rule f below),
 limited to cards with rank <= RANK_CUTOFF, then hand-curated with
 scripts/data/topic_overrides.json. Topics with fewer than MIN_TOPIC_SIZE members are not
-written. The app does not read topics.json yet.
+written. The app syncs topics.json into its word_topics table; at the end of a run the data
+version (dictionary.version.json, see data_version.py) is rewritten from the dictionary and the
+new topics.json, so installed apps resync.
 
 Data (downloaded once into the gitignored WN_DATA_DIR by the `wn` package):
     oewn:2025   Open English WordNet 2025 (CC BY 4.0) — hierarchy and sense order
@@ -19,6 +21,8 @@ import json
 import sys
 from collections import defaultdict
 from pathlib import Path
+
+from data_version import write_data_version
 
 SCRIPTS_DIR = Path(__file__).parent
 WN_DATA_DIR = SCRIPTS_DIR / '.wn_data'
@@ -431,7 +435,8 @@ def main():
     for slug in TOPIC_SLUGS:
         note = '' if len(final[slug]) >= MIN_TOPIC_SIZE else f'  (not written: < {MIN_TOPIC_SIZE})'
         print(f'{slug}: {len(automatic[slug])} automatic -> {len(final[slug])}{note}')
-    print(f'Wrote {args.output}')
+    version = write_data_version(args.dictionary, args.output)
+    print(f'Wrote {args.output} and {version}')
 
 
 if __name__ == '__main__':

@@ -1,21 +1,28 @@
+import topics from "../assets/topics.json";
 import {
   ALL_CATEGORY_KEYS,
   bandKey,
+  canDeselectGroup,
+  canSelectGroup,
   Category,
   CATEGORIES,
+  CATEGORY_GROUPS,
   categoryFilter,
+  deselectGroup,
   formatCategoryCount,
   formatNewWords,
   formatNumber,
   formatSelectionSummary,
-  getSelectionAvailability,
   isAllSelected,
+  isGroupHoldingLastSelection,
   isLastSelected,
   normalizeSelection,
   parseSelection,
+  selectGroup,
   selectionFilter,
   serializeSelection,
   toggleCategory,
+  topicKey,
   validateCategories,
 } from "./categories";
 
@@ -35,27 +42,45 @@ const custom: Category = {
   description: "",
 };
 
+const topic = (slug: string): Category => ({
+  kind: "topic",
+  key: topicKey(slug),
+  title: "",
+  slug,
+});
+
+const TOPIC_SLUGS = [
+  "food", "animal", "plant", "body", "clothing", "home", "transport", "occupation",
+  "family", "colour", "time", "weather", "emotion", "health", "school", "sport", "music",
+  "money", "technology", "nature", "travel",
+];
+
+const BAND_KEYS = [
+  "band:1-500",
+  "band:501-1000",
+  "band:1001-2000",
+  "band:2001-3000",
+  "band:3001-5000",
+  "band:5001-10000",
+  "band:10001-20000",
+  "band:20001-",
+];
+
+const TOPIC_KEYS = TOPIC_SLUGS.map((slug) => `topic:${slug}`);
+
 describe("category registry", () => {
   it("is valid", () => {
     expect(validateCategories(CATEGORIES)).toEqual([]);
   });
 
   it("has the agreed keys in order", () => {
-    expect(ALL_CATEGORY_KEYS).toEqual([
-      "custom",
-      "band:1-500",
-      "band:501-1000",
-      "band:1001-2000",
-      "band:2001-3000",
-      "band:3001-5000",
-      "band:5001-10000",
-      "band:10001-20000",
-      "band:20001-",
-    ]);
+    expect(ALL_CATEGORY_KEYS).toEqual(["custom", ...BAND_KEYS, ...TOPIC_KEYS]);
   });
 
   it("titles bands with non-breaking spaces in thousands", () => {
-    expect(CATEGORIES.map((category) => category.title)).toEqual([
+    expect(
+      CATEGORIES.filter((category) => category.kind !== "topic").map((category) => category.title),
+    ).toEqual([
       "Свои слова",
       "Слова 1–500",
       "Слова 501–1 000",
@@ -70,11 +95,51 @@ describe("category registry", () => {
     expect(formatNumber(1234567)).toBe("1 234 567");
   });
 
-  it("gives every category a one-line description", () => {
+  it("gives own words and every band a one-line description and topics none", () => {
     for (const category of CATEGORIES) {
+      if (category.kind === "topic") {
+        expect(category).not.toHaveProperty("description");
+        continue;
+      }
       expect(category.description).toMatch(/^\S.*\S$/);
       expect(category.description).not.toMatch(/\n/);
     }
+  });
+
+  it("titles the topics in Russian", () => {
+    expect(
+      CATEGORIES.filter((category) => category.kind === "topic").map((category) => category.title),
+    ).toEqual([
+      "Еда и напитки",
+      "Животные",
+      "Растения",
+      "Части тела",
+      "Одежда и украшения",
+      "Дом и быт",
+      "Транспорт и дороги",
+      "Профессии",
+      "Семья",
+      "Цвета",
+      "Время",
+      "Погода",
+      "Чувства и эмоции",
+      "Здоровье и медицина",
+      "Школа и учёба",
+      "Спорт и игры",
+      "Музыка и танцы",
+      "Деньги и покупки",
+      "Техника и компьютеры",
+      "Природа и ландшафт",
+      "Путешествия",
+    ]);
+  });
+
+  it("has a topic for every slug of topics.json and nothing else, in the file's order", () => {
+    const registrySlugs = CATEGORIES.flatMap((category) =>
+      category.kind === "topic" ? [category.slug] : [],
+    );
+
+    expect(registrySlugs).toEqual(Object.keys(topics));
   });
 });
 
@@ -112,6 +177,23 @@ describe("validateCategories", () => {
       "band:1-10 → band:1-10: overlap",
     ]);
     expect(validateCategories([custom])).toEqual(["no bands"]);
+  });
+
+  it("reports a topic with a malformed slug or key and a duplicate topic", () => {
+    expect(
+      validateCategories([
+        custom,
+        band(1, null),
+        topic("food"),
+        topic("food"),
+        topic("Food"),
+        { kind: "topic", key: "plant", title: "", slug: "plant" },
+      ]),
+    ).toEqual([
+      "duplicate keys: topic:food",
+      "topic:Food: a topic needs the key topic:<slug> with a slug of a-z",
+      "plant: a topic needs the key topic:<slug> with a slug of a-z",
+    ]);
   });
 });
 
@@ -155,6 +237,61 @@ describe("selection", () => {
   it("normalises an empty selection to all sections", () => {
     expect(normalizeSelection([])).toEqual(ALL_CATEGORY_KEYS);
   });
+
+  it("keeps topic keys in a stored selection", () => {
+    expect(parseSelection('["topic:travel", "topic:food", "topic:dinosaurs"]')).toEqual([
+      "topic:food",
+      "topic:travel",
+    ]);
+  });
+});
+
+describe("groups", () => {
+  const [customGroup, bandGroup, topicGroup] = CATEGORY_GROUPS;
+
+  it("groups own words, bands and topics in registry order", () => {
+    expect(
+      CATEGORY_GROUPS.map((group) => [
+        group.kind,
+        group.title,
+        group.categories.map((category) => category.key),
+      ]),
+    ).toEqual([
+      ["custom", "Свои слова", ["custom"]],
+      ["band", "Словарь по частотности", BAND_KEYS],
+      ["topic", "Темы", TOPIC_KEYS],
+    ]);
+    expect(CATEGORY_GROUPS.flatMap((group) => group.categories)).toEqual(CATEGORIES);
+  });
+
+  it("selects every section of a group", () => {
+    expect(selectGroup(["band:1-500", "topic:food"], topicGroup)).toEqual([
+      "band:1-500",
+      ...TOPIC_KEYS,
+    ]);
+    expect(canSelectGroup(["band:1-500", "topic:food"], topicGroup)).toBe(true);
+    expect(canSelectGroup(["custom", ...TOPIC_KEYS], topicGroup)).toBe(false);
+  });
+
+  it("deselects a group only when something outside it stays selected", () => {
+    expect(deselectGroup(["custom", "band:1-500", "band:20001-", "topic:food"], bandGroup)).toEqual([
+      "custom",
+      "topic:food",
+    ]);
+    expect(canDeselectGroup(["custom", "band:1-500"], bandGroup)).toBe(true);
+
+    // Только разделы группы — снять нельзя, выбор не меняется
+    expect(canDeselectGroup(["band:1-500", "band:20001-"], bandGroup)).toBe(false);
+    expect(deselectGroup(["band:1-500", "band:20001-"], bandGroup)).toEqual([
+      "band:1-500",
+      "band:20001-",
+    ]);
+    expect(isGroupHoldingLastSelection(["band:1-500", "band:20001-"], bandGroup)).toBe(true);
+
+    // В группе ничего не выбрано — снимать нечего
+    expect(canDeselectGroup(["band:1-500"], customGroup)).toBe(false);
+    expect(isGroupHoldingLastSelection(["band:1-500"], customGroup)).toBe(false);
+  });
 });
 
 describe("SQL filters", () => {
@@ -168,49 +305,23 @@ describe("SQL filters", () => {
       sql: "(is_custom = 0 AND rank >= ?)",
       params: [20001],
     });
+    expect(categoryFilter(topic("food"))).toEqual({
+      sql: "words.dict_key IN (SELECT t.dict_key FROM word_topics t WHERE t.topic = ?)",
+      params: ["food"],
+    });
   });
 
   it("ORs the selected sections in registry order", () => {
-    expect(selectionFilter(["band:20001-", "custom", "band:501-1000"])).toEqual({
-      sql: "(is_custom = 1 OR (is_custom = 0 AND rank BETWEEN ? AND ?) OR (is_custom = 0 AND rank >= ?))",
-      params: [501, 1000, 20001],
+    expect(selectionFilter(["topic:time", "band:20001-", "custom", "band:501-1000"])).toEqual({
+      sql:
+        "(is_custom = 1 OR (is_custom = 0 AND rank BETWEEN ? AND ?) OR (is_custom = 0 AND rank >= ?)" +
+        " OR words.dict_key IN (SELECT t.dict_key FROM word_topics t WHERE t.topic = ?))",
+      params: [501, 1000, 20001, "time"],
     });
   });
 
   it("uses all sections for an empty selection", () => {
     expect(selectionFilter([])).toEqual(selectionFilter(ALL_CATEGORY_KEYS));
-  });
-});
-
-describe("getSelectionAvailability", () => {
-  const counts = {
-    custom: { total: 9, remaining: 4 },
-    "band:1-500": { total: 500, remaining: 20 },
-    "band:501-1000": { total: 500, remaining: 300 },
-  };
-
-  it("splits the selection's new words into own and dictionary", () => {
-    expect(getSelectionAvailability(["custom", "band:1-500", "band:501-1000"], counts)).toEqual({
-      includesCustom: true,
-      ownNew: 4,
-      dictionaryNew: 320,
-    });
-  });
-
-  it("counts no own words when the custom section is not selected", () => {
-    expect(getSelectionAvailability(["band:501-1000"], counts)).toEqual({
-      includesCustom: false,
-      ownNew: 0,
-      dictionaryNew: 300,
-    });
-  });
-
-  it("counts missing sections as empty", () => {
-    expect(getSelectionAvailability(["custom", "band:20001-"], {})).toEqual({
-      includesCustom: true,
-      ownNew: 0,
-      dictionaryNew: 0,
-    });
   });
 });
 
@@ -237,10 +348,14 @@ describe("labels", () => {
   it("summarises the selection", () => {
     expect(formatSelectionSummary(ALL_CATEGORY_KEYS)).toBe("Все разделы");
     expect(formatSelectionSummary(["custom", "band:1-500"])).toBe("Выбрано: 2");
+    expect(formatSelectionSummary(["custom", "topic:food", "topic:time"])).toBe("Выбрано: 3");
   });
 
   it("formats a section's count", () => {
     expect(formatCategoryCount(custom, { total: 9, remaining: 1 })).toBe("1 новое слово");
+    expect(formatCategoryCount(topic("food"), { total: 477, remaining: 470 })).toBe(
+      "осталось 470 из 477",
+    );
     expect(formatCategoryCount(band(10001, 20000), { total: 10000, remaining: 9876 })).toBe(
       "осталось 9 876 из 10 000",
     );

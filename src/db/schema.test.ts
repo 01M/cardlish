@@ -9,10 +9,11 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
   BACKUP_DATABASE_INTO,
-  CREATE_SCHEMA_V4,
+  CREATE_SCHEMA_V5,
   MIGRATE_V1_TO_V2,
   MIGRATE_V2_TO_V3,
   MIGRATE_V3_TO_V4,
+  MIGRATE_V4_TO_V5,
   planMigration,
   SCHEMA_VERSION,
   SELECT_USER_VERSION,
@@ -102,21 +103,29 @@ const runInTransaction = (
   }
 };
 
-// План "upgrade-v1": v1 → v2 → v3 → v4
+// План "upgrade-v1": v1 → v2 → v3 → v4 → v5
 const upgrade = (db: DatabaseSync, failBeforeCommit = false) =>
   runInTransaction(
     db,
-    [MIGRATE_V1_TO_V2, MIGRATE_V2_TO_V3, MIGRATE_V3_TO_V4],
+    [MIGRATE_V1_TO_V2, MIGRATE_V2_TO_V3, MIGRATE_V3_TO_V4, MIGRATE_V4_TO_V5],
     failBeforeCommit,
   );
 
-// План "upgrade-v2": v2 → v3 → v4
+// План "upgrade-v2": v2 → v3 → v4 → v5
 const upgradeV2 = (db: DatabaseSync, failBeforeCommit = false) =>
-  runInTransaction(db, [MIGRATE_V2_TO_V3, MIGRATE_V3_TO_V4], failBeforeCommit);
+  runInTransaction(
+    db,
+    [MIGRATE_V2_TO_V3, MIGRATE_V3_TO_V4, MIGRATE_V4_TO_V5],
+    failBeforeCommit,
+  );
 
-// План "upgrade-v3": v3 → v4
+// План "upgrade-v3": v3 → v4 → v5
 const upgradeV3 = (db: DatabaseSync, failBeforeCommit = false) =>
-  runInTransaction(db, [MIGRATE_V3_TO_V4], failBeforeCommit);
+  runInTransaction(db, [MIGRATE_V3_TO_V4, MIGRATE_V4_TO_V5], failBeforeCommit);
+
+// План "upgrade-v4": v4 → v5
+const upgradeV4 = (db: DatabaseSync, failBeforeCommit = false) =>
+  runInTransaction(db, [MIGRATE_V4_TO_V5], failBeforeCommit);
 
 // База v2 — такая, какой её оставлял перенос v1 → v2 прошлой версии
 const createV2 = (rows: V1Row[]) => {
@@ -136,6 +145,20 @@ const createV3 = (rows: V1Row[]) => {
   return db;
 };
 
+// База v4 — после переноса v3 → v4, с дневным прогрессом и настройками
+const createV4 = (rows: V1Row[]) => {
+  const db = createV3(rows);
+  db.exec(MIGRATE_V3_TO_V4);
+  db.exec(
+    `INSERT INTO daily_progress (local_day, introduced)
+     VALUES ('2026-10-12', 7), ('2026-10-13', 2);
+     INSERT INTO app_settings (key, value)
+     VALUES ('dictionary_version', 'abc'), ('learn_categories', '["band:1-500"]');`,
+  );
+  db.exec("PRAGMA user_version = 4;");
+  return db;
+};
+
 // Схема без служебной sqlite_sequence и с нормализованными пробелами (после
 // RENAME SQLite пишет имя таблицы в кавычках)
 const comparableSchemaOf = (db: DatabaseSync) =>
@@ -146,14 +169,17 @@ const comparableSchemaOf = (db: DatabaseSync) =>
       sql: item.sql?.replace(/\s+/g, " ").replace('"words"', "words"),
     }));
 
-const createFreshV4 = () => {
+const createFreshV5 = () => {
   const db = new DatabaseSync(":memory:");
-  db.exec(CREATE_SCHEMA_V4);
+  db.exec(CREATE_SCHEMA_V5);
   return db;
 };
 
 const dailyRowsOf = (db: DatabaseSync) =>
   db.prepare("SELECT local_day, introduced FROM daily_progress;").all();
+
+const topicRowsOf = (db: DatabaseSync) =>
+  db.prepare("SELECT topic, dict_key FROM word_topics ORDER BY topic, dict_key;").all();
 
 const userVersion = (db: DatabaseSync) =>
   (db.prepare(SELECT_USER_VERSION).get() as { user_version: number })
@@ -200,8 +226,12 @@ describe("planMigration", () => {
     expect(planMigration(3, true)).toBe("upgrade-v3");
   });
 
-  it("is at schema version 4", () => {
-    expect(SCHEMA_VERSION).toBe(4);
+  it("treats version 4 as a v4 database", () => {
+    expect(planMigration(4, true)).toBe("upgrade-v4");
+  });
+
+  it("is at schema version 5", () => {
+    expect(SCHEMA_VERSION).toBe(5);
   });
 
   it.each([true, false])(
@@ -242,9 +272,24 @@ describe("planMigration", () => {
 
     expect(planMigration(userVersion(db), hasWordsTable)).toBe("upgrade-v3");
   });
+
+  it("matches what a v4 database reports", () => {
+    const db = createV4([]);
+    const hasWordsTable = db.prepare(SELECT_WORDS_TABLE).get() !== undefined;
+
+    expect(planMigration(userVersion(db), hasWordsTable)).toBe("upgrade-v4");
+  });
+
+  it("matches what a fresh v5 database reports", () => {
+    const db = createFreshV5();
+    db.exec(SET_SCHEMA_VERSION);
+    const hasWordsTable = db.prepare(SELECT_WORDS_TABLE).get() !== undefined;
+
+    expect(planMigration(userVersion(db), hasWordsTable)).toBe("current");
+  });
 });
 
-describe("v1 → v2 → v3 → v4 migration", () => {
+describe("v1 → v2 → v3 → v4 → v5 migration", () => {
   const v1Rows = [
     dict(1, "apple"),
     dict(2, "Monday", "review"),
@@ -275,15 +320,16 @@ describe("v1 → v2 → v3 → v4 migration", () => {
     ]);
   });
 
-  it("sets user_version to 4 and leaves the same schema as a fresh install", () => {
+  it("sets user_version to 5 and leaves the same schema as a fresh install", () => {
     const db = createV1(v1Rows);
     expect(userVersion(db)).toBe(0);
 
     upgrade(db);
 
-    expect(userVersion(db)).toBe(4);
-    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV4()));
+    expect(userVersion(db)).toBe(5);
+    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV5()));
     expect(dailyRowsOf(db)).toEqual([]);
+    expect(topicRowsOf(db)).toEqual([]);
   });
 
   it("leaves rank empty until the dictionary is synced", () => {
@@ -387,11 +433,11 @@ describe("v1 → v2 → v3 → v4 migration", () => {
     expect(userVersion(db)).toBe(0);
     // Повторная попытка после отката проходит
     upgrade(db);
-    expect(userVersion(db)).toBe(4);
+    expect(userVersion(db)).toBe(5);
   });
 });
 
-describe("v2 → v3 → v4 migration", () => {
+describe("v2 → v3 → v4 → v5 migration", () => {
   const v2Rows = [
     dict(1, "apple"),
     dict(2, "Monday", "review"),
@@ -414,14 +460,14 @@ describe("v2 → v3 → v4 migration", () => {
     );
   });
 
-  it("sets user_version to 4 and leaves the same schema as a fresh install", () => {
+  it("sets user_version to 5 and leaves the same schema as a fresh install", () => {
     const db = createV2(v2Rows);
     db.exec("INSERT INTO app_settings (key, value) VALUES ('theme_preference', 'dark');");
 
     upgradeV2(db);
 
-    expect(userVersion(db)).toBe(4);
-    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV4()));
+    expect(userVersion(db)).toBe(5);
+    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV5()));
     expect(db.prepare("SELECT key, value FROM app_settings;").all()).toEqual([
       { key: "theme_preference", value: "dark" },
     ]);
@@ -438,7 +484,7 @@ describe("v2 → v3 → v4 migration", () => {
   });
 });
 
-describe("v3 → v4 migration", () => {
+describe("v3 → v4 → v5 migration", () => {
   const v3Rows = [
     dict(1, "apple"),
     dict(2, "Monday", "review"),
@@ -460,7 +506,7 @@ describe("v3 → v4 migration", () => {
     expect(rowsBefore).toHaveLength(5);
   });
 
-  it("sets user_version to 4, adds an empty daily_progress and leaves the same schema as a fresh install", () => {
+  it("sets user_version to 5, adds an empty daily_progress and leaves the same schema as a fresh install", () => {
     const db = createV3(v3Rows);
     db.exec(
       `INSERT INTO app_settings (key, value)
@@ -469,9 +515,10 @@ describe("v3 → v4 migration", () => {
 
     upgradeV3(db);
 
-    expect(userVersion(db)).toBe(4);
-    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV4()));
+    expect(userVersion(db)).toBe(5);
+    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV5()));
     expect(dailyRowsOf(db)).toEqual([]);
+    expect(topicRowsOf(db)).toEqual([]);
     expect(db.prepare("SELECT key, value FROM app_settings ORDER BY key;").all()).toEqual([
       { key: "dictionary_version", value: "abc" },
       { key: "theme_preference", value: "dark" },
@@ -489,9 +536,58 @@ describe("v3 → v4 migration", () => {
   });
 });
 
-describe("schema v4 constraints", () => {
-  const createV4 = createFreshV4;
+describe("v4 → v5 migration", () => {
+  const v4Rows = [
+    dict(1, "apple"),
+    dict(2, "Monday", "review"),
+    dict(3, "run", "learned"),
+    custom(7, "Serendipity"),
+    custom(12, "bank", "review"),
+  ];
 
+  const fullRowsOf = (db: DatabaseSync) =>
+    db.prepare("SELECT * FROM words ORDER BY id;").all();
+
+  const settingsOf = (db: DatabaseSync) =>
+    db.prepare("SELECT key, value FROM app_settings ORDER BY key;").all();
+
+  it("keeps every word, daily progress row and setting", () => {
+    const db = createV4(v4Rows);
+    const rowsBefore = fullRowsOf(db);
+    const dailyBefore = dailyRowsOf(db);
+    const settingsBefore = settingsOf(db);
+
+    upgradeV4(db);
+
+    expect(fullRowsOf(db)).toEqual(rowsBefore);
+    expect(rowsBefore).toHaveLength(5);
+    expect(dailyRowsOf(db)).toEqual(dailyBefore);
+    expect(dailyBefore).toHaveLength(2);
+    expect(settingsOf(db)).toEqual(settingsBefore);
+  });
+
+  it("sets user_version to 5, adds an empty word_topics and leaves the same schema as a fresh install", () => {
+    const db = createV4(v4Rows);
+
+    upgradeV4(db);
+
+    expect(userVersion(db)).toBe(5);
+    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV5()));
+    expect(topicRowsOf(db)).toEqual([]);
+  });
+
+  it("leaves v4 untouched when it fails", () => {
+    const db = createV4(v4Rows);
+    const schemaBefore = schemaOf(db);
+
+    expect(() => upgradeV4(db, true)).toThrow("forced failure");
+
+    expect(schemaOf(db)).toEqual(schemaBefore);
+    expect(userVersion(db)).toBe(4);
+  });
+});
+
+describe("schema v5 constraints", () => {
   const insert = (
     db: DatabaseSync,
     dictKey: string | null,
@@ -506,7 +602,7 @@ describe("schema v4 constraints", () => {
       .run(dictKey, isCustom, status);
 
   it("accepts dictionary and custom words", () => {
-    const db = createV4();
+    const db = createFreshV5();
     insert(db, "term", 0);
     insert(db, null, 1);
     insert(db, null, 1);
@@ -519,31 +615,31 @@ describe("schema v4 constraints", () => {
   });
 
   it("rejects an unknown or missing status", () => {
-    const db = createV4();
+    const db = createFreshV5();
     expect(() => insert(db, "a", 0, "done")).toThrow(/CHECK constraint failed/);
     expect(() => insert(db, "b", 0, null)).toThrow(/NOT NULL constraint failed/);
   });
 
   it("rejects a custom word with a dict_key", () => {
-    expect(() => insert(createV4(), "a", 1)).toThrow(/CHECK constraint failed/);
+    expect(() => insert(createFreshV5(), "a", 1)).toThrow(/CHECK constraint failed/);
   });
 
   it("rejects a dictionary word without a dict_key", () => {
-    expect(() => insert(createV4(), null, 0)).toThrow(/CHECK constraint failed/);
+    expect(() => insert(createFreshV5(), null, 0)).toThrow(/CHECK constraint failed/);
   });
 
   it("rejects an is_custom other than 0 or 1", () => {
-    expect(() => insert(createV4(), "a", 2)).toThrow(/CHECK constraint failed/);
+    expect(() => insert(createFreshV5(), "a", 2)).toThrow(/CHECK constraint failed/);
   });
 
   it("rejects a duplicate dict_key", () => {
-    const db = createV4();
+    const db = createFreshV5();
     insert(db, "a", 0);
     expect(() => insert(db, "a", 0)).toThrow(/UNIQUE constraint failed/);
   });
 
   it("keeps one daily_progress row per day with a non-negative count", () => {
-    const db = createV4();
+    const db = createFreshV5();
     db.exec("INSERT INTO daily_progress (local_day) VALUES ('2026-10-13');");
 
     expect(dailyRowsOf(db)).toEqual([{ local_day: "2026-10-13", introduced: 0 }]);
@@ -555,6 +651,29 @@ describe("schema v4 constraints", () => {
     ).toThrow(/CHECK constraint failed/);
     expect(() =>
       db.exec("INSERT INTO daily_progress (local_day) VALUES (NULL);"),
+    ).toThrow(/NOT NULL constraint failed/);
+  });
+
+  it("keeps one word_topics row per topic and key, both required", () => {
+    const db = createFreshV5();
+    db.exec(
+      `INSERT INTO word_topics (topic, dict_key)
+       VALUES ('food', 'apple'), ('plant', 'apple'), ('food', 'bread');`,
+    );
+
+    expect(topicRowsOf(db)).toEqual([
+      { topic: "food", dict_key: "apple" },
+      { topic: "food", dict_key: "bread" },
+      { topic: "plant", dict_key: "apple" },
+    ]);
+    expect(() =>
+      db.exec("INSERT INTO word_topics (topic, dict_key) VALUES ('food', 'apple');"),
+    ).toThrow(/UNIQUE constraint failed/);
+    expect(() =>
+      db.exec("INSERT INTO word_topics (topic, dict_key) VALUES ('food', NULL);"),
+    ).toThrow(/NOT NULL constraint failed/);
+    expect(() =>
+      db.exec("INSERT INTO word_topics (topic, dict_key) VALUES (NULL, 'pear');"),
     ).toThrow(/NOT NULL constraint failed/);
   });
 });

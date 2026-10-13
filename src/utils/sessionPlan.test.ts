@@ -48,14 +48,19 @@ describe("getSessionPlan", () => {
       });
     });
 
-    it("takes the whole session from the bands when there are no own words", () => {
-      expect(getSessionPlan(10, mixed(0, 100))).toEqual({
+    it("takes the whole session from the bands and shows no note when there are no own words", () => {
+      // «Своих слов не хватает (0)» не показываем — полоса и легенда и так
+      // говорят, что вся сессия из словаря
+      const plan = getSessionPlan(10, mixed(0, 100));
+
+      expect(plan).toEqual({
         own: 0,
         dictionary: 10,
         total: 10,
         ownShare: 0,
-        isOwnShort: true,
+        isOwnShort: false,
       });
+      expect(getPlanNoteText(plan, 0)).toBe("");
     });
 
     it("caps the session at what is available when the size is larger", () => {
@@ -147,18 +152,49 @@ describe("getSessionPlan", () => {
       });
     });
 
-    it("returns an empty plan and the short note when the custom section is exhausted too", () => {
+    it("returns an empty plan without the short note when the custom section is exhausted too", () => {
+      // Остаётся только подсказка исчерпанного выбора под карточкой плана
       const plan = getSessionPlan(10, mixed(0, 0));
 
+      expect(isSelectionExhausted(plan.total, 120)).toBe(true);
       expect(plan).toEqual({
         own: 0,
         dictionary: 0,
         total: 0,
         ownShare: 0,
-        isOwnShort: true,
+        isOwnShort: false,
       });
-      expect(getPlanNoteText(plan, 0)).toBe("Своих слов не хватает (0)");
+      expect(getPlanNoteText(plan, 0)).toBe("");
     });
+  });
+});
+
+describe("plan note", () => {
+  // Состояние экрана -> текст примечания в карточке плана
+  const noteFor = (sessionSize: number, available: ReturnType<typeof mixed>) =>
+    getPlanNoteText(getSessionPlan(sessionSize, available), available.ownNew);
+
+  it("is hidden for an exhausted selection", () => {
+    expect(noteFor(10, mixed(0, 0))).toBe("");
+    expect(noteFor(10, bandsOnly(0))).toBe("");
+  });
+
+  it("names a positive own count when own words are short", () => {
+    expect(noteFor(10, mixed(3, 100))).toBe("Своих слов не хватает (3), добавим 7 из словаря");
+    expect(noteFor(10, mixed(1, 0))).toBe("Своих слов не хватает (1)");
+  });
+
+  it("is hidden when own words are not short", () => {
+    expect(noteFor(10, mixed(10, 100))).toBe("");
+    expect(noteFor(10, bandsOnly(100))).toBe("");
+  });
+
+  it("never shows a zero own count", () => {
+    for (const size of [5, 10, 50]) {
+      for (const dictionaryNew of [0, 3, 100]) {
+        expect(noteFor(size, mixed(0, dictionaryNew))).toBe("");
+      }
+    }
   });
 });
 

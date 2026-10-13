@@ -13,6 +13,7 @@ import {
   formatNewWords,
   formatNumber,
   formatSelectionSummary,
+  hasGroupActions,
   isAllSelected,
   isGroupHoldingLastSelection,
   isLastSelected,
@@ -262,6 +263,14 @@ describe("groups", () => {
       ["topic", "Темы", TOPIC_KEYS],
     ]);
     expect(CATEGORY_GROUPS.flatMap((group) => group.categories)).toEqual(CATEGORIES);
+  });
+
+  it("shows group actions only for groups with more than one section", () => {
+    expect(CATEGORY_GROUPS.map(hasGroupActions)).toEqual([false, true, true]);
+    expect(hasGroupActions({ ...bandGroup, categories: bandGroup.categories.slice(0, 1) })).toBe(
+      false,
+    );
+    expect(hasGroupActions({ ...customGroup, categories: [custom, custom] })).toBe(true);
   });
 
   it("selects every section of a group", () => {

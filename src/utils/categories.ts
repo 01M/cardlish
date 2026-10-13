@@ -235,6 +235,11 @@ export const CATEGORY_GROUPS: CategoryGroup[] = (
 const groupKeys = (group: CategoryGroup) =>
   group.categories.map((category) => category.key);
 
+// «Все» / «Нет» показываем только у групп из нескольких разделов: у группы
+// из одного раздела они повторяют флажок самой строки
+export const hasGroupActions = (group: CategoryGroup) =>
+  group.categories.length > 1;
+
 // «Все» выбирает каждый раздел группы; ничего не меняет, если они уже выбраны
 export const canSelectGroup = (
   selection: readonly string[],

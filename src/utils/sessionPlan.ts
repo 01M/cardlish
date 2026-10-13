@@ -10,8 +10,10 @@ export interface SessionPlan {
   total: number;
   // Доля своих слов в сессии (0, если сессия пустая)
   ownShare: number;
-  // Раздел своих слов выбран, но их меньше размера сессии — показываем
-  // примечание «Своих слов не хватает…, добавим dictionary из словаря»
+  // Раздел своих слов выбран, новые свои слова есть, но их меньше размера
+  // сессии — показываем примечание «Своих слов не хватает (N)…, добавим
+  // dictionary из словаря». При нуле своих слов (в том числе когда выбор
+  // исчерпан) примечания нет: «не хватает (0)» ничего не объясняет
   isOwnShort: boolean;
 }
 
@@ -30,7 +32,10 @@ export const getSessionPlan = (
     dictionary,
     total,
     ownShare: total > 0 ? own / total : 0,
-    isOwnShort: available.includesCustom && available.ownNew < sessionSize,
+    isOwnShort:
+      available.includesCustom &&
+      available.ownNew > 0 &&
+      available.ownNew < sessionSize,
   };
 };
 

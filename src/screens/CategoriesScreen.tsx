@@ -31,6 +31,7 @@ import {
   CategoryGroup,
   deselectGroup,
   formatCategoryCount,
+  hasGroupActions,
   isGroupHoldingLastSelection,
   isLastSelected,
   selectGroup,
@@ -197,6 +198,7 @@ export const CategoriesScreen = () => {
                 <View key={group.kind}>
                   <GroupHeader
                     title={group.title}
+                    hasActions={hasGroupActions(group)}
                     canSelect={canSelectGroup(selection, group)}
                     canDeselect={canDeselectGroup(selection, group)}
                     holdsLastSelection={isGroupHoldingLastSelection(
@@ -220,6 +222,8 @@ export const CategoriesScreen = () => {
 
 type GroupHeaderProps = {
   title: string;
+  // Нет у группы из одного раздела (hasGroupActions)
+  hasActions: boolean;
   canSelect: boolean;
   canDeselect: boolean;
   // «Нет» выключено, потому что выбраны только разделы этой группы
@@ -233,6 +237,7 @@ type GroupHeaderProps = {
 // При крупном шрифте действия переносятся под название
 const GroupHeader = ({
   title,
+  hasActions,
   canSelect,
   canDeselect,
   holdsLastSelection,
@@ -244,23 +249,25 @@ const GroupHeader = ({
     <Text style={styles.groupLabel} accessibilityRole="header">
       {title}
     </Text>
-    <View style={styles.groupActions}>
-      <GroupAction
-        label="Все"
-        accessibilityLabel={`Выбрать все разделы группы ${title}`}
-        disabled={!canSelect}
-        onPress={onSelect}
-        styles={styles}
-      />
-      <GroupAction
-        label="Нет"
-        accessibilityLabel={`Снять все разделы группы ${title}`}
-        accessibilityHint={holdsLastSelection ? LAST_SECTION_MESSAGE : undefined}
-        disabled={!canDeselect}
-        onPress={onDeselect}
-        styles={styles}
-      />
-    </View>
+    {hasActions && (
+      <View style={styles.groupActions}>
+        <GroupAction
+          label="Все"
+          accessibilityLabel={`Выбрать все разделы группы ${title}`}
+          disabled={!canSelect}
+          onPress={onSelect}
+          styles={styles}
+        />
+        <GroupAction
+          label="Нет"
+          accessibilityLabel={`Снять все разделы группы ${title}`}
+          accessibilityHint={holdsLastSelection ? LAST_SECTION_MESSAGE : undefined}
+          disabled={!canDeselect}
+          onPress={onDeselect}
+          styles={styles}
+        />
+      </View>
+    )}
   </View>
 );
 
@@ -384,6 +391,9 @@ const createStyles = (theme: Theme) =>
       flexWrap: "wrap",
       alignItems: "center",
       columnGap: 8,
+      // Высота строки действий (44 pt) — и у заголовка без «Все» / «Нет»,
+      // чтобы отступы групп совпадали
+      minHeight: 44,
       marginTop: 8,
       marginBottom: 4,
     },

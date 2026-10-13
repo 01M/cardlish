@@ -460,7 +460,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Setup: a "Разделы" row (summary "Все разделы" / "Выбрано: N" + new words left in the
   selection; opens `/categories`) + one merged plan card: stepper (`StepperButton`) +
   composition bar + legend + inline note ("Своих слов не хватает…", shown when the plan's
-  `isOwnShort` — the custom section is selected and has fewer new words than the session size;
+  `isOwnShort` — the custom section is selected and has new words, but fewer than the session
+  size; never with 0 own words, so never in an exhausted selection, where only the exhausted
+  note shows;
   its "добавим N из словаря" is the plan's `dictionary`, same as the bar and legend, and is
   omitted when it is 0; text from `getPlanNoteText()`). "Новых доступно" in the plan card is the
   selection's count; the stat strip "Новые" and the empty state ("Новые слова закончились",
@@ -526,7 +528,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   its "Закрыть" icon button or Android back. Header stays fixed, list below (a plain
   `ScrollView`, ~30 rows). Rows are grouped (`CATEGORY_GROUPS`) under headers "Свои слова",
   "Словарь по частотности", "Темы" (role `header`; the header row wraps, so at large font sizes
-  the actions move under the title). Each header has "Все" (selects every section of the group;
+  the actions move under the title; `minHeight` 44 so a header without actions keeps the same
+  spacing). A header of a group with more than one row (`hasGroupActions(group)`, derived from
+  the row count — so not "Свои слова") has "Все" (selects every section of the group;
   disabled when all are selected) and "Нет" (deselects the group; disabled when none of it is
   selected or when nothing would remain — then its hint says "Должен быть выбран хотя бы один
   раздел"); labels "Выбрать все разделы группы <title>" / "Снять все разделы группы <title>",

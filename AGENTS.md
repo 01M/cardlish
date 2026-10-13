@@ -161,12 +161,15 @@ and dictionary apart (never a sum of section counts: topics overlap). The plan c
 come from `getSessionPlan(sessionSize, await getSelectionAvailability(selection))`.
 
 The picker groups its rows under headers "Свои слова", "Словарь по частотности" and "Темы"
-(`CATEGORY_GROUPS`, role `header`). Each header has "Все" (select the whole group) and "Нет"
+(`CATEGORY_GROUPS`, role `header`). A header of a group with more than one row
+(`hasGroupActions`; so not "Свои слова") has "Все" (select the whole group) and "Нет"
 (deselect it — disabled when nothing would remain, with a hint why), ≥ 44 pt, labelled
 "Выбрать все разделы группы …" / "Снять все разделы группы …", saved immediately like a row tap.
 
 When the selected sections have no new words left but other sections do
 (`isSelectionExhausted`), "Начать сессию" is disabled and a note asks to pick other sections.
+The plan note "Своих слов не хватает (N)…" appears only for 0 < N < session size, so never in
+that state and never with N = 0.
 
 To add a band, add a row to `BANDS`; the bands must start at 1, stay contiguous and end with an
 open band (`validateCategories`, checked by a test). To add a topic, see "Topic pipeline". The picker route is a root Stack screen with

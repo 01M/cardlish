@@ -49,7 +49,29 @@ export const isDailyGoalReached = (introduced: number, goal: number) =>
 export const getDailyProgressRatio = (introduced: number, goal: number) =>
   goal > 0 ? Math.min(1, Math.max(0, introduced / goal)) : 0;
 
+// Части строки блока: заголовок слева, счёт справа, сверх цели — отдельно
+export type DailyProgressParts = {
+  title: string;
+  count: string;
+  extra: string | null;
+};
+
+export const getDailyProgressParts = (
+  introduced: number,
+  goal: number,
+): DailyProgressParts =>
+  isDailyGoalReached(introduced, goal)
+    ? {
+        title: "Цель выполнена",
+        count: `${goal} из ${goal}`,
+        extra: introduced > goal ? `+${introduced - goal}` : null,
+      }
+    : { title: "Новых слов сегодня", count: `${introduced} из ${goal}`, extra: null };
+
+// Подпись для экранного диктора: всё одной фразой
 export const formatDailyProgress = (introduced: number, goal: number) =>
   isDailyGoalReached(introduced, goal)
-    ? `Цель на день выполнена: ${introduced} из ${goal}`
+    ? `Цель на день выполнена: ${goal} из ${goal}${
+        introduced > goal ? `, ещё ${introduced - goal} сверх цели` : ""
+      }`
     : `Новых слов сегодня: ${introduced} из ${goal}`;

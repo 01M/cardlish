@@ -52,7 +52,9 @@ import {
 import {
   DAILY_GOAL_DEFAULT,
   formatDailyProgress,
+  getDailyProgressParts,
   getDailyProgressRatio,
+  isDailyGoalReached,
   toLocalDay,
 } from "../utils/dailyGoal";
 import {
@@ -335,6 +337,8 @@ export const LearnScreen = () => {
   // ставится сразу, дальше ширина анимируется 220 мс (без «уменьшить
   // движение»); при N >= G полоса полная
   const dailyRatio = getDailyProgressRatio(daily.introduced, daily.goal);
+  const dailyParts = getDailyProgressParts(daily.introduced, daily.goal);
+  const isDailyGoalMet = isDailyGoalReached(daily.introduced, daily.goal);
   const dailyLabel = formatDailyProgress(daily.introduced, daily.goal);
   const dailyFillWidth = useRef(new Animated.Value(0)).current;
   const hasDailyBarLaidOut = useRef(false);
@@ -616,7 +620,26 @@ export const LearnScreen = () => {
           now: Math.min(daily.introduced, daily.goal),
         }}
       >
-        <Text style={styles.todayLabel}>{dailyLabel}</Text>
+        <View style={styles.todayHeaderRow}>
+          <View style={styles.todayTitleRow}>
+            {isDailyGoalMet && (
+              <Ionicons
+                name="checkmark-circle"
+                size={18}
+                style={styles.todayCheckIcon}
+              />
+            )}
+            <Text style={styles.todayLabel} numberOfLines={1}>
+              {dailyParts.title}
+            </Text>
+          </View>
+          <Text style={styles.todayCount} numberOfLines={1}>
+            {dailyParts.count}
+            {dailyParts.extra !== null && (
+              <Text style={styles.todayExtra}>{`  ${dailyParts.extra}`}</Text>
+            )}
+          </Text>
+        </View>
         <View style={[styles.planBar, styles.planBarEmpty]}>
           <Animated.View
             style={[styles.planBarSegment, { width: dailyFillPercent }]}
@@ -845,10 +868,35 @@ const createStyles = (theme: Theme) =>
     marginTop: 15,
     rowGap: 10,
   },
+  todayHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    columnGap: 12,
+  },
+  todayTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    columnGap: 6,
+    flexShrink: 1,
+  },
+  todayCheckIcon: {
+    color: theme.amberAccent,
+  },
   todayLabel: {
     color: theme.textEmphasis,
     fontSize: 15,
     fontWeight: "600",
+  },
+  todayCount: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: theme.textMuted,
+    fontVariant: ["tabular-nums"],
+  },
+  todayExtra: {
+    color: theme.amberAccent,
+    fontWeight: "700",
   },
   sectionsRow: {
     flexDirection: "row",

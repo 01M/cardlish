@@ -2,6 +2,7 @@ import {
   clampDailyGoal,
   DAILY_GOAL_DEFAULT,
   formatDailyProgress,
+  getDailyProgressParts,
   getDailyProgressRatio,
   isDailyGoalReached,
   isValidDailyGoal,
@@ -94,10 +95,30 @@ describe("daily progress labels", () => {
     expect(isDailyGoalReached(9, 10)).toBe(false);
   });
 
-  it("switches to the reached wording at the goal and still shows the count", () => {
+  it("switches to the reached wording at the goal and shows words over the goal", () => {
     expect(formatDailyProgress(10, 10)).toBe("Цель на день выполнена: 10 из 10");
-    expect(formatDailyProgress(23, 10)).toBe("Цель на день выполнена: 23 из 10");
+    expect(formatDailyProgress(23, 10)).toBe(
+      "Цель на день выполнена: 10 из 10, ещё 13 сверх цели",
+    );
     expect(isDailyGoalReached(10, 10)).toBe(true);
+  });
+
+  it("splits the visible label into title, count and over-goal extra", () => {
+    expect(getDailyProgressParts(7, 10)).toEqual({
+      title: "Новых слов сегодня",
+      count: "7 из 10",
+      extra: null,
+    });
+    expect(getDailyProgressParts(10, 10)).toEqual({
+      title: "Цель выполнена",
+      count: "10 из 10",
+      extra: null,
+    });
+    expect(getDailyProgressParts(23, 10)).toEqual({
+      title: "Цель выполнена",
+      count: "10 из 10",
+      extra: "+13",
+    });
   });
 
   it("fills the bar proportionally and caps it at 100%", () => {

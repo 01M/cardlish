@@ -80,6 +80,23 @@ therefore differ from upgraded installs — match dictionary rows by `dict_key`,
 group by frequency, then term. `src/assets/dictionary.test.ts` guards the shape. Every data
 source must be listed in `src/data/sources.json` before its data ships.
 
+The converter also writes `src/assets/dictionary.version.json` (first 16 hex chars of sha256
+over `dictionary.json`, CRLF normalised to LF). Commit `dictionary.json` and
+`dictionary.version.json` together; a jest guard recomputes the hash and fails ("rerun the
+converter") when they diverge.
+
+### Database schema v3 and dictionary sync
+
+`PRAGMA user_version` = 3; `words.rank` (INTEGER, NULL for custom words) is stored but not used
+for ordering yet. On start the app migrates the schema (`planMigration`: fresh / v1 → v3 /
+v2 → v3), then syncs the dictionary when `app_settings.dictionary_version` differs from
+`dictionary.version.json` — a fresh install is filled by the same sync. Sync rules, one
+exclusive transaction (`src/db/dictionarySync.ts`): match rows **only by `dict_key`**, update
+term/translation/transcription/example/rank, never touch `id`, `status`, `is_custom` or custom
+words; rows absent from the new JSON are deleted only if `status = 'new'`, rows with progress
+are kept; the version is written last, so a failed sync stores nothing and shows the DB error
+screen with retry. Re-running the sync changes nothing.
+
 ## Navigation & Routing
 
 - Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.

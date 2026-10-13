@@ -48,13 +48,15 @@ src/data/         sources.json — attribution/licences of every shipped data so
 src/components/   Shared UI (Button, PressableScale, FlipCard, FadeInView, WordFormModal, Confetti, TopFade, ListTopFade)
 src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
-src/db/           SQLite access + models (database.ts), schema/migration SQL + planMigration (schema.ts)
+src/db/           SQLite access + models (database.ts), schema/migration SQL + planMigration (schema.ts),
+                  dictionary sync SQL + pure helpers (dictionarySync.ts)
 src/services/     Side-effectful services (notifications.ts)
 src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); pure, no React/DB:
                   reviewQueue.ts (mergeReviewQueue(prev, fresh)), sessionPlan.ts (getSessionPlan),
                   sources.ts (DataSource, parseSources, formatUrlForDisplay)
 *.test.ts         Unit tests live next to the code they test (never under src/app/)
-src/assets/       dictionary.json (large, generated, git-tracked, never read it) + dictionary.test.ts
+src/assets/       dictionary.json (large, generated, git-tracked, never read it), dictionary.version.json
+                  (generated with it) + dictionary.test.ts (shape + version guard)
 scripts/          Python dictionary pipeline (convert_freedict.py, its tests, requirements.txt, .venv/)
 assets/           App icons / splash
 ```
@@ -89,6 +91,12 @@ scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python
 - Source archive: `freedict-eng-rus-2025.11.23.src.tar.xz` from https://freedict.org/downloads/
   (not in the repo). The output is deterministic (LF line endings) — regenerating must not change
   the file unless the converter or its inputs changed.
+- The converter also writes `src/assets/dictionary.version.json` (`{ "version": … }`, the first
+  16 hex chars of sha256 over `dictionary.json` with CRLF normalised to LF). The app syncs
+  installed dictionaries when this value changes. Workflow: run the converter → commit
+  `dictionary.json` and `dictionary.version.json` together. The jest guard in
+  `src/assets/dictionary.test.ts` recomputes the hash and fails ("rerun the converter") when the
+  two diverge — never edit either file by hand.
 - Converter rules: eligible entries have a single-word headword (`^[A-Za-z][A-Za-z'-]*$`), a
   TEI part of speech among `n v adj adv pronoun preposition postposition conjunction determiner
   numeral interjection particle` (excluded: `pn`, `prefix`, `suffix`, `phraseologicalunit`,
@@ -160,9 +168,11 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Tests only for pure logic (no React rendering, no snapshots, no component tests, no hand-written
   mocks of expo-sqlite or React Native internals). To make logic testable, extract it into a pure
   function (`src/utils/`, or an exported helper such as `splitStyle` in `PressableScale.tsx`).
-- Schema and migration SQL (`src/db/schema.ts`) is tested against real SQLite via `node:sqlite`
-  (`src/db/schema.test.ts`, `@jest-environment node`, `/// <reference types="node" />`). The rest
-  of `src/db/database.ts` is verified by hand on a device.
+- Schema/migration SQL (`src/db/schema.ts`) and dictionary-sync SQL (`src/db/dictionarySync.ts`)
+  are tested against real SQLite via `node:sqlite` (`schema.test.ts`, `dictionarySync.test.ts` —
+  incl. a sync of the real `dictionary.json`; `@jest-environment node`,
+  `/// <reference types="node" />`). The rest of `src/db/database.ts` is verified by hand on a
+  device.
 - New scheduling logic (SRS: intervals, due dates, grading) must be written as pure functions with
   tests in the same change.
 
@@ -177,25 +187,41 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    `StepperButton`, `SessionComplete` in `LearnScreen.tsx`) may stay in the screen file.
 3. **Data access lives in `src/db/`.** All SQL, schema, migrations, and model types stay in
    `src/db/` — queries and model types in `database.ts`; schema/migration SQL strings and pure
-   helpers in `schema.ts` (no expo-sqlite import, so they are tested on `node:sqlite`).
+   helpers in `schema.ts`, dictionary-sync SQL and pure helpers in `dictionarySync.ts` (neither
+   imports expo-sqlite, so both are tested on `node:sqlite`).
    Screens/services call exported async functions — never issue queries inline.
    The DB is opened once via `getDb()` (memoized promise; a failed open clears the memo so a retry
    reopens).
-   - **Schema v2, versioned by `PRAGMA user_version` (= 2; v1 was 0).** `words` has `dict_key`
-     (`term.trim().toLowerCase()`, UNIQUE, NULL for custom words —
-     `CHECK ((is_custom = 1) = (dict_key IS NULL))`), `is_custom` 0/1 and `status` NOT NULL with
-     CHECKs. `initDatabase()` reads the version and follows `planMigration(userVersion,
-     hasWordsTable)`: `fresh` (create schema + seed + set version, one exclusive transaction),
-     `upgrade-v1`, `current`, `too-new` (throws `DatabaseTooNewError`; the DB is not touched and
-     the error screen says to update the app) or `unknown` (error screen).
-   - Seeding: `dictionary.json` is `require`d lazily, only on the seeding path (fresh install, or
-     an empty v1 table), and inserted with batched multi-row INSERTs (`buildSeedBatches`). The
-     JSON's `rank` is not stored yet (`buildSeedBatches` ignores it; tested).
+   - **Schema v3, versioned by `PRAGMA user_version` (= 3; v2 was 2, v1 was 0).** `words` has
+     `dict_key` (`term.trim().toLowerCase()`, UNIQUE, NULL for custom words —
+     `CHECK ((is_custom = 1) = (dict_key IS NULL))`), `is_custom` 0/1, `status` NOT NULL with
+     CHECKs and `rank` INTEGER (frequency rank from `dictionary.json`; NULL for custom words and
+     until synced). `rank` is stored only — learning order does not use it yet and `Word` does
+     not include it. `initDatabase()` = `migrateSchema()` then `syncDictionaryIfNeeded()`;
+     `migrateSchema()` follows `planMigration(userVersion, hasWordsTable)`: `fresh` (create the
+     v3 schema + set version, one exclusive transaction), `upgrade-v1` (v1 → v2 → v3), `upgrade-v2`
+     (`ALTER TABLE … ADD COLUMN rank`), `current`, `too-new` (throws `DatabaseTooNewError`; the DB
+     is not touched and the error screen says to update the app) or `unknown` (version 1 or
+     negative; error screen).
+   - **Dictionary sync** (`dictionarySync.ts`, fills a fresh install too — there is no separate
+     seed path): runs when `app_settings.dictionary_version` differs from
+     `src/assets/dictionary.version.json`. Only then is the 5.5 MB `dictionary.json` `require`d
+     (lazily). One exclusive transaction runs `planDictionarySync()`: upsert in 500-row batches,
+     matched **only by `dict_key`** (ids differ between installs) — `term`, `translation`,
+     `transcription`, `example`, `rank` are updated, **`id`, `status` and `is_custom` never**;
+     custom words (dict_key NULL) are never touched, even if their term equals a dictionary key;
+     dictionary rows absent from the JSON are deleted only when `status = 'new'` (pure
+     `findKeysToDelete()`, batched deletes), rows with progress are kept unchanged; the version is
+     written as the last statement, so it is stored only if the whole sync commits. A second run
+     changes nothing (DO UPDATE skips unchanged rows). Note: SQLite allocates an AUTOINCREMENT
+     value even for rows that end in DO UPDATE, so every sync advances the id counter by about the
+     dictionary size — harmless, ids stay unique and existing ids never change. A failed sync
+     rolls back and shows the DB error screen; "Повторить" retries it.
    - v1 → v2: first `VACUUM INTO` `english_cards.v1-backup.db` next to the DB (failure aborts the
      upgrade); then one exclusive transaction keeps ids, statuses and custom words, merges
      duplicate dictionary keys into the lowest id with the most advanced status, keeps the
-     AUTOINCREMENT counter, and sets the version. Any error rolls back to the untouched v1 DB. The
-     backup is deleted on the next launch that finds schema v2.
+     AUTOINCREMENT counter, adds `rank` (v2 → v3) and sets the version. Any error rolls back to the
+     untouched v1 DB. The backup is deleted on the next launch that finds schema v2 or v3.
    - New schema changes: bump `SCHEMA_VERSION`, add a plan step + SQL in `schema.ts` with
      `node:sqlite` tests (`@jest-environment node` docblock), applied in one transaction.
    - Row type `Word`: `dict_key`/`transcription`/`example` are `string | null`; `status` is
@@ -206,10 +232,6 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    - `resetDatabase()` runs in one exclusive transaction: deletes custom words and sets all
      remaining words to `'new'`. Dictionary rows are NOT re-seeded and keep their ids.
      `resetProgressOnly()` sets every word to `'new'` and keeps custom words.
-   - Known limitation: the schema is versioned and dictionary words have a stable `dict_key`, but
-     dictionary *content* updates (upsert by `dict_key` for existing installs) are not implemented
-     yet — changing `dictionary.json` only affects fresh installs (existing installs keep the v1
-     content — `[[…]]` markup, no merged entries, no function words — until that sync lands).
 4. **React Native primitives only.** No HTML tags (`div`, `span`, `p`, `button`), no DOM APIs, no
    `tailwindcss`/`react-native-web` shortcuts. Use `View`/`Text`/`Pressable`/`FlatList`/
    `ScrollView`/`Modal` + `StyleSheet.create`. Keep list rendering virtualized (`FlatList`).

@@ -9,17 +9,14 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
   BACKUP_DATABASE_INTO,
-  buildSeedBatches,
-  CREATE_SCHEMA_V2,
-  DictionaryItem,
+  CREATE_SCHEMA_V3,
   MIGRATE_V1_TO_V2,
+  MIGRATE_V2_TO_V3,
   planMigration,
   SCHEMA_VERSION,
   SELECT_USER_VERSION,
   SELECT_WORDS_TABLE,
-  SEED_BATCH_SIZE,
   SET_SCHEMA_VERSION,
-  toDictKey,
 } from "./schema";
 
 // Схема v1 — как её создавала прошлая версия initDatabase
@@ -85,12 +82,16 @@ const custom = (id: number, term: string, status = "new"): V1Row => ({
   status,
 });
 
-// Как initDatabase: перенос и версия в одной транзакции, при ошибке — откат.
-// failBeforeCommit имитирует сбой после всех шагов переноса
-const upgrade = (db: DatabaseSync, failBeforeCommit = false) => {
+// Как initDatabase: шаги переноса и версия в одной транзакции, при ошибке —
+// откат. failBeforeCommit имитирует сбой после всех шагов переноса
+const runInTransaction = (
+  db: DatabaseSync,
+  steps: string[],
+  failBeforeCommit = false,
+) => {
   db.exec("BEGIN");
   try {
-    db.exec(MIGRATE_V1_TO_V2);
+    for (const step of steps) db.exec(step);
     if (failBeforeCommit) throw new Error("forced failure");
     db.exec(SET_SCHEMA_VERSION);
     db.exec("COMMIT");
@@ -98,6 +99,38 @@ const upgrade = (db: DatabaseSync, failBeforeCommit = false) => {
     db.exec("ROLLBACK");
     throw error;
   }
+};
+
+// План "upgrade-v1": v1 → v2 → v3
+const upgrade = (db: DatabaseSync, failBeforeCommit = false) =>
+  runInTransaction(db, [MIGRATE_V1_TO_V2, MIGRATE_V2_TO_V3], failBeforeCommit);
+
+// План "upgrade-v2": v2 → v3
+const upgradeV2 = (db: DatabaseSync, failBeforeCommit = false) =>
+  runInTransaction(db, [MIGRATE_V2_TO_V3], failBeforeCommit);
+
+// База v2 — такая, какой её оставлял перенос v1 → v2 прошлой версии
+const createV2 = (rows: V1Row[]) => {
+  const db = createV1(rows);
+  db.exec(MIGRATE_V1_TO_V2);
+  db.exec("PRAGMA user_version = 2;");
+  return db;
+};
+
+// Схема без служебной sqlite_sequence и с нормализованными пробелами (после
+// RENAME SQLite пишет имя таблицы в кавычках)
+const comparableSchemaOf = (db: DatabaseSync) =>
+  (schemaOf(db) as { name: string; sql: string | null }[])
+    .filter((item) => item.name !== "sqlite_sequence")
+    .map((item) => ({
+      ...item,
+      sql: item.sql?.replace(/\s+/g, " ").replace('"words"', "words"),
+    }));
+
+const createFreshV3 = () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(CREATE_SCHEMA_V3);
+  return db;
 };
 
 const userVersion = (db: DatabaseSync) =>
@@ -137,6 +170,14 @@ describe("planMigration", () => {
     expect(planMigration(0, true)).toBe("upgrade-v1");
   });
 
+  it("treats version 2 as a v2 database", () => {
+    expect(planMigration(2, true)).toBe("upgrade-v2");
+  });
+
+  it("is at schema version 3", () => {
+    expect(SCHEMA_VERSION).toBe(3);
+  });
+
   it.each([true, false])(
     "treats the current version as current (words table: %s)",
     (hasWordsTable) => {
@@ -161,9 +202,16 @@ describe("planMigration", () => {
 
     expect(planMigration(userVersion(db), hasWordsTable)).toBe("upgrade-v1");
   });
+
+  it("matches what a v2 database reports", () => {
+    const db = createV2([]);
+    const hasWordsTable = db.prepare(SELECT_WORDS_TABLE).get() !== undefined;
+
+    expect(planMigration(userVersion(db), hasWordsTable)).toBe("upgrade-v2");
+  });
 });
 
-describe("v1 → v2 migration", () => {
+describe("v1 → v2 → v3 migration", () => {
   const v1Rows = [
     dict(1, "apple"),
     dict(2, "Monday", "review"),
@@ -194,27 +242,24 @@ describe("v1 → v2 migration", () => {
     ]);
   });
 
-  it("sets user_version to 2 and leaves the v2 schema in place", () => {
+  it("sets user_version to 3 and leaves the same schema as a fresh install", () => {
     const db = createV1(v1Rows);
     expect(userVersion(db)).toBe(0);
 
     upgrade(db);
 
-    expect(userVersion(db)).toBe(2);
-    const fresh = new DatabaseSync(":memory:");
-    fresh.exec(CREATE_SCHEMA_V2);
-    // Та же схема, что у новой установки (кроме служебной sqlite_sequence;
-    // после RENAME SQLite пишет имя таблицы в кавычках)
-    const withoutSequence = (schema: unknown[]) =>
-      (schema as { name: string; sql: string | null }[])
-        .filter((item) => item.name !== "sqlite_sequence")
-        .map((item) => ({
-          ...item,
-          sql: item.sql?.replace(/\s+/g, " ").replace('"words"', "words"),
-        }));
-    expect(withoutSequence(schemaOf(db))).toEqual(
-      withoutSequence(schemaOf(fresh)),
-    );
+    expect(userVersion(db)).toBe(3);
+    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV3()));
+  });
+
+  it("leaves rank empty until the dictionary is synced", () => {
+    const db = createV1(v1Rows);
+
+    upgrade(db);
+
+    expect(
+      db.prepare("SELECT COUNT(*) AS count FROM words WHERE rank IS NOT NULL;").get(),
+    ).toEqual({ count: 0 });
   });
 
   it("keeps app settings", () => {
@@ -308,16 +353,59 @@ describe("v1 → v2 migration", () => {
     expect(userVersion(db)).toBe(0);
     // Повторная попытка после отката проходит
     upgrade(db);
+    expect(userVersion(db)).toBe(3);
+  });
+});
+
+describe("v2 → v3 migration", () => {
+  const v2Rows = [
+    dict(1, "apple"),
+    dict(2, "Monday", "review"),
+    dict(3, "run", "learned"),
+    custom(7, "Serendipity"),
+    custom(12, "bank", "review"),
+  ];
+
+  it("keeps every row, id, key and status and leaves rank empty", () => {
+    const db = createV2(v2Rows);
+    const rowsBefore = rowsOf(db);
+    const keysBefore = keysOf(db);
+
+    upgradeV2(db);
+
+    expect(rowsOf(db)).toEqual(rowsBefore);
+    expect(keysOf(db)).toEqual(keysBefore);
+    expect(db.prepare("SELECT id, rank FROM words ORDER BY id;").all()).toEqual(
+      [1, 2, 3, 7, 12].map((id) => ({ id, rank: null })),
+    );
+  });
+
+  it("sets user_version to 3 and leaves the same schema as a fresh install", () => {
+    const db = createV2(v2Rows);
+    db.exec("INSERT INTO app_settings (key, value) VALUES ('theme_preference', 'dark');");
+
+    upgradeV2(db);
+
+    expect(userVersion(db)).toBe(3);
+    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV3()));
+    expect(db.prepare("SELECT key, value FROM app_settings;").all()).toEqual([
+      { key: "theme_preference", value: "dark" },
+    ]);
+  });
+
+  it("leaves v2 untouched when it fails", () => {
+    const db = createV2(v2Rows);
+    const schemaBefore = schemaOf(db);
+
+    expect(() => upgradeV2(db, true)).toThrow("forced failure");
+
+    expect(schemaOf(db)).toEqual(schemaBefore);
     expect(userVersion(db)).toBe(2);
   });
 });
 
-describe("schema v2 constraints", () => {
-  const createV2 = () => {
-    const db = new DatabaseSync(":memory:");
-    db.exec(CREATE_SCHEMA_V2);
-    return db;
-  };
+describe("schema v3 constraints", () => {
+  const createV3 = createFreshV3;
 
   const insert = (
     db: DatabaseSync,
@@ -333,7 +421,7 @@ describe("schema v2 constraints", () => {
       .run(dictKey, isCustom, status);
 
   it("accepts dictionary and custom words", () => {
-    const db = createV2();
+    const db = createV3();
     insert(db, "term", 0);
     insert(db, null, 1);
     insert(db, null, 1);
@@ -346,89 +434,27 @@ describe("schema v2 constraints", () => {
   });
 
   it("rejects an unknown or missing status", () => {
-    const db = createV2();
+    const db = createV3();
     expect(() => insert(db, "a", 0, "done")).toThrow(/CHECK constraint failed/);
     expect(() => insert(db, "b", 0, null)).toThrow(/NOT NULL constraint failed/);
   });
 
   it("rejects a custom word with a dict_key", () => {
-    expect(() => insert(createV2(), "a", 1)).toThrow(/CHECK constraint failed/);
+    expect(() => insert(createV3(), "a", 1)).toThrow(/CHECK constraint failed/);
   });
 
   it("rejects a dictionary word without a dict_key", () => {
-    expect(() => insert(createV2(), null, 0)).toThrow(/CHECK constraint failed/);
+    expect(() => insert(createV3(), null, 0)).toThrow(/CHECK constraint failed/);
   });
 
   it("rejects an is_custom other than 0 or 1", () => {
-    expect(() => insert(createV2(), "a", 2)).toThrow(/CHECK constraint failed/);
+    expect(() => insert(createV3(), "a", 2)).toThrow(/CHECK constraint failed/);
   });
 
   it("rejects a duplicate dict_key", () => {
-    const db = createV2();
+    const db = createV3();
     insert(db, "a", 0);
     expect(() => insert(db, "a", 0)).toThrow(/UNIQUE constraint failed/);
-  });
-});
-
-describe("fresh install seeding", () => {
-  const items: DictionaryItem[] = [
-    { term: "apple", translation: "яблоко", transcription: "ˈæpl", example: "" },
-    { term: "Monday", translation: "понедельник", transcription: "" },
-    { term: "o'clock", translation: "час" },
-    { term: "run", translation: "бежать", example: "Run!" },
-    { term: "set", translation: "набор" },
-  ];
-
-  it("creates the schema, seeds the dictionary and sets the version in one go", () => {
-    const db = new DatabaseSync(":memory:");
-    db.exec("BEGIN");
-    db.exec(CREATE_SCHEMA_V2);
-    for (const batch of buildSeedBatches(items, 2)) {
-      db.prepare(batch.sql).run(...batch.params);
-    }
-    db.exec(SET_SCHEMA_VERSION);
-    db.exec("COMMIT");
-
-    expect(userVersion(db)).toBe(2);
-    expect(
-      db
-        .prepare(
-          `SELECT id, dict_key, term, transcription, example, is_custom, status
-           FROM words ORDER BY id;`,
-        )
-        .all(),
-    ).toEqual([
-      { id: 1, dict_key: "apple", term: "apple", transcription: "ˈæpl", example: null, is_custom: 0, status: "new" },
-      { id: 2, dict_key: "monday", term: "Monday", transcription: null, example: null, is_custom: 0, status: "new" },
-      { id: 3, dict_key: "o'clock", term: "o'clock", transcription: null, example: null, is_custom: 0, status: "new" },
-      { id: 4, dict_key: "run", term: "run", transcription: null, example: "Run!", is_custom: 0, status: "new" },
-      { id: 5, dict_key: "set", term: "set", transcription: null, example: null, is_custom: 0, status: "new" },
-    ]);
-  });
-
-  it("ignores fields it does not store, such as rank", () => {
-    const withRank = items.map((item, index) => ({ ...item, rank: index + 1 }));
-
-    expect(buildSeedBatches(withRank, 2)).toEqual(buildSeedBatches(items, 2));
-  });
-
-  it("splits items into batches of the given size", () => {
-    const batches = buildSeedBatches(items, 2);
-
-    expect(batches.map((batch) => batch.params.length)).toEqual([10, 10, 5]);
-    expect(buildSeedBatches([], 2)).toEqual([]);
-  });
-
-  it("keeps the default batch under SQLite's variable limit", () => {
-    expect(SEED_BATCH_SIZE * 5).toBeLessThanOrEqual(32766);
-  });
-
-  it("computes the same key in JS as lower(trim(term)) in the migration", () => {
-    const db = new DatabaseSync(":memory:");
-    for (const term of ["Apple", " RUN ", "o'clock", "Twenty-One"]) {
-      const row = db.prepare("SELECT lower(trim(?)) AS key;").get(term);
-      expect(row).toEqual({ key: toDictKey(term) });
-    }
   });
 });
 

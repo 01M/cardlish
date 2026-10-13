@@ -8,6 +8,7 @@ Run from the repository root with the pipeline venv (see scripts/requirements.tx
         path/to/freedict-eng-rus-2025.11.23.src.tar.xz src/assets/dictionary.json
 """
 import argparse
+import hashlib
 import json
 import re
 import tarfile
@@ -311,15 +312,28 @@ def convert(archive_path):
     return words
 
 
+def dictionary_version(json_bytes):
+    """Version of a dictionary JSON: the first 16 hex chars of sha256 over its bytes with CRLF
+    normalised to LF, so a Windows checkout with CRLF line endings hashes the same."""
+    return hashlib.sha256(json_bytes.replace(b'\r\n', b'\n')).hexdigest()[:16]
+
+
+def version_path(output_path):
+    """dictionary.json -> dictionary.version.json in the same directory."""
+    output = Path(output_path)
+    return output.with_name(f'{output.stem}.version.json')
+
+
 def write_json(words, output_path):
+    """Write the dictionary and, next to it, its version file (read by the app to decide
+    whether installed dictionaries need a sync)."""
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
-    # LF on every OS, so the generated file is byte-identical everywhere
-    output.write_text(
-        json.dumps(words, ensure_ascii=False, indent=2) + '\n',
-        encoding='utf-8',
-        newline='\n',
-    )
+    # LF on every OS, so the generated files are byte-identical everywhere
+    content = (json.dumps(words, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+    output.write_bytes(content)
+    version = json.dumps({'version': dictionary_version(content)}, indent=2) + '\n'
+    version_path(output).write_bytes(version.encode('utf-8'))
 
 
 if __name__ == '__main__':
@@ -329,4 +343,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     words = convert(args.archive)
     write_json(words, args.output)
-    print(f'Created {args.output}: {len(words)} entries')
+    print(f'Created {args.output}: {len(words)} entries, and {version_path(args.output)}')

@@ -1,11 +1,16 @@
 import * as SQLite from "expo-sqlite";
+import dictionaryVersion from "../assets/dictionary.version.json";
+import {
+  DictionaryCard,
+  planDictionarySync,
+  SELECT_DICTIONARY_VERSION,
+  SELECT_NEW_DICTIONARY_KEYS,
+} from "./dictionarySync";
 import {
   BACKUP_DATABASE_INTO,
-  buildSeedBatches,
-  COUNT_WORDS,
-  CREATE_SCHEMA_V2,
-  DictionaryItem,
+  CREATE_SCHEMA_V3,
   MIGRATE_V1_TO_V2,
+  MIGRATE_V2_TO_V3,
   planMigration,
   SELECT_USER_VERSION,
   SELECT_WORDS_TABLE,
@@ -53,17 +58,34 @@ export class DatabaseTooNewError extends Error {
   }
 }
 
-// Заполнение словаря. JSON подгружаем лениво — только здесь, чтобы он
-// не разбирался при каждом запуске
-const seedDictionary = async (txn: SQLite.SQLiteDatabase) => {
-  const dictionary: DictionaryItem[] = require("../assets/dictionary.json");
-  for (const batch of buildSeedBatches(dictionary)) {
-    await txn.runAsync(batch.sql, batch.params);
-  }
+// Синхронизация словаря (правила — в dictionarySync.ts), когда версия
+// встроенного словаря отличается от сохранённой в app_settings. Так же
+// заполняется словарь новой установки. Большой JSON подгружаем лениво —
+// только когда синхронизация нужна, чтобы он не разбирался при каждом запуске
+const syncDictionaryIfNeeded = async (db: SQLite.SQLiteDatabase) => {
+  const installed = await db.getFirstAsync<{ value: string }>(
+    SELECT_DICTIONARY_VERSION,
+  );
+  if (installed?.value === dictionaryVersion.version) return;
+
+  const cards: DictionaryCard[] = require("../assets/dictionary.json");
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    const existingNewKeys = await txn.getAllAsync<{ dict_key: string }>(
+      SELECT_NEW_DICTIONARY_KEYS,
+    );
+    const steps = planDictionarySync(
+      cards,
+      existingNewKeys.map((row) => row.dict_key),
+      dictionaryVersion.version,
+    );
+    for (const step of steps) {
+      await txn.runAsync(step.sql, step.params);
+    }
+  });
 };
 
 // Копия базы v1, которая делается перед переносом на v2. Лежит рядом с
-// базой и удаляется при следующем успешном запуске на v2
+// базой и удаляется при следующем успешном запуске на v2 или v3
 const V1_BACKUP_NAME = "english_cards.v1-backup.db";
 
 const getDbDirectory = (db: SQLite.SQLiteDatabase) =>
@@ -78,10 +100,16 @@ const deleteV1Backup = async (db: SQLite.SQLiteDatabase) => {
   }
 };
 
-// 1. Инициализация базы данных: версия схемы в PRAGMA user_version
+// 1. Инициализация базы данных: перенос схемы (версия в PRAGMA
+// user_version), затем синхронизация словаря. Ошибка любого шага — экран
+// ошибки БД с повтором
 export const initDatabase = async () => {
   const db = await getDb();
+  await migrateSchema(db);
+  await syncDictionaryIfNeeded(db);
+};
 
+const migrateSchema = async (db: SQLite.SQLiteDatabase) => {
   const versionRow = await db.getFirstAsync<{ user_version: number }>(
     SELECT_USER_VERSION,
   );
@@ -90,30 +118,32 @@ export const initDatabase = async () => {
 
   switch (planMigration(userVersion, wordsTable != null)) {
     case "fresh":
-      // Схема, словарь и версия — одной транзакцией
+      // Схема и версия — одной транзакцией; словарь заполнит синхронизация
       await db.withExclusiveTransactionAsync(async (txn) => {
-        await txn.execAsync(CREATE_SCHEMA_V2);
-        await seedDictionary(txn);
+        await txn.execAsync(CREATE_SCHEMA_V3);
         await txn.execAsync(SET_SCHEMA_VERSION);
       });
       return;
     case "upgrade-v1":
       // Без копии v1 не переносим: ошибка здесь — экран ошибки БД. Копию
-      // от прошлой неудачной попытки удаляем, иначе VACUUM INTO упадёт
+      // от прошлой неудачной попытки удаляем, иначе VACUUM INTO упадёт.
+      // Пустую таблицу v1 (первое заполнение словаря прервалось) заполнит
+      // синхронизация
       await deleteV1Backup(db);
       await db.runAsync(BACKUP_DATABASE_INTO, [
         `${getDbDirectory(db)}/${V1_BACKUP_NAME}`,
       ]);
       await db.withExclusiveTransactionAsync(async (txn) => {
         await txn.execAsync(MIGRATE_V1_TO_V2);
-        // Таблица v1 пуста, если первое заполнение словаря прервалось —
-        // тогда заполняем словарь, как это сделала бы v1
-        const countRow = await txn.getFirstAsync<{ count: number }>(
-          COUNT_WORDS,
-        );
-        if (countRow?.count === 0) {
-          await seedDictionary(txn);
-        }
+        await txn.execAsync(MIGRATE_V2_TO_V3);
+        await txn.execAsync(SET_SCHEMA_VERSION);
+      });
+      return;
+    case "upgrade-v2":
+      // Копия v1 могла остаться от переноса v1 → v2: это уже следующий запуск
+      await deleteV1Backup(db);
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.execAsync(MIGRATE_V2_TO_V3);
         await txn.execAsync(SET_SCHEMA_VERSION);
       });
       return;

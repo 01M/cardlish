@@ -1,12 +1,13 @@
 // Схема базы и миграции — только SQL-строки и чистые функции, без
 // expo-sqlite, чтобы их можно было проверять в тестах на node:sqlite.
 // Версия схемы хранится в PRAGMA user_version (у v1 она 0)
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
-// 1. Таблица слов v2. dict_key — стабильный ключ слова из словаря
-// (term в нижнем регистре), у своих слов он NULL
-const createWordsTableSql = (tableName: string) => `
-  CREATE TABLE ${tableName} (
+// 1. Таблица слов. dict_key — стабильный ключ слова из словаря (term в
+// нижнем регистре), у своих слов он NULL. rank (с v3) — частотный ранг
+// слова словаря из dictionary.json, у своих слов NULL. Колонки v2 —
+// отдельно: по ним строится таблица в переносе v1 → v2
+const WORDS_V2_COLUMNS = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     dict_key TEXT UNIQUE,
     term TEXT NOT NULL,
@@ -15,8 +16,13 @@ const createWordsTableSql = (tableName: string) => `
     example TEXT,
     is_custom INTEGER NOT NULL DEFAULT 0 CHECK (is_custom IN (0, 1)),
     status TEXT NOT NULL DEFAULT 'new'
-      CHECK (status IN ('new', 'review', 'learned')),
-    CHECK ((is_custom = 1) = (dict_key IS NULL))
+      CHECK (status IN ('new', 'review', 'learned'))`;
+
+const WORDS_CONSTRAINTS = `
+    CHECK ((is_custom = 1) = (dict_key IS NULL))`;
+
+const createWordsTableSql = (tableName: string, extraColumns = "") => `
+  CREATE TABLE ${tableName} (${WORDS_V2_COLUMNS},${extraColumns}${WORDS_CONSTRAINTS}
   );
 `;
 
@@ -31,9 +37,9 @@ const CREATE_APP_SETTINGS = `
   );
 `;
 
-// 2. Схема v2 для новой установки
-export const CREATE_SCHEMA_V2 = `
-  ${createWordsTableSql("words")}
+// 2. Схема v3 для новой установки (словарь заполняет синхронизация)
+export const CREATE_SCHEMA_V3 = `
+  ${createWordsTableSql("words", "\n    rank INTEGER,")}
   ${CREATE_WORDS_INDEXES}
   ${CREATE_APP_SETTINGS}
 `;
@@ -47,14 +53,16 @@ export const SELECT_WORDS_TABLE =
   "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'words';";
 
 // 3. Что делать с базой при запуске:
-// - "fresh" — новая установка: создать схему v2 и заполнить словарь;
-// - "upgrade-v1" — база v1 (user_version 0, таблица words есть): перенести;
-// - "current" — схема уже v2;
+// - "fresh" — новая установка: создать схему v3 (словарь — синхронизацией);
+// - "upgrade-v1" — база v1 (user_version 0, таблица words есть): v1 → v2 → v3;
+// - "upgrade-v2" — база v2: v2 → v3;
+// - "current" — схема уже v3;
 // - "too-new" — база от более новой версии приложения: ничего не трогаем;
-// - "unknown" — версия, которую не записывала ни одна версия приложения
+// - "unknown" — версия, которую не записывала ни одна версия приложения (1)
 export type MigrationPlan =
   | "fresh"
   | "upgrade-v1"
+  | "upgrade-v2"
   | "current"
   | "too-new"
   | "unknown";
@@ -64,16 +72,18 @@ export const planMigration = (
   hasWordsTable: boolean,
 ): MigrationPlan => {
   if (userVersion === 0) return hasWordsTable ? "upgrade-v1" : "fresh";
+  if (userVersion === 2) return "upgrade-v2";
   if (userVersion === SCHEMA_VERSION) return "current";
   if (userVersion > SCHEMA_VERSION) return "too-new";
   return "unknown";
 };
 
 // 4. Перенос v1 → v2. Выполняется одной транзакцией вместе с
-// SET_SCHEMA_VERSION; при ошибке откат возвращает базу v1 как была.
+// MIGRATE_V2_TO_V3 и SET_SCHEMA_VERSION; при ошибке откат возвращает базу
+// v1 как была.
 // - id переносятся явно, свои слова и статусы — без изменений;
 // - dict_key = lower(trim(term)) у слов словаря (все term в v1 — ASCII,
-//   поэтому lower() в SQLite совпадает с toDictKey);
+//   поэтому lower() в SQLite совпадает с toDictKey из dictionarySync.ts);
 // - дубли dict_key (словарь v1 заполнился дважды) сливаются в строку с
 //   меньшим id, статус берётся самый продвинутый: learned > review > new;
 // - счётчик AUTOINCREMENT не уменьшается: id удалённых своих слов не
@@ -115,48 +125,13 @@ export const MIGRATE_V1_TO_V2 = `
   ${CREATE_APP_SETTINGS}
 `;
 
+// 5. Перенос v2 → v3: колонка частотного ранга. У существующих строк
+// rank — NULL, пока его не заполнит синхронизация словаря. Выполняется
+// одной транзакцией вместе с SET_SCHEMA_VERSION
+export const MIGRATE_V2_TO_V3 = `
+  ALTER TABLE words ADD COLUMN rank INTEGER;
+`;
+
 // Копия базы перед переносом (параметр — абсолютный путь к новому файлу;
 // существующий файл VACUUM INTO не перезаписывает, а падает)
 export const BACKUP_DATABASE_INTO = "VACUUM INTO ?;";
-
-// 5. Заполнение словаря из dictionary.json: многострочные INSERT пачками
-// (по 5 параметров на строку — далеко от лимита переменных SQLite)
-export interface DictionaryItem {
-  term: string;
-  translation: string;
-  transcription?: string;
-  example?: string;
-}
-
-export interface SqlBatch {
-  sql: string;
-  params: (string | null)[];
-}
-
-export const SEED_BATCH_SIZE = 500;
-
-export const COUNT_WORDS = "SELECT COUNT(*) AS count FROM words;";
-
-export const toDictKey = (term: string) => term.trim().toLowerCase();
-
-export const buildSeedBatches = (
-  items: DictionaryItem[],
-  batchSize = SEED_BATCH_SIZE,
-): SqlBatch[] => {
-  const batches: SqlBatch[] = [];
-  for (let start = 0; start < items.length; start += batchSize) {
-    const chunk = items.slice(start, start + batchSize);
-    batches.push({
-      sql: `INSERT INTO words (dict_key, term, translation, transcription, example, is_custom, status)
-            VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, 0, 'new')").join(", ")};`,
-      params: chunk.flatMap((item) => [
-        toDictKey(item.term),
-        item.term,
-        item.translation,
-        item.transcription || null,
-        item.example || null,
-      ]),
-    });
-  }
-  return batches;
-};

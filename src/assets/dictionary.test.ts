@@ -1,8 +1,13 @@
 /**
  * @jest-environment node
  */
+/// <reference types="node" />
 // Проверки поставляемого словаря (генерируется scripts/convert_freedict.py)
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import dictionary from "./dictionary.json";
+import dictionaryVersion from "./dictionary.version.json";
 
 const KNOWN_KEYS = ["example", "rank", "term", "transcription", "translation"];
 
@@ -83,5 +88,22 @@ describe("src/assets/dictionary.json", () => {
     expect([...(ranks as number[])].sort((a, b) => a - b)).toEqual(
       Array.from({ length: entries.length }, (_, index) => index + 1),
     );
+  });
+});
+
+// Версия словаря — sha256 байтов dictionary.json (CRLF → LF), первые 16
+// hex-символов; так же её считает scripts/convert_freedict.py
+describe("src/assets/dictionary.version.json", () => {
+  it("matches the current dictionary.json", () => {
+    const bytes = readFileSync(join(__dirname, "dictionary.json"));
+    const normalized = Buffer.from(bytes.toString("latin1").replace(/\r\n/g, "\n"), "latin1");
+    const actual = createHash("sha256").update(normalized).digest("hex").slice(0, 16);
+
+    if (dictionaryVersion.version !== actual) {
+      throw new Error(
+        `dictionary.version.json is stale (${dictionaryVersion.version}, dictionary.json hashes to ${actual}). ` +
+          "Rerun scripts/convert_freedict.py and commit dictionary.json and dictionary.version.json together.",
+      );
+    }
   });
 });

@@ -4,6 +4,7 @@ Run from the repository root:
     scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v
 """
 import json
+import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -17,10 +18,13 @@ from convert_freedict import (
     clean_transcription,
     clean_translation,
     dedupe_translations,
+    dictionary_version,
     load_overrides,
     merge_translations,
     override_problems,
     read_entries,
+    version_path,
+    write_json,
 )
 
 
@@ -384,6 +388,44 @@ class AssignRanksTest(unittest.TestCase):
         assign_ranks(words, lambda term: 0.0)
 
         self.assertEqual(sorted(word['rank'] for word in words), list(range(1, 51)))
+
+
+class WriteJsonTest(unittest.TestCase):
+    WORDS = [{'term': 'apple', 'translation': 'я́блоко', 'transcription': '', 'example': '', 'rank': 1}]
+
+    def write(self, directory):
+        output = Path(directory) / 'dictionary.json'
+        write_json(self.WORDS, output)
+        return output
+
+    def test_writes_lf_json_and_a_version_file_next_to_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = self.write(directory)
+            content = output.read_bytes()
+            version = json.loads((Path(directory) / 'dictionary.version.json').read_text('utf-8'))
+
+        self.assertNotIn(b'\r\n', content)
+        self.assertEqual(json.loads(content.decode('utf-8')), self.WORDS)
+        self.assertEqual(version, {'version': dictionary_version(content)})
+        self.assertRegex(version['version'], r'^[0-9a-f]{16}$')
+
+    def test_two_runs_are_byte_identical(self):
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            outputs = [self.write(first), self.write(second)]
+            self.assertEqual(outputs[0].read_bytes(), outputs[1].read_bytes())
+            self.assertEqual(
+                version_path(outputs[0]).read_bytes(), version_path(outputs[1]).read_bytes()
+            )
+
+    def test_version_ignores_crlf_line_endings(self):
+        self.assertEqual(dictionary_version(b'[\r\n  1\r\n]\r\n'), dictionary_version(b'[\n  1\n]\n'))
+        self.assertNotEqual(dictionary_version(b'[1]\n'), dictionary_version(b'[2]\n'))
+
+    def test_version_path_sits_next_to_the_output(self):
+        self.assertEqual(
+            version_path(Path('src') / 'assets' / 'dictionary.json'),
+            Path('src') / 'assets' / 'dictionary.version.json',
+        )
 
 
 if __name__ == '__main__':

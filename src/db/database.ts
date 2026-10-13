@@ -1,6 +1,20 @@
 import * as SQLite from "expo-sqlite";
 import dictionaryVersion from "../assets/dictionary.version.json";
 import {
+  CategoryCounts,
+  isAllSelected,
+  parseSelection,
+  serializeSelection,
+} from "../utils/categories";
+import {
+  buildCategoryCountsQuery,
+  buildNewWordsQuery,
+  DELETE_LEARN_CATEGORIES,
+  parseCategoryCounts,
+  SELECT_LEARN_CATEGORIES,
+  SET_LEARN_CATEGORIES,
+} from "./categoryQueries";
+import {
   DictionaryCard,
   planDictionarySync,
   SELECT_DICTIONARY_VERSION,
@@ -30,8 +44,6 @@ export interface Word {
 }
 
 export interface WordsStats {
-  newCustom: number;
-  newDict: number;
   totalNew: number;
   review: number;
   learned: number;
@@ -215,59 +227,61 @@ export const getWordsStats = async (): Promise<WordsStats> => {
   const db = await getDb();
 
   const row = await db.getFirstAsync<{
-    newCustom: number;
-    newDict: number;
+    totalNew: number;
     review: number;
     learned: number;
   }>(
     `SELECT
-       COUNT(CASE WHEN status = 'new' AND is_custom = 1 THEN 1 END) AS newCustom,
-       COUNT(CASE WHEN status = 'new' AND is_custom = 0 THEN 1 END) AS newDict,
+       COUNT(CASE WHEN status = 'new' THEN 1 END) AS totalNew,
        COUNT(CASE WHEN status = 'review' THEN 1 END) AS review,
        COUNT(CASE WHEN status = 'learned' THEN 1 END) AS learned
      FROM words;`,
   );
 
-  const newCustom = row?.newCustom ?? 0;
-  const newDict = row?.newDict ?? 0;
-
   return {
-    newCustom,
-    newDict,
-    totalNew: newCustom + newDict,
+    totalNew: row?.totalNew ?? 0,
     review: row?.review ?? 0,
     learned: row?.learned ?? 0,
   };
 };
 
-// 5. Выборка слов для сессии «Учить»
+// 5. Выборка новых слов для сессии «Учить» из выбранных разделов: сначала
+// свои, затем словарь по частотности (см. buildNewWordsQuery)
 export const getSessionWords = async (
-  source: "custom" | "dictionary",
+  selection: readonly string[],
   limit: number,
 ): Promise<Word[]> => {
   const db = await getDb();
+  const query = buildNewWordsQuery(selection, limit);
+  return await db.getAllAsync<Word>(query.sql, query.params);
+};
 
-  if (source === "dictionary") {
-    return await db.getAllAsync<Word>(
-      "SELECT * FROM words WHERE status = 'new' AND is_custom = 0 ORDER BY RANDOM() LIMIT ?;",
-      [limit],
-    );
+// 5a. Счётчики разделов: всего слов и сколько ещё новых (один проход)
+export const getCategoryCounts = async (): Promise<CategoryCounts> => {
+  const db = await getDb();
+  const query = buildCategoryCountsQuery();
+  const row = await db.getFirstAsync<Record<string, number>>(
+    query.sql,
+    query.params,
+  );
+  return parseCategoryCounts(row);
+};
+
+// 5b. Выбранные разделы «Учить». «Все разделы» храним отсутствием записи
+export const getLearnSelection = async (): Promise<string[]> => {
+  const db = await getDb();
+  const setting = await db.getFirstAsync<{ value: string }>(
+    SELECT_LEARN_CATEGORIES,
+  );
+  return parseSelection(setting?.value);
+};
+
+export const setLearnSelection = async (selection: readonly string[]) => {
+  const db = await getDb();
+  if (isAllSelected(selection)) {
+    await db.runAsync(DELETE_LEARN_CATEGORIES);
   } else {
-    const customWords = await db.getAllAsync<Word>(
-      "SELECT * FROM words WHERE status = 'new' AND is_custom = 1 ORDER BY RANDOM() LIMIT ?;",
-      [limit],
-    );
-
-    if (customWords.length < limit) {
-      const needed = limit - customWords.length;
-      const dictWords = await db.getAllAsync<Word>(
-        "SELECT * FROM words WHERE status = 'new' AND is_custom = 0 ORDER BY RANDOM() LIMIT ?;",
-        [needed],
-      );
-      return [...customWords, ...dictWords];
-    }
-
-    return customWords;
+    await db.runAsync(SET_LEARN_CATEGORIES, [serializeSelection(selection)]);
   }
 };
 

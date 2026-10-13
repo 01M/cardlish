@@ -1,7 +1,7 @@
-import type { WordsStats } from "../db/database";
+import type { SelectionAvailability } from "./categories";
 
 // План сессии «Учить» для карточки плана: сколько своих слов и слов из
-// словаря загрузит getSessionWords для выбранного источника и размера.
+// словаря загрузит getSessionWords для выбранных разделов и размера.
 // Полоса, легенда «Из словаря N» и примечание берут число слов из словаря
 // только из dictionary — так все три совпадают с самой сессией
 export interface SessionPlan {
@@ -10,23 +10,19 @@ export interface SessionPlan {
   total: number;
   // Доля своих слов в сессии (0, если сессия пустая)
   ownShare: number;
-  // Своих слов меньше размера сессии (только для "custom") — показываем
+  // Раздел своих слов выбран, но их меньше размера сессии — показываем
   // примечание «Своих слов не хватает…, добавим dictionary из словаря»
   isOwnShort: boolean;
 }
 
-// 1. Состав сессии: считаем так же, как getSessionWords загружает слова
-// (не меняем сам запрос — только воспроизводим его план на экране)
+// 1. Состав сессии: считаем так же, как getSessionWords загружает слова —
+// сначала свои слова выбора, затем слова словаря из выбранных полос
 export const getSessionPlan = (
-  source: "custom" | "dictionary",
   sessionSize: number,
-  stats: Pick<WordsStats, "newCustom" | "newDict">,
+  available: SelectionAvailability,
 ): SessionPlan => {
-  const own = source === "custom" ? Math.min(sessionSize, stats.newCustom) : 0;
-  const dictionary =
-    source === "custom"
-      ? Math.min(sessionSize - own, stats.newDict)
-      : Math.min(sessionSize, stats.newDict);
+  const own = Math.min(sessionSize, available.ownNew);
+  const dictionary = Math.min(sessionSize - own, available.dictionaryNew);
   const total = own + dictionary;
 
   return {
@@ -34,7 +30,7 @@ export const getSessionPlan = (
     dictionary,
     total,
     ownShare: total > 0 ? own / total : 0,
-    isOwnShort: source === "custom" && stats.newCustom < sessionSize,
+    isOwnShort: available.includesCustom && available.ownNew < sessionSize,
   };
 };
 
@@ -42,10 +38,10 @@ export const getSessionPlan = (
 // Если из словаря добавить нечего, часть «добавим 0 из словаря» опускаем
 export const getPlanNoteText = (
   plan: Pick<SessionPlan, "isOwnShort" | "dictionary">,
-  newCustom: number,
+  ownNew: number,
 ): string => {
   if (!plan.isOwnShort) return "";
-  const shortText = `Своих слов не хватает (${newCustom})`;
+  const shortText = `Своих слов не хватает (${ownNew})`;
   return plan.dictionary > 0
     ? `${shortText}, добавим ${plan.dictionary} из словаря`
     : shortText;

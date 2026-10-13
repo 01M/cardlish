@@ -20,7 +20,7 @@ export interface Theme {
   borderSubtle: string; // рамка кнопок-счётчиков (LearnScreen)
   inputBackground: string; // фон полей ввода
   inputBorder: string; // рамка полей ввода
-  secondaryControlBackground: string; // сегмент-переключатель, ряд фильтров
+  secondaryControlBackground: string; // ряд фильтров (WordsScreen)
   secondaryControlBackgroundAlt: string; // кнопка закрытия сессии
   secondaryButtonBorder: string; // рамка вторичной кнопки (Button, variant "secondary")
 
@@ -28,7 +28,7 @@ export interface Theme {
   textPrimary: string; // основной текст (заголовки, термины)
   textEmphasis: string; // усиленный текст: крупные числа, заголовки пустых состояний
   textSecondary: string; // вторичный текст (переводы, подписи)
-  textTertiary: string; // текст кнопок-переключателей и крестика закрытия
+  textTertiary: string; // текст фильтров (WordsScreen) и крестиков закрытия
   textMuted: string; // приглушённый текст (подзаголовки, sectionLabel)
   textMutedAlt: string; // альтернативный приглушённый (транскрипции, label в форме)
   textMutedSoft: string; // самый слабый: подсказки, placeholder

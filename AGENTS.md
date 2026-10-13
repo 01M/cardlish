@@ -87,8 +87,8 @@ converter") when they diverge.
 
 ### Database schema v3 and dictionary sync
 
-`PRAGMA user_version` = 3; `words.rank` (INTEGER, NULL for custom words) is stored but not used
-for ordering yet. On start the app migrates the schema (`planMigration`: fresh / v1 → v3 /
+`PRAGMA user_version` = 3; `words.rank` (INTEGER, NULL for custom words) defines the Learn
+sections and the order of new dictionary words (see below). On start the app migrates the schema (`planMigration`: fresh / v1 → v3 /
 v2 → v3), then syncs the dictionary when `app_settings.dictionary_version` differs from
 `dictionary.version.json` — a fresh install is filled by the same sync. Sync rules, one
 exclusive transaction (`src/db/dictionarySync.ts`): match rows **only by `dict_key`**, update
@@ -96,6 +96,25 @@ term/translation/transcription/example/rank, never touch `id`, `status`, `is_cus
 words; rows absent from the new JSON are deleted only if `status = 'new'`, rows with progress
 are kept; the version is written last, so a failed sync stores nothing and shows the DB error
 screen with retry. Re-running the sync changes nothing.
+
+### Learn sections
+
+New words for a Learn session come only from the sections the user selected on `/categories`.
+Sections are defined in code, not in the database: `"custom"` (own words, `is_custom = 1`) and
+frequency bands over `words.rank` from the `BANDS` table in `src/utils/categories.ts`
+(1–500, 501–1000, 1001–2000, 2001–3000, 3001–5000, 5001–10000, 10001–20000, 20001+; keys
+`band:<from>-<to>`, the open last band `band:<from>-`). Rows with rank NULL belong to no band.
+The selection is `app_settings.learn_categories`, a JSON array of keys; no row means all
+sections (choosing all deletes the row), unknown keys are dropped, empty or broken values mean
+all, and the last section can never be deselected. A session takes own new words first (random
+order), then dictionary new words by ascending rank, never from outside the selection. SQL lives
+in `src/db/categoryQueries.ts` (pure, tested on `node:sqlite`); the plan card numbers come from
+`getSessionPlan(sessionSize, getSelectionAvailability(selection, counts))`.
+
+To add a section, add a row to `BANDS`; the bands must start at 1, stay contiguous and end with an
+open band (`validateCategories`, checked by a test). The picker route is a root Stack screen with
+`presentation: "fullScreenModal"` and no header; after adding a route, regenerate the gitignored
+typed routes (`.expo/types/router.d.ts`, command in CLAUDE.md) so tsc knows the new href.
 
 ## Navigation & Routing
 

@@ -26,6 +26,8 @@ import { FadeInView } from "../components/FadeInView";
 import { FlipCard } from "../components/FlipCard";
 import { PressableScale } from "../components/PressableScale";
 import {
+  getCategoryCounts,
+  getLearnSelection,
   getSessionWords,
   getWordsStats,
   markWordAsReview,
@@ -37,10 +39,24 @@ import { useReduceMotion } from "../hooks/useReduceMotion";
 import { Theme } from "../theme/tokens";
 import { useTheme } from "../theme/useTheme";
 import { confirmResetProgress, showErrorAlert } from "../utils/alerts";
+import {
+  ALL_CATEGORY_KEYS,
+  CategoryCounts,
+  formatNewWords,
+  formatSelectionSummary,
+  getSelectionAvailability,
+} from "../utils/categories";
 import { getPlanNoteText, getSessionPlan } from "../utils/sessionPlan";
 
-// Паддинг дорожки-переключателя источника слов (он же — отступ ползунка)
-const TRACK_PADDING = 4;
+// Статистика, счётчики разделов и выбор разделов — одной загрузкой
+const loadLearnData = async () => {
+  const [stats, counts, selection] = await Promise.all([
+    getWordsStats(),
+    getCategoryCounts(),
+    getLearnSelection(),
+  ]);
+  return { stats, counts, selection };
+};
 
 // Диапазон высоты, за который прозрачность примечания доходит до 1
 const NOTE_OPACITY_RANGE = 16;
@@ -61,16 +77,27 @@ export const LearnScreen = () => {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const [source, setSource] = useState<"custom" | "dictionary">("custom");
   const [sessionSize, setSessionSize] = useState<number>(10);
   const [isProcessing, setIsProcessing] = useState(false);
   const [stats, setStats] = useState<WordsStats>({
-    newCustom: 0,
-    newDict: 0,
     totalNew: 0,
     review: 0,
     learned: 0,
   });
+  // Разделы, из которых берутся новые слова (выбираются на /categories),
+  // и сколько слов в каждом разделе
+  const [selection, setSelection] = useState<string[]>(ALL_CATEGORY_KEYS);
+  const [counts, setCounts] = useState<CategoryCounts>({});
+
+  // Все три значения обновляем вместе, без await между ними
+  const applyLearnData = useCallback(
+    (data: Awaited<ReturnType<typeof loadLearnData>>) => {
+      setStats(data.stats);
+      setCounts(data.counts);
+      setSelection(data.selection);
+    },
+    [],
+  );
 
   // Состояния сессии
   const [sessionWords, setSessionWords] = useState<Word[] | null>(null);
@@ -90,11 +117,13 @@ export const LearnScreen = () => {
   const [loadFailed, setLoadFailed] = useState(false);
   const hasStatsRef = useRef(false);
 
+  // Перезагрузка на каждом фокусе — в том числе при возврате с выбора
+  // разделов, поэтому план всегда считается по сохранённому выбору
   const loadStats = useCallback(async () => {
     try {
-      const data = await getWordsStats();
+      const data = await loadLearnData();
       hasStatsRef.current = true;
-      setStats(data);
+      applyLearnData(data);
       setLoadFailed(false);
       setIsLoaded(true);
     } catch {
@@ -104,7 +133,7 @@ export const LearnScreen = () => {
       setIsLoaded(true);
       showErrorAlert();
     }
-  }, []);
+  }, [applyLearnData]);
 
   useFocusEffect(
     useCallback(() => {
@@ -113,17 +142,21 @@ export const LearnScreen = () => {
   );
 
   // 7. СОСТАВ СЕССИИ: план считается так же, как getSessionWords загружает
-  // слова (см. getSessionPlan)
+  // слова из выбранных разделов (см. getSessionPlan)
+  const available = getSelectionAvailability(selection, counts);
+  const availableNew = available.ownNew + available.dictionaryNew;
+  const selectionSummary = formatSelectionSummary(selection);
+  const availableNewText = formatNewWords(availableNew);
   const {
     own: plannedOwn,
     dictionary: plannedDict,
     total: plannedTotal,
     ownShare,
     isOwnShort: isNoteVisible,
-  } = getSessionPlan(source, sessionSize, stats);
+  } = getSessionPlan(sessionSize, available);
 
   // Одна на экран подписка на "уменьшить движение" — ей пользуются и
-  // переключатель источника, и степпер, и его кнопки, и примечание в плане
+  // степпер, и полоса состава, и примечание в плане
   const reduceMotion = useReduceMotion();
 
   // 8. ПРИМЕЧАНИЕ В КАРТОЧКЕ ПЛАНА: своя анимация высоты и прозрачности
@@ -135,9 +168,9 @@ export const LearnScreen = () => {
     () =>
       getPlanNoteText(
         { isOwnShort: isNoteVisible, dictionary: plannedDict },
-        stats.newCustom,
+        available.ownNew,
       ),
-    [isNoteVisible, plannedDict, stats.newCustom],
+    [isNoteVisible, plannedDict, available.ownNew],
   );
   const lastNoteTextRef = useRef("");
   if (noteText) {
@@ -187,7 +220,7 @@ export const LearnScreen = () => {
   const handleStart = async () => {
     lastSessionLengthRef.current = 0;
     try {
-      const words = await getSessionWords(source, sessionSize);
+      const words = await getSessionWords(selection, sessionSize);
       if (words.length === 0) {
         setShowCompletion(true);
         return;
@@ -204,48 +237,12 @@ export const LearnScreen = () => {
     confirmResetProgress(async () => {
       try {
         await resetProgressOnly();
-        const data = await getWordsStats();
-        setStats(data);
+        applyLearnData(await loadLearnData());
       } catch {
         showErrorAlert();
       }
     });
   };
-
-  const handleSourceChange = (nextSource: "custom" | "dictionary") => {
-    setSource(nextSource);
-    void Haptics.selectionAsync().catch(() => {});
-  };
-
-  // 5. ПЕРЕКЛЮЧАТЕЛЬ ИСТОЧНИКА: скользящий "ползунок" между позициями
-  const [trackWidth, setTrackWidth] = useState<number>(0);
-  const thumbWidth =
-    trackWidth > 0 ? (trackWidth - 2 * TRACK_PADDING) / 2 : 0;
-  const selectedIndex = source === "custom" ? 0 : 1;
-  const thumbTranslateX = useRef(new Animated.Value(0)).current;
-  const hasLaidOut = useRef(false);
-
-  // Укладка трека: измеряем ширину для ползунка; ползунок ставим сразу,
-  // без анимации
-  const handleTrackLayout = (event: LayoutChangeEvent) => {
-    setTrackWidth(event.nativeEvent.layout.width);
-  };
-
-  useEffect(() => {
-    if (trackWidth === 0) return;
-    const targetX = selectedIndex * thumbWidth;
-    if (!hasLaidOut.current || reduceMotion) {
-      thumbTranslateX.setValue(targetX);
-    } else {
-      Animated.spring(thumbTranslateX, {
-        toValue: targetX,
-        speed: 18,
-        bounciness: 4,
-        useNativeDriver: true,
-      }).start();
-    }
-    hasLaidOut.current = true;
-  }, [trackWidth, thumbWidth, selectedIndex, thumbTranslateX, reduceMotion]);
 
   // 6. СТЕППЕР РАЗМЕРА СЕССИИ: пульс числа при изменении (не на первом рендере)
   const numberScale = useRef(new Animated.Value(1)).current;
@@ -324,8 +321,8 @@ export const LearnScreen = () => {
       } else {
         // Сессия завершена. Статистику грузим до смены экрана, чтобы переход
         // сессия -> завершение прошёл одним рендером (без кадра с настройкой)
-        const data = await getWordsStats();
-        setStats(data);
+        const data = await loadLearnData();
+        applyLearnData(data);
         setShowCompletion(true);
         setSessionWords(null);
         setCurrentIndex(0);
@@ -541,52 +538,26 @@ export const LearnScreen = () => {
         </View>
       </View>
 
-      <Text style={styles.label}>Источник слов</Text>
-      <View style={styles.toggleRow} onLayout={handleTrackLayout}>
-        {thumbWidth > 0 && (
-          <Animated.View
-            style={[
-              styles.toggleThumb,
-              {
-                width: thumbWidth,
-                transform: [{ translateX: thumbTranslateX }],
-              },
-            ]}
-            pointerEvents="none"
-          />
-        )}
-        <PressableScale
-          style={styles.toggleBtn}
-          onPress={() => handleSourceChange("custom")}
-          pressedScale={0.98}
-          accessibilityState={{ selected: source === "custom" }}
-        >
-          <Text
-            style={[
-              styles.toggleText,
-              source === "custom" && styles.toggleTextActive,
-            ]}
-          >
-            Свои слова
+      {/* Разделы, из которых берутся новые слова: открывает выбор */}
+      <PressableScale
+        style={styles.sectionsRow}
+        onPress={() => router.push("/categories")}
+        pressedScale={0.98}
+        accessibilityLabel={`Разделы: ${selectionSummary}, ${availableNewText}`}
+        accessibilityHint="Открывает выбор разделов"
+      >
+        <View style={styles.sectionsText}>
+          <Text style={styles.sectionsTitle}>Разделы</Text>
+          <Text style={styles.sectionsSummary}>
+            {selectionSummary} · {availableNewText}
           </Text>
-        </PressableScale>
-
-        <PressableScale
-          style={styles.toggleBtn}
-          onPress={() => handleSourceChange("dictionary")}
-          pressedScale={0.98}
-          accessibilityState={{ selected: source === "dictionary" }}
-        >
-          <Text
-            style={[
-              styles.toggleText,
-              source === "dictionary" && styles.toggleTextActive,
-            ]}
-          >
-            Словарь
-          </Text>
-        </PressableScale>
-      </View>
+        </View>
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          style={styles.sectionsChevron}
+        />
+      </PressableScale>
 
       <View style={styles.planCard}>
         <Text style={styles.planCardLabel}>Слов за сессию</Text>
@@ -623,7 +594,7 @@ export const LearnScreen = () => {
         <View style={styles.planHeaderRow}>
           <Text style={styles.planTitle}>План на сессию</Text>
           <Text style={styles.planAvailable}>
-            Новых доступно: {stats.totalNew}
+            Новых доступно: {availableNew}
           </Text>
         </View>
 
@@ -737,14 +708,6 @@ const createStyles = (theme: Theme) =>
     marginTop: 7,
     marginBottom: 22,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: theme.textMutedAlt,
-    textTransform: "uppercase",
-    marginBottom: 10,
-    marginTop: 15,
-  },
   statsRow: {
     backgroundColor: theme.inkCardBackground,
     borderRadius: 20,
@@ -772,32 +735,34 @@ const createStyles = (theme: Theme) =>
     height: 34,
     backgroundColor: theme.inkCardDivider,
   },
-  toggleRow: {
+  sectionsRow: {
     flexDirection: "row",
-    backgroundColor: theme.secondaryControlBackground,
-    borderRadius: 15,
-    padding: TRACK_PADDING,
-  },
-  toggleThumb: {
-    position: "absolute",
-    top: TRACK_PADDING,
-    bottom: TRACK_PADDING,
-    left: TRACK_PADDING,
-    borderRadius: 10,
-    backgroundColor: theme.orangeAccent,
-  },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 12,
     alignItems: "center",
-    borderRadius: 10,
+    columnGap: 12,
+    minHeight: 44,
+    backgroundColor: theme.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 15,
   },
-  toggleText: {
+  sectionsText: { flex: 1 },
+  sectionsTitle: {
+    color: theme.textEmphasis,
+    fontSize: 15,
     fontWeight: "600",
-    color: theme.textTertiary,
-    fontSize: 14,
   },
-  toggleTextActive: { color: theme.textOnAccent },
+  sectionsSummary: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  sectionsChevron: {
+    color: theme.textMuted,
+  },
   counterBtn: {
     width: 48,
     height: 48,

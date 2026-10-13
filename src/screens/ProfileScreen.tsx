@@ -60,8 +60,6 @@ export const ProfileScreen = () => {
   const scheme = useColorSchemeName();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [stats, setStats] = useState<WordsStats>({
-    newCustom: 0,
-    newDict: 0,
     totalNew: 0,
     review: 0,
     learned: 0,

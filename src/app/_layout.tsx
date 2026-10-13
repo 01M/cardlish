@@ -115,6 +115,16 @@ export default function RootLayout() {
               headerShadowVisible: false,
             }}
           />
+          {/* Выбор разделов «Учить»: полноэкранная модалка, выезжает снизу,
+              как форма слова; закрывается своей кнопкой и «назад» на Android */}
+          <Stack.Screen
+            name="categories"
+            options={{
+              presentation: "fullScreenModal",
+              animation: "slide_from_bottom",
+              headerShown: false,
+            }}
+          />
         </Stack>
         <TopFade />
       </ThemeProvider>

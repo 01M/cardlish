@@ -10,7 +10,12 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 ## Tech stack
 
 - **Expo SDK 57** (`expo ~57.0.28`) + **React Native 0.86** + **React 19.2**
-- **Expo Router ~57** (`main: "expo-router/entry"`, `experiments.typedRoutes: true`) under `src/app/`
+- **Expo Router ~57** (`main: "expo-router/entry"`, `experiments.typedRoutes: true`) under `src/app/`;
+  hrefs are checked by tsc against the gitignored `.expo/types/router.d.ts`. After adding a
+  route without running the dev server, regenerate it with Expo's own generator:
+  `EXPO_ROUTER_APP_ROOT="$(pwd -W)/src/app" node -e "require('./node_modules/expo/node_modules/@expo/cli/node_modules/@expo/router-server/build/typed-routes').regenerateDeclarations('.expo/types')"`
+  (Git Bash; a running `expo start` also rewrites it and may add bogus `/../…` entries for
+  files outside `src/app` — regenerate if you see them)
 - **TypeScript ~6** with `strict: true`, path alias `@/* → ./src/*`
 - **Package manager: npm** (`package-lock.json` present, no `bun.lock`)
 - **expo-sqlite ~57** for the local on-device database (`english_cards.db`)
@@ -43,17 +48,21 @@ src/app/          Expo Router routes — THIN wrappers only
   (tabs)/words.tsx   -> re-exports WordsScreen
   (tabs)/profile.tsx -> re-exports ProfileScreen
   sources.tsx        -> re-exports SourcesScreen (root Stack, pushed from Profile)
-src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen, SourcesScreen)
+  categories.tsx     -> re-exports CategoriesScreen (root Stack full-screen modal, opened from Learn)
+src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen, SourcesScreen,
+                  CategoriesScreen)
 src/data/         sources.json — attribution/licences of every shipped data source
 src/components/   Shared UI (Button, PressableScale, FlipCard, FadeInView, WordFormModal, Confetti, TopFade, ListTopFade)
 src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts), schema/migration SQL + planMigration (schema.ts),
-                  dictionary sync SQL + pure helpers (dictionarySync.ts)
+                  dictionary sync SQL + pure helpers (dictionarySync.ts), Learn section SQL
+                  (categoryQueries.ts)
 src/services/     Side-effectful services (notifications.ts)
 src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); pure, no React/DB:
                   reviewQueue.ts (mergeReviewQueue(prev, fresh)), sessionPlan.ts (getSessionPlan),
-                  sources.ts (DataSource, parseSources, formatUrlForDisplay)
+                  sources.ts (DataSource, parseSources, formatUrlForDisplay),
+                  categories.ts (section registry + band table, selection, SQL filters, labels)
 *.test.ts         Unit tests live next to the code they test (never under src/app/)
 src/assets/       dictionary.json (large, generated, git-tracked, never read it), dictionary.version.json
                   (generated with it) + dictionary.test.ts (shape + version guard)
@@ -168,9 +177,10 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Tests only for pure logic (no React rendering, no snapshots, no component tests, no hand-written
   mocks of expo-sqlite or React Native internals). To make logic testable, extract it into a pure
   function (`src/utils/`, or an exported helper such as `splitStyle` in `PressableScale.tsx`).
-- Schema/migration SQL (`src/db/schema.ts`) and dictionary-sync SQL (`src/db/dictionarySync.ts`)
-  are tested against real SQLite via `node:sqlite` (`schema.test.ts`, `dictionarySync.test.ts` —
-  incl. a sync of the real `dictionary.json`; `@jest-environment node`,
+- Schema/migration SQL (`src/db/schema.ts`), dictionary-sync SQL (`src/db/dictionarySync.ts`)
+  and section SQL (`src/db/categoryQueries.ts`) are tested against real SQLite via
+  `node:sqlite` (`schema.test.ts`, `dictionarySync.test.ts`, `categoryQueries.test.ts` — incl.
+  a sync of the real `dictionary.json` and its band sizes; `@jest-environment node`,
   `/// <reference types="node" />`). The rest of `src/db/database.ts` is verified by hand on a
   device.
 - New scheduling logic (SRS: intervals, due dates, grading) must be written as pure functions with
@@ -187,8 +197,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    `StepperButton`, `SessionComplete` in `LearnScreen.tsx`) may stay in the screen file.
 3. **Data access lives in `src/db/`.** All SQL, schema, migrations, and model types stay in
    `src/db/` — queries and model types in `database.ts`; schema/migration SQL strings and pure
-   helpers in `schema.ts`, dictionary-sync SQL and pure helpers in `dictionarySync.ts` (neither
-   imports expo-sqlite, so both are tested on `node:sqlite`).
+   helpers in `schema.ts`, dictionary-sync SQL and pure helpers in `dictionarySync.ts`, Learn
+   section SQL (selection setting, per-section counts, next new words) in `categoryQueries.ts`
+   (none of them imports expo-sqlite, so all are tested on `node:sqlite`).
    Screens/services call exported async functions — never issue queries inline.
    The DB is opened once via `getDb()` (memoized promise; a failed open clears the memo so a retry
    reopens).
@@ -196,8 +207,8 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
      `dict_key` (`term.trim().toLowerCase()`, UNIQUE, NULL for custom words —
      `CHECK ((is_custom = 1) = (dict_key IS NULL))`), `is_custom` 0/1, `status` NOT NULL with
      CHECKs and `rank` INTEGER (frequency rank from `dictionary.json`; NULL for custom words and
-     until synced). `rank` is stored only — learning order does not use it yet and `Word` does
-     not include it. `initDatabase()` = `migrateSchema()` then `syncDictionaryIfNeeded()`;
+     until synced). `rank` defines the Learn sections (frequency bands) and the order of new
+     dictionary words in a session; `Word` does not include it. `initDatabase()` = `migrateSchema()` then `syncDictionaryIfNeeded()`;
      `migrateSchema()` follows `planMigration(userVersion, hasWordsTable)`: `fresh` (create the
      v3 schema + set version, one exclusive transaction), `upgrade-v1` (v1 → v2 → v3), `upgrade-v2`
      (`ALTER TABLE … ADD COLUMN rank`), `current`, `too-new` (throws `DatabaseTooNewError`; the DB
@@ -225,7 +236,11 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    - New schema changes: bump `SCHEMA_VERSION`, add a plan step + SQL in `schema.ts` with
      `node:sqlite` tests (`@jest-environment node` docblock), applied in one transaction.
    - Row type `Word`: `dict_key`/`transcription`/`example` are `string | null`; `status` is
-     `"new" | "review" | "learned"`. `WordsStats` is exported and shared by Learn and Profile.
+     `"new" | "review" | "learned"`. `WordsStats` (`totalNew`, `review`, `learned`) is exported
+     and shared by Learn and Profile; Learn's own/dictionary split comes from the section counts
+     (`getCategoryCounts()`), not from `WordsStats`.
+   - `getSessionWords(selection, limit)`, `getCategoryCounts()`, `getLearnSelection()` /
+     `setLearnSelection()` — see "Sections" under UI conventions.
    - `getWordsStats()` is one query (`COUNT(CASE …)`), backed by index `idx_words_is_custom_status`.
    - `markWordAsReview()` only moves words that are still `'new'` (guards against a stale Learn
      session).
@@ -296,8 +311,10 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   - Icon buttons — Learn session close, Words search clear, FlipCard speak (`TouchableOpacity`;
     speak is tied to FlipCard's `isSpeaking` flip guard) and `StepperButton` (`PressableScale`,
     0.92 scale, 0.35 dimming): icon-only, own sizes, labelled via `accessibilityLabel`.
-  - Learn source toggle and Words filter chips (`PressableScale`): selectable controls with
-    `accessibilityState={{ selected }}`; the toggle shares a sliding thumb.
+  - Words filter chips (`PressableScale`): selectable controls with
+    `accessibilityState={{ selected }}`.
+  - Section picker rows (`PressableScale`, `accessibilityRole="checkbox"`) and its close button
+    (`TouchableOpacity`, same look as the Learn session close).
   - Words per-card "Изменить"/"Удалить" (`TouchableOpacity`): inline links with tuned `hitSlop`.
 - Other pressables use `PressableScale` (`src/components/PressableScale.tsx`, press-scale
   feedback; `Button` is built on it). Its `style` is split: placement/size props (`alignSelf`,
@@ -318,18 +335,56 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   `resetDatabase()`, deletes custom words) has its own dedicated confirmation dialog.
 - Icons are Ionicons from @expo/vector-icons — never emoji or text glyphs.
 - Haptics are fire-and-forget: `void Haptics.x().catch(() => {})`. Selection: FlipCard flip,
-  Learn source toggle and session-size stepper, Profile reminder switch and theme setting.
+  Learn session-size stepper, section picker toggle, Profile reminder switch and theme setting.
   Light impact: Learn next card, Review "forgot". Success: Learn session complete, Review "remembered".
+  Warning: tapping the last selected section in the picker.
 
 **Learn screen**
-- Setup: sliding-thumb source toggle (two labels over one `Animated.View` thumb on
-  `theme.orangeAccent`) + one merged plan card: stepper (`StepperButton`) + composition bar +
-  legend + inline note ("Своих слов не хватает…", shown when the plan's `isOwnShort`; its
-  "добавим N из словаря" is the plan's `dictionary`, same as the bar and legend, and is omitted
-  when it is 0; text from `getPlanNoteText()`).
-- The composition split mirrors what `getSessionWords()` will load — computed by the pure
-  `getSessionPlan(source, sessionSize, stats)` (`src/utils/sessionPlan.ts`, tested), never new
-  queries.
+- Setup: a "Разделы" row (summary "Все разделы" / "Выбрано: N" + new words left in the
+  selection; opens `/categories`) + one merged plan card: stepper (`StepperButton`) +
+  composition bar + legend + inline note ("Своих слов не хватает…", shown when the plan's
+  `isOwnShort` — the custom section is selected and has fewer new words than the session size;
+  its "добавим N из словаря" is the plan's `dictionary`, same as the bar and legend, and is
+  omitted when it is 0; text from `getPlanNoteText()`). "Новых доступно" in the plan card is the
+  selection's count; the stat strip "Новые" and the empty state ("Новые слова закончились",
+  `totalNew === 0`) stay global. An exhausted selection with words left elsewhere just shows 0 —
+  "Начать сессию" then ends in the empty completion screen (no count, no confetti).
+- The composition split mirrors what `getSessionWords(selection, size)` will load — computed by
+  the pure `getSessionPlan(sessionSize, getSelectionAvailability(selection, counts))`
+  (`src/utils/sessionPlan.ts`, tested), never new queries. Stats, section counts and the
+  selection are loaded together (`loadLearnData`) on every focus, so returning from the picker
+  refreshes the plan.
+
+**Sections (Learn → `/categories`)**
+- New words come only from the selected sections: "custom" (`is_custom = 1`, "Свои слова") and
+  frequency bands over `words.rank` (dictionary rows only; rank NULL is in no band). The band
+  table `BANDS` lives in `src/utils/categories.ts` (no schema, no table): 1–500, 501–1000,
+  1001–2000, 2001–3000, 3001–5000, 5001–10000, 10001–20000, 20001+ (open-ended). Keys:
+  `"custom"`, `band:<from>-<to>` and `band:<from>-` for the open band; titles are generated
+  ("Слова 10 001–20 000", NBSP digit groups via `formatNumber`), one frequency-only description
+  per band (no level/CEFR claims).
+- Selection: `app_settings.learn_categories` = JSON array of keys in registry order. Absent =
+  all sections — selecting everything deletes the key, so a section added later is selected
+  for those users automatically. `parseSelection` drops unknown keys and dedupes; empty,
+  unparsable or non-array → all. The picker never deselects the last section
+  (`isLastSelected` / `toggleCategory`).
+- Session order (`buildNewWordsQuery`, `src/db/categoryQueries.ts`): own words first (random
+  order, as before), then dictionary words by ascending rank; `LIMIT` = session size; no top-up
+  from outside the selection. Counts: `buildCategoryCountsQuery()` — one `COUNT(CASE …)` pass
+  with `total_<i>` / `remaining_<i>` per section; `remaining` (status `'new'`) always equals what
+  the session query can pick (tested).
+- Adding a section: add a row to `BANDS` keeping it contiguous from 1 with an open last band
+  (`validateCategories` test fails otherwise). Changing a band's bounds changes its key — old keys
+  in saved selections are dropped by `parseSelection` (falls back to all if nothing remains).
+- Picker (`src/screens/CategoriesScreen.tsx`, route `src/app/categories.tsx`): root Stack screen
+  with `presentation: "fullScreenModal"`, `animation: "slide_from_bottom"`, no header — the same
+  full-screen slide-up look as `WordFormModal` (top padding `max(insets.top, 24)`); closed by
+  its "Закрыть" icon button or Android back. Header stays fixed, list below. Each toggle is
+  saved first and applied on success (`showErrorAlert()` and the old state on failure). Rows:
+  role checkbox, `accessibilityState={{ checked }}`, label = title + description + count; the
+  last selected row has a hint, and tapping it announces "Должен быть выбран хотя бы один
+  раздел" (also stated in the intro text). Loading: background only, then `FadeInView`; a failed
+  load shows the icon + "Не удалось загрузить данные" + "Повторить".
 - Completion (`SessionComplete`): badge pop, `Confetti`, word count-up, success haptic.
 - Empty state ("Новые слова закончились"): "Добавить слова" is a primary `Button`, "Сбросить
   прогресс" a secondary `Button` below it (goes through `confirmResetProgress()`).
@@ -355,8 +410,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 
 **Accessibility**
 - `PressableScale` defaults to `accessibilityRole="button"`. Icon-only buttons need a Russian
-  `accessibilityLabel`. Selectable controls (Learn source toggle, Words filter chips) set
-  `accessibilityState={{ selected }}`. Small touch targets use `hitSlop` to reach 44pt.
+  `accessibilityLabel`. Selectable controls (Words filter chips) set
+  `accessibilityState={{ selected }}`; section picker rows are checkboxes
+  (`accessibilityState={{ checked }}`). Small touch targets use `hitSlop` to reach 44pt.
 - `FlipCard`: only the visible face is exposed to screen readers; each face has an invisible
   full-size button with the label and an `activate` action; speak buttons stay separately
   focusable, labelled "Произнести слово".
@@ -417,8 +473,8 @@ asks: `node_modules/`, `.git/`, `.expo/`, generated `ios/`+`android/`, `dist/`, 
   a new key in the `Theme` interface plus light and dark values (text must reach at least 4.5:1
   contrast on the dark surfaces).
 - An element using `buttonInk` as its background uses `textOnButtonInk` for its text.
-- `orangeAccent` is `#D97706` in both themes and is only for fills (buttons, the Learn toggle
-  thumb, the plan bar segment and legend dot), the tab bar tint and confetti. Orange TEXT or icons
+- `orangeAccent` is `#D97706` in both themes and is only for fills (buttons, the plan bar
+  segment and legend dot), the tab bar tint and confetti. Orange TEXT or icons
   on surfaces use `amberAccent`. `textMutedHint` and `statAmber` no longer exist — use
   `textMuted` / `amberAccent`.
 - White text on `#D97706` is ~3.2:1 — accepted consciously for bold button labels; do not "fix" it

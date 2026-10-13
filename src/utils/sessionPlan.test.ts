@@ -1,4 +1,8 @@
-import { getPlanNoteText, getSessionPlan } from "./sessionPlan";
+import {
+  getPlanNoteText,
+  getSessionPlan,
+  isSelectionExhausted,
+} from "./sessionPlan";
 
 // Выбор со своими словами и полосами словаря
 const mixed = (ownNew: number, dictionaryNew: number) => ({
@@ -167,5 +171,14 @@ describe("getPlanNoteText", () => {
 
   it("is empty when own words are not short", () => {
     expect(getPlanNoteText({ isOwnShort: false, dictionary: 7 }, 3)).toBe("");
+  });
+});
+
+describe("isSelectionExhausted", () => {
+  it("is true only when the selection is empty but other sections still have new words", () => {
+    expect(isSelectionExhausted(0, 120)).toBe(true);
+    expect(isSelectionExhausted(3, 120)).toBe(false);
+    // Новых слов нет совсем — это экран «Новые слова закончились»
+    expect(isSelectionExhausted(0, 0)).toBe(false);
   });
 });

@@ -85,11 +85,13 @@ over `dictionary.json`, CRLF normalised to LF). Commit `dictionary.json` and
 `dictionary.version.json` together; a jest guard recomputes the hash and fails ("rerun the
 converter") when they diverge.
 
-### Database schema v3 and dictionary sync
+### Database schema v4 and dictionary sync
 
-`PRAGMA user_version` = 3; `words.rank` (INTEGER, NULL for custom words) defines the Learn
-sections and the order of new dictionary words (see below). On start the app migrates the schema (`planMigration`: fresh / v1 → v3 /
-v2 → v3), then syncs the dictionary when `app_settings.dictionary_version` differs from
+`PRAGMA user_version` = 4; `words.rank` (INTEGER, NULL for custom words) defines the Learn
+sections and the order of new dictionary words (see below); `daily_progress` (v4) counts new
+words per local day (see "Daily goal"). On start the app migrates the schema (`planMigration`:
+fresh / v1 → v4 / v2 → v4 / v3 → v4, each in one exclusive transaction; newer than 4 →
+`DatabaseTooNewError`), then syncs the dictionary when `app_settings.dictionary_version` differs from
 `dictionary.version.json` — a fresh install is filled by the same sync. Sync rules, one
 exclusive transaction (`src/db/dictionarySync.ts`): match rows **only by `dict_key`**, update
 term/translation/transcription/example/rank, never touch `id`, `status`, `is_custom` or custom
@@ -111,10 +113,28 @@ order), then dictionary new words by ascending rank, never from outside the sele
 in `src/db/categoryQueries.ts` (pure, tested on `node:sqlite`); the plan card numbers come from
 `getSessionPlan(sessionSize, getSelectionAvailability(selection, counts))`.
 
+When the selected sections have no new words left but other sections do
+(`isSelectionExhausted`), "Начать сессию" is disabled and a note asks to pick other sections.
+
 To add a section, add a row to `BANDS`; the bands must start at 1, stay contiguous and end with an
 open band (`validateCategories`, checked by a test). The picker route is a root Stack screen with
 `presentation: "fullScreenModal"` and no header; after adding a route, regenerate the gitignored
 typed routes (`.expo/types/router.d.ts`, command in CLAUDE.md) so tsc knows the new href.
+
+### Daily goal
+
+`daily_progress (local_day, introduced)` counts words that left `'new'` per local day. Only
+`markWordAsReview()` (Learn "Далее", `new → review`) counts: in the same exclusive transaction
+and only if its `AND status = 'new'` UPDATE changed a row, so repeated calls never double count;
+own words count too. `review → learned` (`markWordAsLearned()`, guarded to `'review'`) and
+deletions never count. `local_day` is `toLocalDay(new Date())` — local date components, never
+UTC — passed as a parameter (no SQLite `'localtime'`). Both resets clear `daily_progress` in their
+transaction; the dictionary sync never touches it. The goal is `app_settings.daily_goal`
+(integer text, 5–50 step 5, default 10, anything else reads as 10). Learn shows a "Сегодня" block
+("Новых слов сегодня: N из G" / "Цель на день выполнена: N из G", progressbar role) and reloads it
+on focus and when the app returns to the foreground; Profile has a "Цель на день" stepper
+(adjustable role). The goal does not change the session size or the plan. SQL lives in
+`src/db/progressQueries.ts`, pure helpers in `src/utils/dailyGoal.ts`; both are tested.
 
 ## Navigation & Routing
 

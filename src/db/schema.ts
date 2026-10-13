@@ -1,7 +1,7 @@
 // Схема базы и миграции — только SQL-строки и чистые функции, без
 // expo-sqlite, чтобы их можно было проверять в тестах на node:sqlite.
 // Версия схемы хранится в PRAGMA user_version (у v1 она 0)
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 // 1. Таблица слов. dict_key — стабильный ключ слова из словаря (term в
 // нижнем регистре), у своих слов он NULL. rank (с v3) — частотный ранг
@@ -37,11 +37,21 @@ const CREATE_APP_SETTINGS = `
   );
 `;
 
-// 2. Схема v3 для новой установки (словарь заполняет синхронизация)
-export const CREATE_SCHEMA_V3 = `
+// Сколько слов за локальный день впервые ушли из 'new' (с v4). local_day —
+// 'YYYY-MM-DD' по местному времени устройства, считается в JS (toLocalDay)
+const CREATE_DAILY_PROGRESS = `
+  CREATE TABLE daily_progress (
+    local_day TEXT PRIMARY KEY NOT NULL,
+    introduced INTEGER NOT NULL DEFAULT 0 CHECK (introduced >= 0)
+  );
+`;
+
+// 2. Схема v4 для новой установки (словарь заполняет синхронизация)
+export const CREATE_SCHEMA_V4 = `
   ${createWordsTableSql("words", "\n    rank INTEGER,")}
   ${CREATE_WORDS_INDEXES}
   ${CREATE_APP_SETTINGS}
+  ${CREATE_DAILY_PROGRESS}
 `;
 
 // Ставится последним шагом той же транзакции, что меняет схему
@@ -53,16 +63,18 @@ export const SELECT_WORDS_TABLE =
   "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'words';";
 
 // 3. Что делать с базой при запуске:
-// - "fresh" — новая установка: создать схему v3 (словарь — синхронизацией);
-// - "upgrade-v1" — база v1 (user_version 0, таблица words есть): v1 → v2 → v3;
-// - "upgrade-v2" — база v2: v2 → v3;
-// - "current" — схема уже v3;
+// - "fresh" — новая установка: создать схему v4 (словарь — синхронизацией);
+// - "upgrade-v1" — база v1 (user_version 0, таблица words есть): v1 → … → v4;
+// - "upgrade-v2" — база v2: v2 → v3 → v4;
+// - "upgrade-v3" — база v3: v3 → v4;
+// - "current" — схема уже v4;
 // - "too-new" — база от более новой версии приложения: ничего не трогаем;
 // - "unknown" — версия, которую не записывала ни одна версия приложения (1)
 export type MigrationPlan =
   | "fresh"
   | "upgrade-v1"
   | "upgrade-v2"
+  | "upgrade-v3"
   | "current"
   | "too-new"
   | "unknown";
@@ -73,14 +85,15 @@ export const planMigration = (
 ): MigrationPlan => {
   if (userVersion === 0) return hasWordsTable ? "upgrade-v1" : "fresh";
   if (userVersion === 2) return "upgrade-v2";
+  if (userVersion === 3) return "upgrade-v3";
   if (userVersion === SCHEMA_VERSION) return "current";
   if (userVersion > SCHEMA_VERSION) return "too-new";
   return "unknown";
 };
 
 // 4. Перенос v1 → v2. Выполняется одной транзакцией вместе с
-// MIGRATE_V2_TO_V3 и SET_SCHEMA_VERSION; при ошибке откат возвращает базу
-// v1 как была.
+// MIGRATE_V2_TO_V3, MIGRATE_V3_TO_V4 и SET_SCHEMA_VERSION; при ошибке откат
+// возвращает базу v1 как была.
 // - id переносятся явно, свои слова и статусы — без изменений;
 // - dict_key = lower(trim(term)) у слов словаря (все term в v1 — ASCII,
 //   поэтому lower() в SQLite совпадает с toDictKey из dictionarySync.ts);
@@ -127,10 +140,14 @@ export const MIGRATE_V1_TO_V2 = `
 
 // 5. Перенос v2 → v3: колонка частотного ранга. У существующих строк
 // rank — NULL, пока его не заполнит синхронизация словаря. Выполняется
-// одной транзакцией вместе с SET_SCHEMA_VERSION
+// одной транзакцией вместе с MIGRATE_V3_TO_V4 и SET_SCHEMA_VERSION
 export const MIGRATE_V2_TO_V3 = `
   ALTER TABLE words ADD COLUMN rank INTEGER;
 `;
+
+// 6. Перенос v3 → v4: пустая таблица дневного прогресса (прошлые дни не
+// восстанавливаем). Одной транзакцией вместе с SET_SCHEMA_VERSION
+export const MIGRATE_V3_TO_V4 = CREATE_DAILY_PROGRESS;
 
 // Копия базы перед переносом (параметр — абсолютный путь к новому файлу;
 // существующий файл VACUUM INTO не перезаписывает, а падает)

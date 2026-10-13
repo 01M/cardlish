@@ -52,17 +52,19 @@ src/app/          Expo Router routes — THIN wrappers only
 src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen, ProfileScreen, SourcesScreen,
                   CategoriesScreen)
 src/data/         sources.json — attribution/licences of every shipped data source
-src/components/   Shared UI (Button, PressableScale, FlipCard, FadeInView, WordFormModal, Confetti, TopFade, ListTopFade)
+src/components/   Shared UI (Button, PressableScale, StepperButton, FlipCard, FadeInView, WordFormModal, Confetti, TopFade, ListTopFade)
 src/hooks/        Shared hooks (useReduceMotion)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
 src/db/           SQLite access + models (database.ts), schema/migration SQL + planMigration (schema.ts),
                   dictionary sync SQL + pure helpers (dictionarySync.ts), Learn section SQL
-                  (categoryQueries.ts)
+                  (categoryQueries.ts), status changes + daily progress + goal + reset SQL
+                  (progressQueries.ts)
 src/services/     Side-effectful services (notifications.ts)
 src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); pure, no React/DB:
                   reviewQueue.ts (mergeReviewQueue(prev, fresh)), sessionPlan.ts (getSessionPlan),
                   sources.ts (DataSource, parseSources, formatUrlForDisplay),
-                  categories.ts (section registry + band table, selection, SQL filters, labels)
+                  categories.ts (section registry + band table, selection, SQL filters, labels),
+                  dailyGoal.ts (toLocalDay, goal parse/clamp/step, "Сегодня" labels)
 *.test.ts         Unit tests live next to the code they test (never under src/app/)
 src/assets/       dictionary.json (large, generated, git-tracked, never read it), dictionary.version.json
                   (generated with it) + dictionary.test.ts (shape + version guard)
@@ -177,10 +179,12 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 - Tests only for pure logic (no React rendering, no snapshots, no component tests, no hand-written
   mocks of expo-sqlite or React Native internals). To make logic testable, extract it into a pure
   function (`src/utils/`, or an exported helper such as `splitStyle` in `PressableScale.tsx`).
-- Schema/migration SQL (`src/db/schema.ts`), dictionary-sync SQL (`src/db/dictionarySync.ts`)
-  and section SQL (`src/db/categoryQueries.ts`) are tested against real SQLite via
-  `node:sqlite` (`schema.test.ts`, `dictionarySync.test.ts`, `categoryQueries.test.ts` — incl.
-  a sync of the real `dictionary.json` and its band sizes; `@jest-environment node`,
+- Schema/migration SQL (`src/db/schema.ts`), dictionary-sync SQL (`src/db/dictionarySync.ts`),
+  section SQL (`src/db/categoryQueries.ts`) and progress SQL (`src/db/progressQueries.ts`) are
+  tested against real SQLite via `node:sqlite` (`schema.test.ts`, `dictionarySync.test.ts`,
+  `categoryQueries.test.ts`, `progressQueries.test.ts` — incl. a sync of the real
+  `dictionary.json` and its band sizes; tests mirror `database.ts` flows such as "UPDATE, then
+  +1 only if it changed a row" in small helpers; `@jest-environment node`,
   `/// <reference types="node" />`). The rest of `src/db/database.ts` is verified by hand on a
   device.
 - New scheduling logic (SRS: intervals, due dates, grading) must be written as pure functions with
@@ -194,7 +198,8 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    `src/screens/XScreen.tsx` + a one-line route wrapper in `src/app/`.
 2. **Shared UI goes to `src/components/`, shared hooks to `src/hooks/`.** If two screens need it,
    extract it; keep components presentational and prop-driven. Screen-local subcomponents (e.g.
-   `StepperButton`, `SessionComplete` in `LearnScreen.tsx`) may stay in the screen file.
+   `SessionComplete` in `LearnScreen.tsx`) may stay in the screen file; `StepperButton` was
+   extracted once Profile needed it too.
 3. **Data access lives in `src/db/`.** All SQL, schema, migrations, and model types stay in
    `src/db/` — queries and model types in `database.ts`; schema/migration SQL strings and pure
    helpers in `schema.ts`, dictionary-sync SQL and pure helpers in `dictionarySync.ts`, Learn
@@ -203,17 +208,21 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    Screens/services call exported async functions — never issue queries inline.
    The DB is opened once via `getDb()` (memoized promise; a failed open clears the memo so a retry
    reopens).
-   - **Schema v3, versioned by `PRAGMA user_version` (= 3; v2 was 2, v1 was 0).** `words` has
+   - **Schema v4, versioned by `PRAGMA user_version` (= 4; v3 was 3, v2 was 2, v1 was 0).**
+     `daily_progress (local_day TEXT PRIMARY KEY NOT NULL, introduced INTEGER NOT NULL DEFAULT 0
+     CHECK (introduced >= 0))` (v4) counts words that left `'new'` per local day. `words` has
      `dict_key` (`term.trim().toLowerCase()`, UNIQUE, NULL for custom words —
      `CHECK ((is_custom = 1) = (dict_key IS NULL))`), `is_custom` 0/1, `status` NOT NULL with
      CHECKs and `rank` INTEGER (frequency rank from `dictionary.json`; NULL for custom words and
      until synced). `rank` defines the Learn sections (frequency bands) and the order of new
      dictionary words in a session; `Word` does not include it. `initDatabase()` = `migrateSchema()` then `syncDictionaryIfNeeded()`;
      `migrateSchema()` follows `planMigration(userVersion, hasWordsTable)`: `fresh` (create the
-     v3 schema + set version, one exclusive transaction), `upgrade-v1` (v1 → v2 → v3), `upgrade-v2`
-     (`ALTER TABLE … ADD COLUMN rank`), `current`, `too-new` (throws `DatabaseTooNewError`; the DB
-     is not touched and the error screen says to update the app) or `unknown` (version 1 or
-     negative; error screen).
+     v4 schema + set version, one exclusive transaction), `upgrade-v1` (v1 → v2 → v3 → v4),
+     `upgrade-v2` (`ALTER TABLE … ADD COLUMN rank`, then v3 → v4), `upgrade-v3`
+     (`CREATE TABLE daily_progress`, empty; no backup), `current`, `too-new` (above 4; throws
+     `DatabaseTooNewError`; the DB is not touched and the error screen says to update the app)
+     or `unknown` (version 1 or negative; error screen). Every upgrade runs in one exclusive
+     transaction that ends with `SET_SCHEMA_VERSION`.
    - **Dictionary sync** (`dictionarySync.ts`, fills a fresh install too — there is no separate
      seed path): runs when `app_settings.dictionary_version` differs from
      `src/assets/dictionary.version.json`. Only then is the 5.5 MB `dictionary.json` `require`d
@@ -231,8 +240,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    - v1 → v2: first `VACUUM INTO` `english_cards.v1-backup.db` next to the DB (failure aborts the
      upgrade); then one exclusive transaction keeps ids, statuses and custom words, merges
      duplicate dictionary keys into the lowest id with the most advanced status, keeps the
-     AUTOINCREMENT counter, adds `rank` (v2 → v3) and sets the version. Any error rolls back to the
-     untouched v1 DB. The backup is deleted on the next launch that finds schema v2 or v3.
+     AUTOINCREMENT counter, adds `rank` (v2 → v3) and `daily_progress` (v3 → v4) and sets the
+     version. Any error rolls back to the untouched v1 DB. The backup is deleted on the next launch
+     that finds schema v2 or later.
    - New schema changes: bump `SCHEMA_VERSION`, add a plan step + SQL in `schema.ts` with
      `node:sqlite` tests (`@jest-environment node` docblock), applied in one transaction.
    - Row type `Word`: `dict_key`/`transcription`/`example` are `string | null`; `status` is
@@ -242,11 +252,23 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
    - `getSessionWords(selection, limit)`, `getCategoryCounts()`, `getLearnSelection()` /
      `setLearnSelection()` — see "Sections" under UI conventions.
    - `getWordsStats()` is one query (`COUNT(CASE …)`), backed by index `idx_words_is_custom_status`.
-   - `markWordAsReview()` only moves words that are still `'new'` (guards against a stale Learn
-     session).
-   - `resetDatabase()` runs in one exclusive transaction: deletes custom words and sets all
-     remaining words to `'new'`. Dictionary rows are NOT re-seeded and keep their ids.
-     `resetProgressOnly()` sets every word to `'new'` and keeps custom words.
+   - Status changes (SQL in `progressQueries.ts`): `markWordAsReview()` (Learn "Далее") is the
+     only way a word leaves `'new'`. It only moves words that are still `'new'` (guards against a
+     stale Learn session) and, in the same exclusive transaction and only when that UPDATE changed
+     a row, adds 1 to today's `daily_progress` row (`INSERT … ON CONFLICT(local_day) DO UPDATE
+     SET introduced = introduced + 1`) — a repeated call never double counts; own words count
+     like dictionary words. `markWordAsLearned()` (Review "Вспомнил") only moves `'review'` →
+     `'learned'` and never counts. Deleting words (own words, sync, full reset) never counts.
+   - Local day: `toLocalDay(new Date())` (`src/utils/dailyGoal.ts`, local date components, never
+     `toISOString`/UTC) computed in JS and passed as a parameter — no SQLite `'localtime'`.
+   - `getDailyProgress(localDay)` → `{ introduced, goal }` (one query); `getDailyGoal()` /
+     `setDailyGoal()`: `app_settings.daily_goal`, integer as text, 5–50 in steps of 5, default
+     10; anything else reads as the default (`parseDailyGoal`), invalid values are never written.
+   - `resetDatabase()` runs in one exclusive transaction: deletes custom words, sets all
+     remaining words to `'new'` and clears `daily_progress`. Dictionary rows are NOT re-seeded
+     and keep their ids. `resetProgressOnly()` (also one exclusive transaction) sets every word to
+     `'new'`, clears `daily_progress` and keeps custom words. Neither touches the goal; the
+     dictionary sync never touches `daily_progress`.
 4. **React Native primitives only.** No HTML tags (`div`, `span`, `p`, `button`), no DOM APIs, no
    `tailwindcss`/`react-native-web` shortcuts. Use `View`/`Text`/`Pressable`/`FlatList`/
    `ScrollView`/`Modal` + `StyleSheet.create`. Keep list rendering virtualized (`FlatList`).
@@ -309,8 +331,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   - Words header "Добавить" (`PressableScale`): compact with an icon — would need size and icon
     props for one call site.
   - Icon buttons — Learn session close, Words search clear, FlipCard speak (`TouchableOpacity`;
-    speak is tied to FlipCard's `isSpeaking` flip guard) and `StepperButton` (`PressableScale`,
-    0.92 scale, 0.35 dimming): icon-only, own sizes, labelled via `accessibilityLabel`.
+    speak is tied to FlipCard's `isSpeaking` flip guard) and `StepperButton`
+    (`src/components/StepperButton.tsx`, `PressableScale`, 48 pt, 0.92 scale, 0.35 dimming; Learn
+    session size and Profile daily goal): icon-only, own sizes, labelled via `accessibilityLabel`.
   - Words filter chips (`PressableScale`): selectable controls with
     `accessibilityState={{ selected }}`.
   - Section picker rows (`PressableScale`, `accessibilityRole="checkbox"`) and its close button
@@ -335,7 +358,8 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   `resetDatabase()`, deletes custom words) has its own dedicated confirmation dialog.
 - Icons are Ionicons from @expo/vector-icons — never emoji or text glyphs.
 - Haptics are fire-and-forget: `void Haptics.x().catch(() => {})`. Selection: FlipCard flip,
-  Learn session-size stepper, section picker toggle, Profile reminder switch and theme setting.
+  Learn session-size stepper, section picker toggle, Profile daily-goal stepper, reminder switch
+  and theme setting.
   Light impact: Learn next card, Review "forgot". Success: Learn session complete, Review "remembered".
   Warning: tapping the last selected section in the picker.
 
@@ -347,13 +371,24 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   its "добавим N из словаря" is the plan's `dictionary`, same as the bar and legend, and is
   omitted when it is 0; text from `getPlanNoteText()`). "Новых доступно" in the plan card is the
   selection's count; the stat strip "Новые" and the empty state ("Новые слова закончились",
-  `totalNew === 0`) stay global. An exhausted selection with words left elsewhere just shows 0 —
-  "Начать сессию" then ends in the empty completion screen (no count, no confetti).
+  `totalNew === 0`) stay global. Exhausted selection (`isSelectionExhausted()`: 0 new words in
+  the selection, > 0 globally): "Начать сессию" is a disabled `Button` (Pressable reports
+  `disabled` to screen readers) and a note under the plan card says "В выбранных разделах не
+  осталось новых слов. Выберите другие разделы."
+- "Сегодня" block (above the "Разделы" row): `formatDailyProgress()` — "Новых слов сегодня: N из
+  G", from N >= G "Цель на день выполнена: N из G" — over a bar in the plan-bar style
+  (`planBar` + `planBarEmpty` track, `planBarSegment` fill) that is full at N >= G; the width
+  animates like the composition bar (first value instant, then 220 ms, instant with Reduce
+  Motion). The block is one accessible element: role `progressbar`, label = the text,
+  `accessibilityValue` `{ min: 0, max: G, now: min(N, G) }`. The goal never changes the session
+  size or the plan.
 - The composition split mirrors what `getSessionWords(selection, size)` will load — computed by
   the pure `getSessionPlan(sessionSize, getSelectionAvailability(selection, counts))`
-  (`src/utils/sessionPlan.ts`, tested), never new queries. Stats, section counts and the
-  selection are loaded together (`loadLearnData`) on every focus, so returning from the picker
-  refreshes the plan.
+  (`src/utils/sessionPlan.ts`, tested), never new queries. Stats, section counts, the selection
+  and today's progress are loaded together (`loadLearnData`) on every focus, so returning from
+  the picker refreshes the plan. Returning from the background does not fire focus, so while
+  Learn is focused it also listens to `AppState` and reloads on `"active"` (the subscription
+  lives in the same `useFocusEffect` and is removed on blur) — the day rolls over after midnight.
 
 **Sections (Learn → `/categories`)**
 - New words come only from the selected sections: "custom" (`is_custom = 1`, "Свои слова") and
@@ -400,6 +435,11 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   (`isDailyReminderActive()`: permission granted + reminder scheduled). A stale flag is turned off
   silently (`console.error` on failure) and leftover scheduled reminders are cancelled; nothing is
   scheduled and no permission is requested.
+- "ОБУЧЕНИЕ" section (before "НАПОМИНАНИЯ"): "Цель на день" row with − / + `StepperButton`s
+  (5–50, step 5, `stepDailyGoal`), disabled at the limits. The row is one accessible element:
+  role `adjustable`, value text "N новых слов", `increment` / `decrement` actions. Each step is
+  saved first (`setDailyGoal`), then shown; on failure `showErrorAlert()` and the old value;
+  further taps are ignored while saving. Selection haptic on success.
 
 **Components**
 - `FlipCard`: fixed height 370; the back face content is in a `ScrollView` (tap flips, drag

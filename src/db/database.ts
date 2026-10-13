@@ -7,6 +7,11 @@ import {
   serializeSelection,
 } from "../utils/categories";
 import {
+  isValidDailyGoal,
+  parseDailyGoal,
+  toLocalDay,
+} from "../utils/dailyGoal";
+import {
   buildCategoryCountsQuery,
   buildNewWordsQuery,
   DELETE_LEARN_CATEGORIES,
@@ -21,10 +26,24 @@ import {
   SELECT_NEW_DICTIONARY_KEYS,
 } from "./dictionarySync";
 import {
+  CLEAR_DAILY_PROGRESS,
+  DailyProgress,
+  DELETE_CUSTOM_WORDS,
+  INCREMENT_DAILY_PROGRESS,
+  MARK_WORD_AS_LEARNED,
+  MARK_WORD_AS_REVIEW,
+  parseDailyProgress,
+  RESET_ALL_STATUSES,
+  SELECT_DAILY_GOAL,
+  SELECT_DAILY_PROGRESS,
+  SET_DAILY_GOAL,
+} from "./progressQueries";
+import {
   BACKUP_DATABASE_INTO,
-  CREATE_SCHEMA_V3,
+  CREATE_SCHEMA_V4,
   MIGRATE_V1_TO_V2,
   MIGRATE_V2_TO_V3,
+  MIGRATE_V3_TO_V4,
   planMigration,
   SELECT_USER_VERSION,
   SELECT_WORDS_TABLE,
@@ -42,6 +61,8 @@ export interface Word {
   is_custom: number;
   status: "new" | "review" | "learned";
 }
+
+export type { DailyProgress } from "./progressQueries";
 
 export interface WordsStats {
   totalNew: number;
@@ -97,7 +118,7 @@ const syncDictionaryIfNeeded = async (db: SQLite.SQLiteDatabase) => {
 };
 
 // Копия базы v1, которая делается перед переносом на v2. Лежит рядом с
-// базой и удаляется при следующем успешном запуске на v2 или v3
+// базой и удаляется при следующем успешном запуске на v2 или новее
 const V1_BACKUP_NAME = "english_cards.v1-backup.db";
 
 const getDbDirectory = (db: SQLite.SQLiteDatabase) =>
@@ -132,7 +153,7 @@ const migrateSchema = async (db: SQLite.SQLiteDatabase) => {
     case "fresh":
       // Схема и версия — одной транзакцией; словарь заполнит синхронизация
       await db.withExclusiveTransactionAsync(async (txn) => {
-        await txn.execAsync(CREATE_SCHEMA_V3);
+        await txn.execAsync(CREATE_SCHEMA_V4);
         await txn.execAsync(SET_SCHEMA_VERSION);
       });
       return;
@@ -148,6 +169,7 @@ const migrateSchema = async (db: SQLite.SQLiteDatabase) => {
       await db.withExclusiveTransactionAsync(async (txn) => {
         await txn.execAsync(MIGRATE_V1_TO_V2);
         await txn.execAsync(MIGRATE_V2_TO_V3);
+        await txn.execAsync(MIGRATE_V3_TO_V4);
         await txn.execAsync(SET_SCHEMA_VERSION);
       });
       return;
@@ -156,6 +178,15 @@ const migrateSchema = async (db: SQLite.SQLiteDatabase) => {
       await deleteV1Backup(db);
       await db.withExclusiveTransactionAsync(async (txn) => {
         await txn.execAsync(MIGRATE_V2_TO_V3);
+        await txn.execAsync(MIGRATE_V3_TO_V4);
+        await txn.execAsync(SET_SCHEMA_VERSION);
+      });
+      return;
+    case "upgrade-v3":
+      // Копия v1 могла остаться от переноса v1 → v3 предыдущей версии
+      await deleteV1Backup(db);
+      await db.withExclusiveTransactionAsync(async (txn) => {
+        await txn.execAsync(MIGRATE_V3_TO_V4);
         await txn.execAsync(SET_SCHEMA_VERSION);
       });
       return;
@@ -286,13 +317,18 @@ export const setLearnSelection = async (selection: readonly string[]) => {
 };
 
 // 6. Перевод слова в статус 'review' (только из 'new': устаревшая сессия
-// «Учить» не должна трогать слова, которые уже ушли дальше)
+// «Учить» не должна трогать слова, которые уже ушли дальше). Если слово
+// действительно ушло из 'new', в той же транзакции +1 к прогрессу
+// сегодняшнего локального дня; повторный вызов ничего не считает
 export const markWordAsReview = async (wordId: number) => {
   const db = await getDb();
-  await db.runAsync(
-    "UPDATE words SET status = 'review' WHERE id = ? AND status = 'new';",
-    [wordId],
-  );
+  const localDay = toLocalDay(new Date());
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    const result = await txn.runAsync(MARK_WORD_AS_REVIEW, [wordId]);
+    if (result.changes > 0) {
+      await txn.runAsync(INCREMENT_DAILY_PROGRESS, [localDay]);
+    }
+  });
 };
 
 // 7. Получение слов на повторение
@@ -303,28 +339,58 @@ export const getReviewWords = async (): Promise<Word[]> => {
   );
 };
 
-// 8. Перевод слова в статус 'learned'
+// 8. Перевод слова в статус 'learned' (только из 'review'; в дневной
+// прогресс не идёт)
 export const markWordAsLearned = async (wordId: number) => {
   const db = await getDb();
-  await db.runAsync("UPDATE words SET status = 'learned' WHERE id = ?;", [
-    wordId,
-  ]);
+  await db.runAsync(MARK_WORD_AS_LEARNED, [wordId]);
 };
 
-// 9. Полный сброс базы: удаляем свои слова, словарь возвращаем в 'new'.
-// Строки словаря сохраняют свои id
+// 9. Полный сброс базы: удаляем свои слова, словарь возвращаем в 'new',
+// дневной прогресс очищаем. Строки словаря сохраняют свои id
 export const resetDatabase = async () => {
   const db = await getDb();
   await db.withExclusiveTransactionAsync(async (txn) => {
-    await txn.runAsync("DELETE FROM words WHERE is_custom = 1;");
-    await txn.runAsync("UPDATE words SET status = 'new';");
+    await txn.runAsync(DELETE_CUSTOM_WORDS);
+    await txn.runAsync(RESET_ALL_STATUSES);
+    await txn.runAsync(CLEAR_DAILY_PROGRESS);
   });
 };
 
-// 10. Сброс только прогресса
+// 10. Сброс только прогресса (вместе с дневным прогрессом)
 export const resetProgressOnly = async () => {
   const db = await getDb();
-  await db.runAsync("UPDATE words SET status = 'new';");
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync(RESET_ALL_STATUSES);
+    await txn.runAsync(CLEAR_DAILY_PROGRESS);
+  });
+};
+
+// 10a. Дневная цель и сколько новых слов введено за локальный день
+// (localDay — toLocalDay(new Date()) на момент загрузки экрана)
+export const getDailyProgress = async (
+  localDay: string,
+): Promise<DailyProgress> => {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{
+    introduced: number | null;
+    goal: string | null;
+  }>(SELECT_DAILY_PROGRESS, [localDay]);
+  return parseDailyProgress(row);
+};
+
+export const getDailyGoal = async (): Promise<number> => {
+  const db = await getDb();
+  const setting = await db.getFirstAsync<{ value: string }>(SELECT_DAILY_GOAL);
+  return parseDailyGoal(setting?.value);
+};
+
+export const setDailyGoal = async (goal: number) => {
+  if (!isValidDailyGoal(goal)) {
+    throw new Error(`Invalid daily goal ${goal}`);
+  }
+  const db = await getDb();
+  await db.runAsync(SET_DAILY_GOAL, [String(goal)]);
 };
 
 export const getReminderEnabled = async (): Promise<boolean> => {

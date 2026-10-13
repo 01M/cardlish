@@ -20,11 +20,13 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  getDailyGoal,
   getReminderEnabled,
   getThemePreference,
   getWordsStats,
   resetDatabase,
   resetProgressOnly,
+  setDailyGoal,
   setReminderEnabled,
   setThemePreference,
   WordsStats,
@@ -32,6 +34,14 @@ import {
 import { Button } from "../components/Button";
 import { FadeInView } from "../components/FadeInView";
 import { PressableScale } from "../components/PressableScale";
+import { StepperButton } from "../components/StepperButton";
+import { formatNewWords } from "../utils/categories";
+import {
+  DAILY_GOAL_DEFAULT,
+  DAILY_GOAL_MAX,
+  DAILY_GOAL_MIN,
+  stepDailyGoal,
+} from "../utils/dailyGoal";
 import { useReduceMotion } from "../hooks/useReduceMotion";
 import {
   disableDailyReminder,
@@ -68,6 +78,8 @@ export const ProfileScreen = () => {
   const [reminderEnabled, setReminderEnabledState] = useState(false);
   const [themePreference, setThemePreferenceState] =
     useState<ThemePreference>("system");
+  const [dailyGoal, setDailyGoalState] = useState(DAILY_GOAL_DEFAULT);
+  const isSavingGoalRef = useRef(false);
 
   // Первая загрузка: до её завершения контента нет, затем он плавно
   // появляется (FadeInView); прогресс-бар анимируется только при изменении
@@ -80,16 +92,22 @@ export const ProfileScreen = () => {
 
   const loadProfileData = async () => {
     try {
-      const [currentStats, isReminderEnabled, storedThemePreference] =
-        await Promise.all([
-          getWordsStats(),
-          getReminderEnabled(),
-          getThemePreference(),
-        ]);
+      const [
+        currentStats,
+        isReminderEnabled,
+        storedThemePreference,
+        storedDailyGoal,
+      ] = await Promise.all([
+        getWordsStats(),
+        getReminderEnabled(),
+        getThemePreference(),
+        getDailyGoal(),
+      ]);
       setStats(currentStats);
       setTotalCount(currentStats.totalNew + currentStats.review + currentStats.learned);
       setReminderEnabledState(isReminderEnabled);
       setThemePreferenceState(storedThemePreference);
+      setDailyGoalState(storedDailyGoal);
     } catch {
       showErrorAlert();
     } finally {
@@ -208,6 +226,23 @@ export const ProfileScreen = () => {
     }
   };
 
+  // Цель сохраняется сразу; при ошибке остаётся прежняя. Пока одно
+  // нажатие сохраняется, следующие не принимаем
+  const handleGoalStep = async (direction: 1 | -1) => {
+    const next = stepDailyGoal(dailyGoal, direction);
+    if (next === dailyGoal || isSavingGoalRef.current) return;
+    isSavingGoalRef.current = true;
+    try {
+      await setDailyGoal(next);
+      setDailyGoalState(next);
+      void Haptics.selectionAsync().catch(() => {});
+    } catch {
+      showErrorAlert();
+    } finally {
+      isSavingGoalRef.current = false;
+    }
+  };
+
   const handleThemePreferenceChange = (pref: ThemePreference) => {
     setThemePreferenceState(pref);
     applyThemePreference(pref);
@@ -288,6 +323,53 @@ export const ProfileScreen = () => {
             {totalCount}
           </Text>
           <Text style={styles.statLabel}>Всего в базе</Text>
+        </View>
+      </View>
+
+      {/* Цель на день: только для блока «Сегодня» в «Учить», размер сессии
+          и план не меняет. Для скринридера строка — одно регулируемое поле */}
+      <Text style={styles.sectionLabel}>ОБУЧЕНИЕ</Text>
+      <View
+        style={styles.goalRow}
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel="Цель на день"
+        accessibilityValue={{ text: formatNewWords(dailyGoal) }}
+        accessibilityActions={[
+          { name: "increment", label: "Увеличить цель" },
+          { name: "decrement", label: "Уменьшить цель" },
+        ]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === "increment") {
+            void handleGoalStep(1);
+          } else if (event.nativeEvent.actionName === "decrement") {
+            void handleGoalStep(-1);
+          }
+        }}
+      >
+        <View style={styles.reminderText}>
+          <Text style={styles.rowTitle}>Цель на день</Text>
+          <Text style={styles.reminderSubtitle}>Новых слов за день</Text>
+        </View>
+        <View style={styles.goalStepper}>
+          <StepperButton
+            onPress={() => void handleGoalStep(-1)}
+            disabled={dailyGoal <= DAILY_GOAL_MIN}
+            accessibilityLabel="Уменьшить цель"
+            icon="remove"
+          />
+          <Text
+            style={styles.goalValue}
+            maxFontSizeMultiplier={BIG_DIGITS_MAX_FONT_SCALE}
+          >
+            {dailyGoal}
+          </Text>
+          <StepperButton
+            onPress={() => void handleGoalStep(1)}
+            disabled={dailyGoal >= DAILY_GOAL_MAX}
+            accessibilityLabel="Увеличить цель"
+            icon="add"
+          />
         </View>
       </View>
 
@@ -451,6 +533,30 @@ const createStyles = (theme: Theme) =>
     justifyContent: "space-between",
   },
   reminderText: { flex: 1, paddingRight: 16 },
+  goalRow: {
+    backgroundColor: theme.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 16,
+    marginBottom: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  goalStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    columnGap: 8,
+  },
+  goalValue: {
+    minWidth: 36,
+    textAlign: "center",
+    fontSize: 20,
+    fontWeight: "800",
+    color: theme.textEmphasis,
+    fontVariant: ["tabular-nums"],
+  },
   rowTitle: {
     color: theme.textPrimary,
     fontWeight: "800",

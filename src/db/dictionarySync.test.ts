@@ -17,7 +17,7 @@ import {
   SYNC_BATCH_SIZE,
   toDictKey,
 } from "./dictionarySync";
-import { CREATE_SCHEMA_V3, SET_SCHEMA_VERSION } from "./schema";
+import { CREATE_SCHEMA_V4, SET_SCHEMA_VERSION } from "./schema";
 
 const card = (
   term: string,
@@ -26,9 +26,9 @@ const card = (
   transcription = "",
 ): DictionaryCard => ({ term, translation, transcription, example: "", rank });
 
-const createV3 = () => {
+const createV4 = () => {
   const db = new DatabaseSync(":memory:");
-  db.exec(CREATE_SCHEMA_V3);
+  db.exec(CREATE_SCHEMA_V4);
   db.exec(SET_SCHEMA_VERSION);
   return db;
 };
@@ -44,10 +44,10 @@ type Row = {
   rank: number | null;
 };
 
-// База после переноса v2 → v3: строки словаря со старым содержимым и без
+// База после переноса v2 → v4: строки словаря со старым содержимым и без
 // rank, свои слова, прогресс
 const createSyncedBefore = (rows: Omit<Row, "rank">[]) => {
-  const db = createV3();
+  const db = createV4();
   const insert = db.prepare(
     `INSERT INTO words (id, dict_key, term, translation, transcription, example, is_custom, status)
      VALUES (?, ?, ?, ?, ?, NULL, ?, ?);`,
@@ -104,7 +104,7 @@ const versionOf = (db: DatabaseSync) =>
 
 describe("dictionary sync", () => {
   it("fills an empty database (fresh install)", () => {
-    const db = createV3();
+    const db = createV4();
 
     sync(db, [card("apple", "я́блоко", 2, "/ˈæpəl/"), card("the", "(определённый артикль)", 1)]);
 
@@ -186,6 +186,17 @@ describe("dictionary sync", () => {
     ]);
   });
 
+  it("leaves daily progress untouched", () => {
+    const db = createSyncedBefore([dictRow(1, "apple", "review"), dictRow(2, "gone")]);
+    db.exec("INSERT INTO daily_progress (local_day, introduced) VALUES ('2026-10-13', 3);");
+
+    sync(db, [card("apple", "я́блоко", 1), card("the", "арти́кль", 2)]);
+
+    expect(db.prepare("SELECT local_day, introduced FROM daily_progress;").all()).toEqual([
+      { local_day: "2026-10-13", introduced: 3 },
+    ]);
+  });
+
   it("changes nothing when run a second time", () => {
     const db = createSyncedBefore([dictRow(1, "apple", "review"), dictRow(2, "gone"), customRow(3, "bank")]);
     const cards = [card("apple", "я́блоко", 2), card("the", "арти́кль", 1)];
@@ -218,7 +229,7 @@ describe("dictionary sync", () => {
 
   it("syncs the real dictionary.json into an empty database", () => {
     const cards = realDictionary as DictionaryCard[];
-    const db = createV3();
+    const db = createV4();
 
     sync(db, cards, "real");
 

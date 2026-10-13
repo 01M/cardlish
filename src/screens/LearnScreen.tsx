@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   Animated,
+  AppState,
   Easing,
   LayoutChangeEvent,
   ScrollView,
@@ -25,8 +26,11 @@ import { Confetti } from "../components/Confetti";
 import { FadeInView } from "../components/FadeInView";
 import { FlipCard } from "../components/FlipCard";
 import { PressableScale } from "../components/PressableScale";
+import { StepperButton } from "../components/StepperButton";
 import {
+  DailyProgress,
   getCategoryCounts,
+  getDailyProgress,
   getLearnSelection,
   getSessionWords,
   getWordsStats,
@@ -46,16 +50,28 @@ import {
   formatSelectionSummary,
   getSelectionAvailability,
 } from "../utils/categories";
-import { getPlanNoteText, getSessionPlan } from "../utils/sessionPlan";
+import {
+  DAILY_GOAL_DEFAULT,
+  formatDailyProgress,
+  getDailyProgressRatio,
+  toLocalDay,
+} from "../utils/dailyGoal";
+import {
+  getPlanNoteText,
+  getSessionPlan,
+  isSelectionExhausted,
+} from "../utils/sessionPlan";
 
-// Статистика, счётчики разделов и выбор разделов — одной загрузкой
+// Статистика, счётчики разделов, выбор разделов и прогресс сегодняшнего
+// локального дня — одной загрузкой (день считается в момент загрузки)
 const loadLearnData = async () => {
-  const [stats, counts, selection] = await Promise.all([
+  const [stats, counts, selection, daily] = await Promise.all([
     getWordsStats(),
     getCategoryCounts(),
     getLearnSelection(),
+    getDailyProgress(toLocalDay(new Date())),
   ]);
-  return { stats, counts, selection };
+  return { stats, counts, selection, daily };
 };
 
 // Диапазон высоты, за который прозрачность примечания доходит до 1
@@ -88,13 +104,19 @@ export const LearnScreen = () => {
   // и сколько слов в каждом разделе
   const [selection, setSelection] = useState<string[]>(ALL_CATEGORY_KEYS);
   const [counts, setCounts] = useState<CategoryCounts>({});
+  // Блок «Сегодня»: новых слов за локальный день и дневная цель
+  const [daily, setDaily] = useState<DailyProgress>({
+    introduced: 0,
+    goal: DAILY_GOAL_DEFAULT,
+  });
 
-  // Все три значения обновляем вместе, без await между ними
+  // Все значения обновляем вместе, без await между ними
   const applyLearnData = useCallback(
     (data: Awaited<ReturnType<typeof loadLearnData>>) => {
       setStats(data.stats);
       setCounts(data.counts);
       setSelection(data.selection);
+      setDaily(data.daily);
     },
     [],
   );
@@ -135,9 +157,16 @@ export const LearnScreen = () => {
     }
   }, [applyLearnData]);
 
+  // Возврат приложения из фона не вызывает фокус экрана: пока «Учить» в
+  // фокусе, перезагружаем данные и при переходе в "active" — так блок
+  // «Сегодня» переходит на новый день после полуночи
   useFocusEffect(
     useCallback(() => {
       loadStats();
+      const subscription = AppState.addEventListener("change", (state) => {
+        if (state === "active") loadStats();
+      });
+      return () => subscription.remove();
     }, [loadStats]),
   );
 
@@ -147,6 +176,7 @@ export const LearnScreen = () => {
   const availableNew = available.ownNew + available.dictionaryNew;
   const selectionSummary = formatSelectionSummary(selection);
   const availableNewText = formatNewWords(availableNew);
+  const isExhausted = isSelectionExhausted(availableNew, stats.totalNew);
   const {
     own: plannedOwn,
     dictionary: plannedDict,
@@ -288,6 +318,32 @@ export const LearnScreen = () => {
     hasBarLaidOut.current = true;
   }, [ownShare, plannedTotal, ownShareWidth, reduceMotion]);
   const ownSharePercent = ownShareWidth.interpolate({
+    inputRange: [0, 100],
+    outputRange: ["0%", "100%"],
+  });
+
+  // Полоса «Сегодня»: как полоса состава — первое значение после загрузки
+  // ставится сразу, дальше ширина анимируется 220 мс (без «уменьшить
+  // движение»); при N >= G полоса полная
+  const dailyRatio = getDailyProgressRatio(daily.introduced, daily.goal);
+  const dailyLabel = formatDailyProgress(daily.introduced, daily.goal);
+  const dailyFillWidth = useRef(new Animated.Value(0)).current;
+  const hasDailyBarLaidOut = useRef(false);
+  useEffect(() => {
+    if (!isLoaded) return;
+    const target = dailyRatio * 100;
+    if (!hasDailyBarLaidOut.current || reduceMotion) {
+      dailyFillWidth.setValue(target);
+    } else {
+      Animated.timing(dailyFillWidth, {
+        toValue: target,
+        duration: 220,
+        useNativeDriver: false,
+      }).start();
+    }
+    hasDailyBarLaidOut.current = true;
+  }, [isLoaded, dailyRatio, dailyFillWidth, reduceMotion]);
+  const dailyFillPercent = dailyFillWidth.interpolate({
     inputRange: [0, 100],
     outputRange: ["0%", "100%"],
   });
@@ -538,6 +594,27 @@ export const LearnScreen = () => {
         </View>
       </View>
 
+      {/* Сегодня: новые слова за локальный день против дневной цели (цель
+          задаётся в Профиле и не меняет размер сессии) */}
+      <View
+        style={styles.todayCard}
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel={dailyLabel}
+        accessibilityValue={{
+          min: 0,
+          max: daily.goal,
+          now: Math.min(daily.introduced, daily.goal),
+        }}
+      >
+        <Text style={styles.todayLabel}>{dailyLabel}</Text>
+        <View style={[styles.planBar, styles.planBarEmpty]}>
+          <Animated.View
+            style={[styles.planBarSegment, { width: dailyFillPercent }]}
+          />
+        </View>
+      </View>
+
       {/* Разделы, из которых берутся новые слова: открывает выбор */}
       <PressableScale
         style={styles.sectionsRow}
@@ -567,7 +644,6 @@ export const LearnScreen = () => {
             disabled={sessionSize <= 5}
             accessibilityLabel="Уменьшить количество"
             icon="remove"
-            styles={styles}
           />
           <View style={styles.counterValueWrap}>
             <Animated.Text
@@ -586,7 +662,6 @@ export const LearnScreen = () => {
             disabled={sessionSize >= 50}
             accessibilityLabel="Увеличить количество"
             icon="add"
-            styles={styles}
           />
         </View>
 
@@ -659,9 +734,25 @@ export const LearnScreen = () => {
         </Animated.View>
       </View>
 
+      {/* Выбранные разделы исчерпаны, а в других новые слова ещё есть */}
+      {isExhausted && (
+        <View style={styles.exhaustedRow}>
+          <Ionicons
+            name="information-circle-outline"
+            size={16}
+            style={styles.planNoteIcon}
+          />
+          <Text style={styles.planNoteText}>
+            В выбранных разделах не осталось новых слов. Выберите другие
+            разделы.
+          </Text>
+        </View>
+      )}
+
       <Button
         label="Начать сессию"
         onPress={handleStart}
+        disabled={isExhausted}
         style={styles.buttonGap}
       />
     </ScrollView>
@@ -735,6 +826,21 @@ const createStyles = (theme: Theme) =>
     height: 34,
     backgroundColor: theme.inkCardDivider,
   },
+  todayCard: {
+    backgroundColor: theme.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 15,
+    rowGap: 10,
+  },
+  todayLabel: {
+    color: theme.textEmphasis,
+    fontSize: 15,
+    fontWeight: "600",
+  },
   sectionsRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -762,19 +868,6 @@ const createStyles = (theme: Theme) =>
   },
   sectionsChevron: {
     color: theme.textMuted,
-  },
-  counterBtn: {
-    width: 48,
-    height: 48,
-    backgroundColor: theme.surfaceElevated,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: theme.borderSubtle,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  counterBtnIcon: {
-    color: theme.textEmphasis,
   },
   planCard: {
     backgroundColor: theme.surface,
@@ -900,6 +993,12 @@ const createStyles = (theme: Theme) =>
     lineHeight: 16,
     color: theme.amberAccent,
   },
+  exhaustedRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    columnGap: 6,
+    marginTop: 10,
+  },
   buttonGap: {
     marginTop: 10,
   },
@@ -1005,34 +1104,6 @@ const createStyles = (theme: Theme) =>
     marginBottom: 20,
   },
 });
-
-type StepperButtonProps = {
-  onPress: () => void;
-  disabled: boolean;
-  accessibilityLabel: string;
-  icon: "remove" | "add";
-  styles: ReturnType<typeof createStyles>;
-};
-
-// 7. КНОПКА СТЕППЕРА: нажатие сжимает её до 0.92 (PressableScale)
-const StepperButton = ({
-  onPress,
-  disabled,
-  accessibilityLabel,
-  icon,
-  styles,
-}: StepperButtonProps) => (
-  <PressableScale
-    onPress={onPress}
-    disabled={disabled}
-    pressedScale={0.92}
-    accessibilityLabel={accessibilityLabel}
-    accessibilityState={{ disabled }}
-    style={[styles.counterBtn, { opacity: disabled ? 0.35 : 1 }]}
-  >
-    <Ionicons name={icon} size={22} style={styles.counterBtnIcon} />
-  </PressableScale>
-);
 
 type SessionCompleteProps = {
   wordCount: number;

@@ -9,9 +9,10 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {
   BACKUP_DATABASE_INTO,
-  CREATE_SCHEMA_V3,
+  CREATE_SCHEMA_V4,
   MIGRATE_V1_TO_V2,
   MIGRATE_V2_TO_V3,
+  MIGRATE_V3_TO_V4,
   planMigration,
   SCHEMA_VERSION,
   SELECT_USER_VERSION,
@@ -101,19 +102,37 @@ const runInTransaction = (
   }
 };
 
-// План "upgrade-v1": v1 → v2 → v3
+// План "upgrade-v1": v1 → v2 → v3 → v4
 const upgrade = (db: DatabaseSync, failBeforeCommit = false) =>
-  runInTransaction(db, [MIGRATE_V1_TO_V2, MIGRATE_V2_TO_V3], failBeforeCommit);
+  runInTransaction(
+    db,
+    [MIGRATE_V1_TO_V2, MIGRATE_V2_TO_V3, MIGRATE_V3_TO_V4],
+    failBeforeCommit,
+  );
 
-// План "upgrade-v2": v2 → v3
+// План "upgrade-v2": v2 → v3 → v4
 const upgradeV2 = (db: DatabaseSync, failBeforeCommit = false) =>
-  runInTransaction(db, [MIGRATE_V2_TO_V3], failBeforeCommit);
+  runInTransaction(db, [MIGRATE_V2_TO_V3, MIGRATE_V3_TO_V4], failBeforeCommit);
+
+// План "upgrade-v3": v3 → v4
+const upgradeV3 = (db: DatabaseSync, failBeforeCommit = false) =>
+  runInTransaction(db, [MIGRATE_V3_TO_V4], failBeforeCommit);
 
 // База v2 — такая, какой её оставлял перенос v1 → v2 прошлой версии
 const createV2 = (rows: V1Row[]) => {
   const db = createV1(rows);
   db.exec(MIGRATE_V1_TO_V2);
   db.exec("PRAGMA user_version = 2;");
+  return db;
+};
+
+// База v3 — после переноса v2 → v3 и синхронизации словаря (rank заполнен
+// у слов словаря)
+const createV3 = (rows: V1Row[]) => {
+  const db = createV2(rows);
+  db.exec(MIGRATE_V2_TO_V3);
+  db.exec("UPDATE words SET rank = id * 10 WHERE is_custom = 0;");
+  db.exec("PRAGMA user_version = 3;");
   return db;
 };
 
@@ -127,11 +146,14 @@ const comparableSchemaOf = (db: DatabaseSync) =>
       sql: item.sql?.replace(/\s+/g, " ").replace('"words"', "words"),
     }));
 
-const createFreshV3 = () => {
+const createFreshV4 = () => {
   const db = new DatabaseSync(":memory:");
-  db.exec(CREATE_SCHEMA_V3);
+  db.exec(CREATE_SCHEMA_V4);
   return db;
 };
+
+const dailyRowsOf = (db: DatabaseSync) =>
+  db.prepare("SELECT local_day, introduced FROM daily_progress;").all();
 
 const userVersion = (db: DatabaseSync) =>
   (db.prepare(SELECT_USER_VERSION).get() as { user_version: number })
@@ -174,8 +196,12 @@ describe("planMigration", () => {
     expect(planMigration(2, true)).toBe("upgrade-v2");
   });
 
-  it("is at schema version 3", () => {
-    expect(SCHEMA_VERSION).toBe(3);
+  it("treats version 3 as a v3 database", () => {
+    expect(planMigration(3, true)).toBe("upgrade-v3");
+  });
+
+  it("is at schema version 4", () => {
+    expect(SCHEMA_VERSION).toBe(4);
   });
 
   it.each([true, false])(
@@ -209,9 +235,16 @@ describe("planMigration", () => {
 
     expect(planMigration(userVersion(db), hasWordsTable)).toBe("upgrade-v2");
   });
+
+  it("matches what a v3 database reports", () => {
+    const db = createV3([]);
+    const hasWordsTable = db.prepare(SELECT_WORDS_TABLE).get() !== undefined;
+
+    expect(planMigration(userVersion(db), hasWordsTable)).toBe("upgrade-v3");
+  });
 });
 
-describe("v1 → v2 → v3 migration", () => {
+describe("v1 → v2 → v3 → v4 migration", () => {
   const v1Rows = [
     dict(1, "apple"),
     dict(2, "Monday", "review"),
@@ -242,14 +275,15 @@ describe("v1 → v2 → v3 migration", () => {
     ]);
   });
 
-  it("sets user_version to 3 and leaves the same schema as a fresh install", () => {
+  it("sets user_version to 4 and leaves the same schema as a fresh install", () => {
     const db = createV1(v1Rows);
     expect(userVersion(db)).toBe(0);
 
     upgrade(db);
 
-    expect(userVersion(db)).toBe(3);
-    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV3()));
+    expect(userVersion(db)).toBe(4);
+    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV4()));
+    expect(dailyRowsOf(db)).toEqual([]);
   });
 
   it("leaves rank empty until the dictionary is synced", () => {
@@ -353,11 +387,11 @@ describe("v1 → v2 → v3 migration", () => {
     expect(userVersion(db)).toBe(0);
     // Повторная попытка после отката проходит
     upgrade(db);
-    expect(userVersion(db)).toBe(3);
+    expect(userVersion(db)).toBe(4);
   });
 });
 
-describe("v2 → v3 migration", () => {
+describe("v2 → v3 → v4 migration", () => {
   const v2Rows = [
     dict(1, "apple"),
     dict(2, "Monday", "review"),
@@ -380,14 +414,14 @@ describe("v2 → v3 migration", () => {
     );
   });
 
-  it("sets user_version to 3 and leaves the same schema as a fresh install", () => {
+  it("sets user_version to 4 and leaves the same schema as a fresh install", () => {
     const db = createV2(v2Rows);
     db.exec("INSERT INTO app_settings (key, value) VALUES ('theme_preference', 'dark');");
 
     upgradeV2(db);
 
-    expect(userVersion(db)).toBe(3);
-    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV3()));
+    expect(userVersion(db)).toBe(4);
+    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV4()));
     expect(db.prepare("SELECT key, value FROM app_settings;").all()).toEqual([
       { key: "theme_preference", value: "dark" },
     ]);
@@ -404,8 +438,59 @@ describe("v2 → v3 migration", () => {
   });
 });
 
-describe("schema v3 constraints", () => {
-  const createV3 = createFreshV3;
+describe("v3 → v4 migration", () => {
+  const v3Rows = [
+    dict(1, "apple"),
+    dict(2, "Monday", "review"),
+    dict(3, "run", "learned"),
+    custom(7, "Serendipity"),
+    custom(12, "bank", "review"),
+  ];
+
+  const fullRowsOf = (db: DatabaseSync) =>
+    db.prepare("SELECT * FROM words ORDER BY id;").all();
+
+  it("keeps every row, key, status and rank", () => {
+    const db = createV3(v3Rows);
+    const rowsBefore = fullRowsOf(db);
+
+    upgradeV3(db);
+
+    expect(fullRowsOf(db)).toEqual(rowsBefore);
+    expect(rowsBefore).toHaveLength(5);
+  });
+
+  it("sets user_version to 4, adds an empty daily_progress and leaves the same schema as a fresh install", () => {
+    const db = createV3(v3Rows);
+    db.exec(
+      `INSERT INTO app_settings (key, value)
+       VALUES ('theme_preference', 'dark'), ('dictionary_version', 'abc');`,
+    );
+
+    upgradeV3(db);
+
+    expect(userVersion(db)).toBe(4);
+    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV4()));
+    expect(dailyRowsOf(db)).toEqual([]);
+    expect(db.prepare("SELECT key, value FROM app_settings ORDER BY key;").all()).toEqual([
+      { key: "dictionary_version", value: "abc" },
+      { key: "theme_preference", value: "dark" },
+    ]);
+  });
+
+  it("leaves v3 untouched when it fails", () => {
+    const db = createV3(v3Rows);
+    const schemaBefore = schemaOf(db);
+
+    expect(() => upgradeV3(db, true)).toThrow("forced failure");
+
+    expect(schemaOf(db)).toEqual(schemaBefore);
+    expect(userVersion(db)).toBe(3);
+  });
+});
+
+describe("schema v4 constraints", () => {
+  const createV4 = createFreshV4;
 
   const insert = (
     db: DatabaseSync,
@@ -421,7 +506,7 @@ describe("schema v3 constraints", () => {
       .run(dictKey, isCustom, status);
 
   it("accepts dictionary and custom words", () => {
-    const db = createV3();
+    const db = createV4();
     insert(db, "term", 0);
     insert(db, null, 1);
     insert(db, null, 1);
@@ -434,27 +519,43 @@ describe("schema v3 constraints", () => {
   });
 
   it("rejects an unknown or missing status", () => {
-    const db = createV3();
+    const db = createV4();
     expect(() => insert(db, "a", 0, "done")).toThrow(/CHECK constraint failed/);
     expect(() => insert(db, "b", 0, null)).toThrow(/NOT NULL constraint failed/);
   });
 
   it("rejects a custom word with a dict_key", () => {
-    expect(() => insert(createV3(), "a", 1)).toThrow(/CHECK constraint failed/);
+    expect(() => insert(createV4(), "a", 1)).toThrow(/CHECK constraint failed/);
   });
 
   it("rejects a dictionary word without a dict_key", () => {
-    expect(() => insert(createV3(), null, 0)).toThrow(/CHECK constraint failed/);
+    expect(() => insert(createV4(), null, 0)).toThrow(/CHECK constraint failed/);
   });
 
   it("rejects an is_custom other than 0 or 1", () => {
-    expect(() => insert(createV3(), "a", 2)).toThrow(/CHECK constraint failed/);
+    expect(() => insert(createV4(), "a", 2)).toThrow(/CHECK constraint failed/);
   });
 
   it("rejects a duplicate dict_key", () => {
-    const db = createV3();
+    const db = createV4();
     insert(db, "a", 0);
     expect(() => insert(db, "a", 0)).toThrow(/UNIQUE constraint failed/);
+  });
+
+  it("keeps one daily_progress row per day with a non-negative count", () => {
+    const db = createV4();
+    db.exec("INSERT INTO daily_progress (local_day) VALUES ('2026-10-13');");
+
+    expect(dailyRowsOf(db)).toEqual([{ local_day: "2026-10-13", introduced: 0 }]);
+    expect(() =>
+      db.exec("INSERT INTO daily_progress (local_day) VALUES ('2026-10-13');"),
+    ).toThrow(/UNIQUE constraint failed/);
+    expect(() =>
+      db.exec("INSERT INTO daily_progress (local_day, introduced) VALUES ('2026-10-14', -1);"),
+    ).toThrow(/CHECK constraint failed/);
+    expect(() =>
+      db.exec("INSERT INTO daily_progress (local_day) VALUES (NULL);"),
+    ).toThrow(/NOT NULL constraint failed/);
   });
 });
 

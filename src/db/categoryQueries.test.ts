@@ -23,7 +23,7 @@ import {
   SET_LEARN_CATEGORIES,
 } from "./categoryQueries";
 import { DictionaryCard, planDictionarySync } from "./dictionarySync";
-import { CREATE_SCHEMA_V3, SET_SCHEMA_VERSION } from "./schema";
+import { CREATE_SCHEMA_V4, SET_SCHEMA_VERSION } from "./schema";
 
 type Status = "new" | "review" | "learned";
 
@@ -53,7 +53,7 @@ const CUSTOM: [string, Status][] = [
 
 const createFixture = () => {
   const db = new DatabaseSync(":memory:");
-  db.exec(CREATE_SCHEMA_V3);
+  db.exec(CREATE_SCHEMA_V4);
   db.exec(SET_SCHEMA_VERSION);
   const insertDict = db.prepare(
     `INSERT INTO words (dict_key, term, translation, is_custom, status, rank)
@@ -176,7 +176,7 @@ describe("buildCategoryCountsQuery", () => {
   it("splits the real dictionary into full bands", () => {
     const cards = realDictionary as DictionaryCard[];
     const db = new DatabaseSync(":memory:");
-    db.exec(CREATE_SCHEMA_V3);
+    db.exec(CREATE_SCHEMA_V4);
     db.exec("BEGIN");
     for (const step of planDictionarySync(cards, [], "real")) {
       db.prepare(step.sql).run(...step.params);
@@ -193,7 +193,7 @@ describe("buildCategoryCountsQuery", () => {
 
   it("returns zeros for an empty table", () => {
     const db = new DatabaseSync(":memory:");
-    db.exec(CREATE_SCHEMA_V3);
+    db.exec(CREATE_SCHEMA_V4);
 
     expect(Object.values(countsOf(db))).toEqual(
       CATEGORIES.map(() => ({ total: 0, remaining: 0 })),

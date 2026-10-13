@@ -21,6 +21,9 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 - **expo-sqlite ~57** for the local on-device database (`english_cards.db`)
 - **expo-notifications** for the study reminders (one-shot local notifications, see "Reminders"), **expo-speech** for pronunciation,
   **expo-constants**, **expo-font**, **expo-linking**, **expo-status-bar**
+- **expo-splash-screen ~57** — the only way to keep the native splash up until the DB is ready
+  (`preventAutoHideAsync` / `hideAsync`) and to configure it via its config plugin; see "App
+  icon, notification icon and splash screen"
 - **expo-system-ui** is installed so that `userInterfaceStyle: "automatic"` works on Android —
   no imports, but do not remove it
 - **react-native-safe-area-context ~5.7** + **react-native-screens ~4.26**
@@ -50,7 +53,7 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 
 ```
 src/app/          Expo Router routes — THIN wrappers only
-  _layout.tsx     Root: SafeAreaProvider, StatusBar, TopFade, DB init gate
+  _layout.tsx     Root: SafeAreaProvider, StatusBar, TopFade, DB init gate, native splash hide
   (tabs)/_layout.tsx  NativeTabs navigator (Учить / Повторение / Слова / Профиль)
   (tabs)/index.tsx   -> re-exports LearnScreen
   (tabs)/review.tsx  -> re-exports ReviewScreen
@@ -65,6 +68,7 @@ src/components/   Shared UI (Button, PressableScale, StepperButton, FlipCard, Fa
                   TimePickerModal)
 src/hooks/        Shared hooks (useReduceMotion, useReminderReplan)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
+                  + tokens.test.ts (app.json splash / notification colours = tokens)
 src/db/           SQLite access + models (database.ts), schema/migration SQL + planMigration (schema.ts),
                   dictionary + topic sync SQL + pure helpers (dictionarySync.ts), Learn section
                   SQL (categoryQueries.ts), status changes + daily progress + goal + reset SQL
@@ -88,7 +92,10 @@ src/assets/       dictionary.json (large, generated, git-tracked, never read it)
 scripts/          Python pipelines: convert_freedict.py, build_topics.py, data_version.py (shared
                   version writer), their tests, requirements.txt, data/ (card_overrides.json,
                   excluded_terms.json, topic_overrides.json), .venv/ and .wn_data/ (gitignored)
-assets/           App icons / splash
+assets/           Final artwork, never regenerate: icon.png (1024, opaque app icon),
+                  android-icon-background/foreground/monochrome.png (adaptive icon layers),
+                  notification-icon.png (96×96 white on transparent, Android notification small
+                  icon), splash-icon.png (1024 RGBA, ~640 px rounded square centred), favicon.png
 ```
 
 ## Commands
@@ -279,6 +286,33 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   screens), and from Profile after any reminder setting change (switch, time added / changed /
   removed) and after a granted permission. Because the window only moves when the app runs,
   reminders stop by themselves about a week after the app was last opened.
+
+**App icon, notification icon and splash screen** (all in `app.json`; the images in `assets/`
+are final — do not regenerate or edit them)
+- `icon` `./assets/icon.png`; `android.adaptiveIcon`: the three `android-icon-*` layers, fallback
+  `backgroundColor` `#1E2833` (top tone of the icon's dark gradient).
+- `expo-notifications` plugin: `icon` `./assets/notification-icon.png`, `color` `#D97706`
+  (= `orangeAccent`).
+- `expo-splash-screen` plugin (keys from the package's `plugin/src/types.ts` and
+  `getAndroidSplashConfig.ts` / `getIosSplashConfig.ts`; the README there is the outdated bare
+  workflow guide): `image` `./assets/splash-icon.png`, `imageWidth` 240, `resizeMode`
+  `contain`, `backgroundColor` `#F7F7F2` (= `lightTheme.pageBackground`), `dark.backgroundColor`
+  `#0F1519` (= `darkTheme.pageBackground`); no dark image (both themes share it). The splash
+  follows the system appearance (the in-app theme preference is applied only after JS starts).
+- Android: the plugin always uses the Android 12 SplashScreen API (`Theme.SplashScreen`,
+  `windowSplashScreenAnimatedIcon`, no icon background, also on older Android via
+  core-splashscreen): the image is drawn at `imageWidth` dp in a 288 dp canvas and masked to a
+  192 dp circle (radius 96 dp). The artwork's farthest opaque pixel is 0.384 × image width from
+  the centre, so `imageWidth` ≤ 250 keeps it unclipped; 240 → visible square ≈ 150 dp, corners
+  at 92 dp. No extra Android keys are needed. iOS draws the image at 240 pt, no mask.
+- Behaviour: `src/app/_layout.tsx` calls `SplashScreen.preventAutoHideAsync()` at module level
+  and `SplashScreen.hideAsync()` in an effect once `isReady` or `initFailed` is set (the existing
+  `prepare()` = `initDatabase()` → schema migration + dictionary sync), so the splash never
+  hides before the DB is ready and never covers the error screen. A retry after an error shows
+  the gate's spinner (the splash is gone). The config takes effect only in a native build
+  (`preview` APK).
+- Guard: `src/theme/tokens.test.ts` fails when the app.json splash backgrounds or the
+  notification colour drift from the tokens — change app.json together with `tokens.ts`.
 
 **Windows dev environment**
 - If PowerShell blocks `npx.ps1`, call `npx.cmd` instead.
@@ -702,7 +736,9 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   (DB gate in `src/app/_layout.tsx`: `isReady` / `initFailed`). ProfileScreen: independent loads go
   through one `Promise.all`, an `isLoaded` flag gates the `FadeInView` content fade-in, and derived values
   come from `getWordsStats()` (totalCount = totalNew + review + learned).
-- Loading/error states: the DB gate shows a spinner, and on failure "Не удалось открыть базу
+- Loading/error states: on launch the native splash covers the DB gate until init succeeds or
+  fails (see "App icon, notification icon and splash screen"); the gate's own spinner is seen
+  only during a retry, and on failure "Не удалось открыть базу
   данных" + "Повторить". LearnScreen and ReviewScreen render only the page background until their first load
   completes; a failed first load shows an icon + "Не удалось загрузить данные" + "Повторить".
   Profile fades its content in even after a failed load (with `showErrorAlert()`); Words renders

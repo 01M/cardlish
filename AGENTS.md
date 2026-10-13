@@ -226,6 +226,26 @@ after about a week. Profile shows the switch, the list of times (tap to edit wit
 `TimePickerModal` from `@expo/ui`, a 44 pt remove button when more than one), "Добавить время"
 (disabled at 3) and a note about the goal and the one-week stop.
 
+### App icon, notification icon and splash screen
+
+Images in `assets/` are final artwork — do not regenerate them. `icon.png` (1024, opaque) is the
+app icon; `android-icon-background/foreground/monochrome.png` are the adaptive icon layers
+(fallback `backgroundColor` `#1E2833`); `notification-icon.png` (96×96, white on transparent) is
+the Android notification small icon, tinted `#D97706` (= `orangeAccent`) via the
+`expo-notifications` plugin. The splash uses **expo-splash-screen** (added for
+`preventAutoHideAsync`/`hideAsync`; plugin keys come from its `plugin/src/types.ts`):
+`image` `splash-icon.png` (a 640 px rounded square centred on a 1024 transparent canvas),
+`imageWidth` 240 (visible square ≈ 150 dp), `resizeMode` `contain`, `backgroundColor` =
+`lightTheme.pageBackground`, `dark.backgroundColor` = `darkTheme.pageBackground`. On Android
+the plugin uses the Android 12 SplashScreen API on every version: the image is drawn at
+`imageWidth` dp on a 288 dp icon canvas and masked to a 192 dp circle; the artwork reaches
+38.4 % of the canvas width from the centre, so `imageWidth` must stay ≤ 250 (240 → 92 dp of the
+96 dp radius). The root layout calls `preventAutoHideAsync()` at module level and
+`hideAsync()` once the existing init (schema migration + dictionary sync) has either succeeded
+or failed, so the error screen is never covered; a retry shows the in-app loading view.
+`src/theme/tokens.test.ts` checks the app.json splash and notification colours against the
+tokens — change both together.
+
 ## Navigation & Routing
 
 - Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.

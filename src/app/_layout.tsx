@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
@@ -17,6 +18,10 @@ import { Theme } from "@/theme/tokens";
 import TopFade from "@/components/TopFade";
 import { Button } from "@/components/Button";
 import { useReminderReplan } from "@/hooks/useReminderReplan";
+
+// Системная заставка держится, пока не готова база (перенос схемы и
+// синхронизация словаря); скрывается после успеха или ошибки инициализации
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const scheme = useColorSchemeName();
@@ -61,6 +66,14 @@ export default function RootLayout() {
   useEffect(() => {
     prepare();
   }, [prepare]);
+
+  // После первого исхода инициализации (приложение или экран ошибки уже
+  // отрисованы) убираем заставку; повтор после ошибки идёт без неё
+  useEffect(() => {
+    if (isReady || initFailed) {
+      void SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isReady, initFailed]);
 
   const handleRetry = () => {
     setInitFailed(false);

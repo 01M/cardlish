@@ -266,6 +266,11 @@ When the lock file is regenerated or the local Node major changes, update the pi
 `npm ci --ignore-scripts --dry-run` passes under the pinned Node version, and check the
 "Install dependencies" step of the EAS build log before building further.
 
+The display name is "Cardlish" (`app.json` `"name"`). The `slug` (`english-cards`), `scheme`,
+`android.package` / `ios.bundleIdentifier`, `extra.eas.projectId`, `package.json` `"name"`,
+`eas.json` and the DB file names intentionally stay unchanged: changing them would detach the
+EAS project, create a different store app or orphan installed users' data.
+
 `react-native-reanimated` and `react-native-worklets` are only auto-installed peers
 (react-native-drawer-layout, from expo-router). The app does not use them (built-in `Animated`
 only), but they are autolinked into the Android build. Never import them or add them to

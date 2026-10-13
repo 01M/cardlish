@@ -2,10 +2,18 @@
 
 ## App overview
 
-"Английские карточки" (`english-cards`) — an Expo/React Native English-vocabulary flashcard app
+"Cardlish" (`english-cards`) — an Expo/React Native English-vocabulary flashcard app
 with spaced repetition. Users flip cards, grade them (`new` → `review` → `learned`), manage a
 custom word list on top of a bundled FreeDict dictionary, get up to three daily study reminders, and track
 per-status statistics. UI copy is Russian; identifiers and code are English.
+
+**Name vs identifiers:** the user-visible brand is "Cardlish" — `app.json` `"name"` (launcher
+label, iOS display name) and the author of the `manual-corrections` entry in
+`src/data/sources.json`. Everything else intentionally keeps the old identifiers: `slug`
+`english-cards`, `scheme` `englishcards`, `android.package` / `ios.bundleIdentifier`,
+`extra.eas.projectId`, `package.json` `"name"`, `eas.json` and the DB files `english_cards.db` /
+`english_cards.v1-backup.db`. Changing them would detach the EAS project, make a new app for the
+stores (another package id) or orphan installed users' data — never rename them for branding.
 
 ## Tech stack
 

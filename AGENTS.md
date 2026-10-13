@@ -67,7 +67,7 @@ multi-syllable words, no dots/parentheses/off-glide marks, tied affricates (`t͡
 
 Build order: cards → exclusions → ranks → hand corrections, so ranks stay dense and corrections
 never change a rank. Offensive vocabulary (profanity, slurs, abusive insults, explicit sexual
-acts / sex toys / porn, obsolete racial typology — 154 keys) is removed from the dictionary
+acts / sex toys / porn, obsolete racial typology — 156 keys) is removed from the dictionary
 entirely via `scripts/data/excluded_terms.json`, one `{ "key", "reason" }` per line; the build
 fails loudly on an unknown or duplicate key, an empty reason, unknown fields or a key that is
 also in `card_overrides.json`. Remove such keys from `topic_overrides.json` too; a jest test

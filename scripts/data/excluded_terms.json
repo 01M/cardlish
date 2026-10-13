@@ -152,5 +152,7 @@
   {"key": "pussywhipped", "reason": "profanity"},
   {"key": "schizy", "reason": "slur (mental illness)"},
   {"key": "shiteater", "reason": "profanity"},
-  {"key": "shitly", "reason": "profanity"}
+  {"key": "shitly", "reason": "profanity"},
+  {"key": "nob", "reason": "profanity (vulgar British slang; the remaining translation is anatomical-crude)"},
+  {"key": "ho", "reason": "slur (its main modern sense; the cleaned card was nonsense)"}
 ]

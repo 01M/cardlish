@@ -1527,5 +1527,15 @@
   {"topic": "animal", "key": "instar", "action": "remove", "reason": "translation-mismatch"},
   {"topic": "emotion", "key": "lecherous", "action": "remove", "reason": "vulgar"},
   {"topic": "emotion", "key": "warpath", "action": "remove", "reason": "off-topic"},
-  {"topic": "food", "key": "junket", "action": "remove", "reason": "wrong-sense"}
+  {"topic": "food", "key": "junket", "action": "remove", "reason": "wrong-sense"},
+  {"topic": "body", "key": "clitoris", "action": "remove", "reason": "vulgar"},
+  {"topic": "body", "key": "vulva", "action": "remove", "reason": "vulgar"},
+  {"topic": "body", "key": "foreskin", "action": "remove", "reason": "vulgar"},
+  {"topic": "body", "key": "labia", "action": "remove", "reason": "vulgar"},
+  {"topic": "body", "key": "hymen", "action": "remove", "reason": "vulgar"},
+  {"topic": "body", "key": "phallus", "action": "remove", "reason": "vulgar"},
+  {"topic": "body", "key": "glans", "action": "remove", "reason": "vulgar"},
+  {"topic": "body", "key": "scrotum", "action": "remove", "reason": "vulgar"},
+  {"topic": "body", "key": "testicle", "action": "remove", "reason": "vulgar"},
+  {"topic": "body", "key": "genitalia", "action": "remove", "reason": "vulgar"}
 ]

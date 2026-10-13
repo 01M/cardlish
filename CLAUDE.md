@@ -141,7 +141,7 @@ scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python
   1..N, and an override (even a `term` change such as i → I) never changes a rank.
 - **Excluded terms** (offensive vocabulary, removed from the dictionary entirely — no opt-in
   section) live in `scripts/data/excluded_terms.json` (UTF-8, LF, one `{ "key", "reason" }` per
-  line; 154 keys: profanity, slurs, abusive insults, explicit sexual acts / sex toys / porn,
+  line; 156 keys: profanity, slurs, abusive insults, explicit sexual acts / sex toys / porn,
   obsolete racial typology). Ordinary words whose translation only had a crude item keep the
   card and get a `card_overrides.json` entry without it. The build fails loudly, listing every
   problem, on: unknown key (not produced by the converter), duplicate key, empty reason, unknown
@@ -211,8 +211,9 @@ scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.j
   `vulgar`, `missed-member`, `calendar`). Policy: a word belongs to a topic only if both its
   commonly used sense and the Russian translation on its card fit the topic; vulgar, sexual,
   offensive or slur items never belong to any topic (offensive words are not in the dictionary
-  at all, crude translation items are removed by card overrides; neutral anatomical terms such
-  as penis, vagina, breast belong to `body`). A shift of ranks (e.g. after excluding cards)
+  at all, crude translation items are removed by card overrides; of the sexual anatomy only
+  penis, vagina, breast, anus and buttock are in `body` — other genital terms keep their cards
+  but are removed from topics with reason `vulgar`). A shift of ranks (e.g. after excluding cards)
   moves cards across `RANK_CUTOFF` and the rank-dependent sense rule: rebuild, review the new
   automatic members and fix stale overrides the build reports. Overrides are applied after the automatic mapping; an explicit `add` may bring in a
   card above the rank cutoff. The build fails loudly, listing every problem, on: unknown topic,

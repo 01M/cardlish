@@ -230,7 +230,7 @@ after about a week. Profile shows the switch, the list of times (tap to edit wit
 
 Images in `assets/` are final artwork — do not regenerate them. `icon.png` (1024, opaque) is the
 app icon; `android-icon-background/foreground/monochrome.png` are the adaptive icon layers
-(fallback `backgroundColor` `#1E2833`); `notification-icon.png` (96×96, white on transparent) is
+(fallback `backgroundColor` `#D97706`); `notification-icon.png` (96×96, white on transparent) is
 the Android notification small icon, tinted `#D97706` (= `orangeAccent`) via the
 `expo-notifications` plugin. The splash uses **expo-splash-screen** (added for
 `preventAutoHideAsync`/`hideAsync`; plugin keys come from its `plugin/src/types.ts`):

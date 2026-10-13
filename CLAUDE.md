@@ -298,7 +298,7 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
 **App icon, notification icon and splash screen** (all in `app.json`; the images in `assets/`
 are final — do not regenerate or edit them)
 - `icon` `./assets/icon.png`; `android.adaptiveIcon`: the three `android-icon-*` layers, fallback
-  `backgroundColor` `#1E2833` (top tone of the icon's dark gradient).
+  `backgroundColor` `#D97706` (the amber icon background).
 - `expo-notifications` plugin: `icon` `./assets/notification-icon.png`, `color` `#D97706`
   (= `orangeAccent`).
 - `expo-splash-screen` plugin (keys from the package's `plugin/src/types.ts` and

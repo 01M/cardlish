@@ -62,3 +62,5 @@ Thumbs.db
 .claude/settings.local.json
 # Python venv for the dictionary pipeline
 scripts/.venv/
+# WordNet data cache for the topic pipeline (large SQLite + downloads)
+scripts/.wn_data/

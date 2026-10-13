@@ -32,7 +32,8 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
   FreeDict eng-rus TEI archive into `src/assets/dictionary.json` and adds a wordfreq frequency
   `rank`; venv in `scripts/.venv` (gitignored), deps pinned in `scripts/requirements.txt`
   (`wordfreq==3.1.1`), stdlib `unittest` tests in `scripts/test_convert_freedict.py`. See
-  "Dictionary pipeline" under Commands.
+  "Dictionary pipeline" under Commands. `scripts/build_topics.py` (`wn==1.1.1`) derives topic
+  membership (`src/assets/topics.json`) from Open English WordNet — see "Topic pipeline".
 - Lint: `eslint` 9 + `eslint-config-expo` (`eslint.config.js`)
 - Tests: `jest` 29 + `jest-expo` preset (`"jest"` key in `package.json`); jest types come from
   `"types": ["jest"]` in `tsconfig.json` (TS 6 no longer auto-includes `@types/*`)
@@ -67,8 +68,10 @@ src/utils/        alerts.ts (confirmResetProgress, showErrorAlert); pure, no Rea
                   dailyGoal.ts (toLocalDay, goal parse/clamp/step, "Сегодня" labels)
 *.test.ts         Unit tests live next to the code they test (never under src/app/)
 src/assets/       dictionary.json (large, generated, git-tracked, never read it), dictionary.version.json
-                  (generated with it) + dictionary.test.ts (shape + version guard)
-scripts/          Python dictionary pipeline (convert_freedict.py, its tests, requirements.txt, .venv/)
+                  (generated with it) + dictionary.test.ts (shape + version guard); topics.json
+                  (generated topic membership, not read by the app yet) + topics.test.ts (guard)
+scripts/          Python pipelines: convert_freedict.py, build_topics.py, their tests, requirements.txt,
+                  data/ (card_overrides.json, topic_overrides.json), .venv/ and .wn_data/ (gitignored)
 assets/           App icons / splash
 ```
 
@@ -148,6 +151,49 @@ scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python
   group 2 (everything else); within a group frequency descending, then lowercase term.
   `src/assets/dictionary.test.ts` guards the shape; the item cap and dedupe are covered by the
   Python tests (they work on real item lists).
+
+**Topic pipeline** (`scripts/build_topics.py`; same venv, `wn==1.1.1` from requirements.txt):
+
+```bash
+scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.json src/assets/topics.json
+scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.json src/assets/topics.json --review <scratch>/review.txt
+```
+
+- Data: Open English WordNet 2025 (`oewn:2025`, hierarchy + sense order) and `omw-en:2.0`
+  (Princeton WordNet 3.0, only its SemCor sense counts). The `wn` package downloads both into
+  the gitignored cache `scripts/.wn_data/` (also in `.claudeignore` / `.kilocodeignore`); first
+  run: `wn.config.data_directory = 'scripts/.wn_data'; wn.download('oewn:2025');
+  wn.download('omw-en:2.0')`. A build takes ~1.5 min.
+- Output `src/assets/topics.json`: `{ "<slug>": ["<dict_key>", …] }`, slugs in `TOPICS` order,
+  keys sorted, LF, one key per line; deterministic (two runs are byte-identical). The app does
+  **not** read it yet (no schema, sync or UI for topics). `src/assets/topics.test.ts` guards it:
+  every key exists in dictionary.json, no duplicates, sorted, ≥ 40 keys per topic, unique slugs —
+  no hard-coded counts.
+- `TOPICS` (21 slugs with Russian working titles) lists each topic's root synsets by stable
+  OEWN id plus a comment label; a missing id fails the build. A card belongs to a topic when one
+  of its chosen senses has a root among its hypernyms (instance hypernyms ignored; `animal`
+  excludes `hominid`; adjectives count only for `colour`/`emotion`, via attribute / derivation /
+  pertainym links). Chosen senses — rule f, per WordNet part of speech: dominant parts of speech
+  only, first sense, senses with a strong SemCor count, the second sense of a rare card with few
+  senses, the second sense of a food/plant/animal/body regular-polysemy pair. Only cards with
+  rank ≤ `RANK_CUTOFF` (20000) come from the automatic mapping; topics with fewer than
+  `MIN_TOPIC_SIZE` (40) members after curation are not written.
+- **Hand curation** in `scripts/data/topic_overrides.json` (UTF-8, LF, a JSON array with one
+  object per line): `{ "topic", "key", "action": "add" | "remove", "reason" }`, reasons from
+  `OVERRIDE_REASONS` (`wrong-sense`, `translation-mismatch`, `slang`, `rare-jargon`, `off-topic`,
+  `vulgar`, `missed-member`, `calendar`). Policy: a word belongs to a topic only if both its
+  commonly used sense and the Russian translation on its card fit the topic; vulgar, sexual,
+  offensive or slur items (including cards whose translation shows such terms) never belong to
+  any topic. Overrides are applied after the automatic mapping; an explicit `add` may bring in a
+  card above the rank cutoff. The build fails loudly, listing every problem, on: unknown topic,
+  key not in dictionary.json, duplicate decision, `remove` of a key not in the automatic set,
+  `add` of a key already in it (both stale), unknown reason or fields. `--review` writes the
+  curation candidates (automatic members + rule-c additions at rank ≤ 20000, with translations).
+  After editing, rebuild and update the topic-decision counts in the `manual-corrections` entry
+  of `src/data/sources.json` (a Python test checks them).
+- Licences: the `open-english-wordnet` entry in `src/data/sources.json` (CC BY 4.0) carries both
+  Princeton notices verbatim in `noticeText` — OEWN's `WNDB_License.txt` and omw-en's
+  `LICENSE` (WordNet 3.0) — since the licences require them on all copies.
 
 `expo-notifications` needs a **development build** — Expo Go on Android crashes on import
 (Since SDK 53 push notifications are stripped from Expo Go). `src/services/notifications.ts`

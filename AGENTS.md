@@ -51,6 +51,7 @@ Windows use the `py` launcher (bare `python` may hit the WindowsApps alias). The
 py -V:3.14 -m venv scripts/.venv                                        # once
 scripts/.venv/Scripts/python.exe -m pip install -r scripts/requirements.txt
 scripts/.venv/Scripts/python.exe scripts/convert_freedict.py <path>/freedict-eng-rus-2025.11.23.src.tar.xz src/assets/dictionary.json
+scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.json src/assets/topics.json
 scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python tests
 ```
 
@@ -84,6 +85,23 @@ The converter also writes `src/assets/dictionary.version.json` (first 16 hex cha
 over `dictionary.json`, CRLF normalised to LF). Commit `dictionary.json` and
 `dictionary.version.json` together; a jest guard recomputes the hash and fails ("rerun the
 converter") when they diverge.
+
+### Topic pipeline (Python, build-time only)
+
+`scripts/build_topics.py src/assets/dictionary.json src/assets/topics.json [--review <path>]`
+maps dictionary cards to 21 topics (food, animal, … travel) with Open English WordNet 2025
+(`oewn:2025`) and the sense counts of `omw-en:2.0`, both downloaded by `wn==1.1.1` into the
+gitignored `scripts/.wn_data/`. Roots are stable OEWN synset ids (a missing id fails the build);
+only cards with rank ≤ `RANK_CUTOFF` (20000) come from the automatic mapping. Hand decisions live
+in `scripts/data/topic_overrides.json`, one `{ "topic", "key", "action": "add"|"remove",
+"reason" }` per line (reasons: wrong-sense, translation-mismatch, slang, rare-jargon, off-topic,
+vulgar, missed-member, calendar); the build fails loudly on unknown topics, unknown keys,
+duplicates, stale adds/removes or unknown reasons. A word belongs to a topic only if its common
+sense and its card translation both fit; vulgar, sexual, offensive or slur items are never
+included. Topics under `MIN_TOPIC_SIZE` (40) are not written. Output `src/assets/topics.json`
+(slug → sorted keys, LF, deterministic) is guarded by `src/assets/topics.test.ts` and is **not
+read by the app yet**. Update the topic-decision counts in the `manual-corrections` entry of
+`src/data/sources.json` after editing the overrides (a Python test checks them).
 
 ### Database schema v4 and dictionary sync
 

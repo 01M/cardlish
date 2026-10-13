@@ -48,3 +48,6 @@ repomix-output.xml
 # Python venv for the dictionary pipeline (scripts/requirements.txt)
 scripts/.venv/
 __pycache__/
+
+# WordNet data cache for scripts/build_topics.py (downloaded by the `wn` package)
+scripts/.wn_data/

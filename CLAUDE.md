@@ -26,8 +26,15 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 - **react-native-safe-area-context ~5.7** + **react-native-screens ~4.26**
 - **@expo/vector-icons ^15** (Ionicons), **expo-haptics**, **expo-linear-gradient** (edge fades);
   animations use the built-in `Animated` API (react-native-reanimated is NOT used)
-- **EAS Build/Submit** — profiles `development`, `preview`, `production` (see `eas.json`);
-  all Android builds are APKs, `appVersionSource: "remote"`
+- **react-native-reanimated** and **react-native-worklets** are not app dependencies: npm
+  auto-installs them only as peers (react-native-drawer-layout, a dependency of expo-router),
+  and they are autolinked into the Android build. The app does not use them — never import them
+  and do not add them to `package.json`.
+- **EAS Build/Submit** — two build profiles in `eas.json`: `preview` (APK, internal
+  distribution, `autoIncrement`) and `production` (app-bundle / AAB for Google Play,
+  `autoIncrement`); `appVersionSource: "remote"`. There is NO `development` profile —
+  expo-dev-client is not installed, development runs in Expo Go. Both profiles pin `"node"` to
+  the local Node version (see "EAS Node pin" under Commands).
 - **Dictionary pipeline (Python, build-time only)** `scripts/convert_freedict.py` converts the
   FreeDict eng-rus TEI archive into `src/assets/dictionary.json` and adds a wordfreq frequency
   `rank`; venv in `scripts/.venv` (gitignored), deps pinned in `scripts/requirements.txt`
@@ -97,10 +104,18 @@ npx expo install <pkg>     # ALWAYS use for adding deps (SDK-compatible versions
 npx expo install --fix     # fix incompatible versions
 
 # EAS (no local Xcode/Android Studio needed)
-npx eas-cli@latest build --profile development|preview|production
-npx eas-cli@latest build --profile development --platform android   # dev client with native modules
+npx eas-cli@latest build --profile preview --platform android      # APK for testing
+npx eas-cli@latest build --profile production --platform android   # AAB for Google Play
 npx eas-cli@latest submit --profile production
 ```
+
+**EAS Node pin:** `preview` and `production` set `"node"` (currently `"26.8.2"`) to the local
+Node version, so EAS runs the same bundled npm as the machine that generated
+`package-lock.json`. EAS's default SDK 57 image ships npm 10.9.x, whose `npm ci` rejects our
+npm-11 lock file ("Missing: react-native-worklets@0.10.4 from lock file"). Whenever the lock
+file is regenerated or the local Node major changes: update the pin, run
+`npm ci --ignore-scripts --dry-run` under the Node version pinned in `eas.json` (it must pass),
+and check the "Install dependencies" step of the next EAS build log before relying on it.
 
 **Dictionary pipeline** (run from the repo root; Python via the `py` launcher, not bare `python`):
 
@@ -231,7 +246,7 @@ scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.j
   Princeton notices verbatim in `noticeText` — OEWN's `WNDB_License.txt` and omw-en's
   `LICENSE` (WordNet 3.0) — since the licences require them on all copies.
 
-`expo-notifications` needs a **development build** — Expo Go on Android crashes on import
+`expo-notifications` needs a **native build** (the `preview` APK; there is no dev client) — Expo Go on Android crashes on import
 (Since SDK 53 push notifications are stripped from Expo Go). `src/services/notifications.ts`
 already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that guard.
 

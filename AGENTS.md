@@ -237,8 +237,22 @@ after about a week. Profile shows the switch, the list of times (tap to edit wit
 Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
 Docs: https://docs.expo.dev/eas/index.md
 
+This project's `eas.json` has two build profiles only: `preview` (APK, internal distribution,
+autoIncrement) and `production` (app-bundle / AAB for Google Play, autoIncrement). There is no
+`development` profile — expo-dev-client is not installed; development runs in Expo Go. Both
+profiles pin `"node"` to the local Node version: EAS's default SDK 57 image ships npm 10.9.x,
+whose `npm ci` rejects our npm-11 `package-lock.json` ("Missing: react-native-worklets@0.10.4").
+When the lock file is regenerated or the local Node major changes, update the pin, check that
+`npm ci --ignore-scripts --dry-run` passes under the pinned Node version, and check the
+"Install dependencies" step of the EAS build log before building further.
+
+`react-native-reanimated` and `react-native-worklets` are only auto-installed peers
+(react-native-drawer-layout, from expo-router). The app does not use them (built-in `Animated`
+only), but they are autolinked into the Android build. Never import them or add them to
+`package.json`.
+
 ## Rules
 
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
+- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a native build: `npx expo run:ios|android` locally, or the `preview` EAS profile (this project has no `development` profile).
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md

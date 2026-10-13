@@ -5,6 +5,7 @@
   },
   "build": {
     "preview": {
+      "node": "26.8.2",
       "distribution": "internal",
       "autoIncrement": true,
       "android": {
@@ -12,6 +13,7 @@
       }
     },
     "production": {
+      "node": "26.8.2",
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"

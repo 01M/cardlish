@@ -1,15 +1,15 @@
 {
   "expo": {
     "name": "Cardlish",
-    "slug": "english-cards",
+    "slug": "cardlish",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "scheme": "englishcards",
+    "scheme": "cardlish",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "anya.red.ass"
+      "bundleIdentifier": "com.cardlish.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +19,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "anya.red.ass"
+      "package": "com.cardlish.app"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -52,10 +52,7 @@
       ]
     ],
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "33c188b0-1005-4434-8889-9a31c056958f"
-      }
+      "router": {}
     }
   }
 }

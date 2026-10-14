@@ -83,8 +83,8 @@ override (identical to the generated card), a `term` that differs from the key o
 case, an empty `reason`, unknown fields or invalid values.
 
 JSON shape: array of `{ term, translation, transcription, example, rank }`, one per lowercase
-`term` (= `dict_key`), in the order of each group's first source entry. Fresh-install ids
-therefore differ from upgraded installs — match dictionary rows by `dict_key`, never by id.
+`term` (= `dict_key`), in the order of each group's first source entry. Row ids are not stable
+across installs and dictionary updates — match dictionary rows by `dict_key`, never by id.
 `rank` is 1..N: plain lowercase words known to wordfreq first, then everything else; within each
 group by frequency, then term. `src/assets/dictionary.test.ts` guards the shape. Every data
 source must be listed in `src/data/sources.json` before its data ships.
@@ -129,8 +129,7 @@ the schema (`planMigration`: fresh → create v5 in one exclusive transaction; 5
 newer than 5 → `DatabaseTooNewError`; anything else — versions 1–4, an old v1 DB with version 0,
 negatives → `DatabaseUnsupportedError`, error screen asks to reinstall; the v1 → v5 upgrade chain
 was squashed before the first release), then syncs when `app_settings.dictionary_version` differs from
-`dictionary.version.json` — a fresh install is filled by the same sync, and since the version
-now covers `topics.json` too, every upgraded install syncs once. Sync rules, one exclusive
+`dictionary.version.json` — a fresh install is filled by the same sync. Sync rules, one exclusive
 transaction (`src/db/dictionarySync.ts`): match rows **only by `dict_key`**, update
 term/translation/transcription/example/rank, never touch `id`, `status`, `is_custom` or custom
 words; rows absent from the new JSON are deleted only if `status = 'new'`, rows with progress
@@ -216,8 +215,8 @@ at 21 items (3 × 7; iOS allows 64 pending). Texts are Russian without emoji: th
 повторить слова" and one of 3 bodies with the number of words in `'review'` (or, with none, 3
 bodies about the daily goal), rotated by local day of year + time index. The adapter
 `createReminderReplanner` (`src/services/reminders.ts`, deps injected, tested with a fake
-notifications API) cancels ALL scheduled notifications first (this also removes the DAILY
-trigger of older builds), then — only if enabled and permission is already granted, never
+notifications API) cancels ALL scheduled notifications first (the rolling window is
+re-planned from scratch), then — only if enabled and permission is already granted, never
 prompting — schedules one `DATE` trigger per item (Android channel `study-reminders`). Calls are
 serialised and never throw (`console.error`). `replanReminders` (wired in
 `src/services/notifications.ts`) runs at start and on AppState `active` / `background` /
@@ -267,10 +266,13 @@ When the lock file is regenerated or the local Node major changes, update the pi
 `npm ci --ignore-scripts --dry-run` passes under the pinned Node version, and check the
 "Install dependencies" step of the EAS build log before building further.
 
-The display name is "Cardlish" (`app.json` `"name"`). The `slug` (`english-cards`), `scheme`,
-`android.package` / `ios.bundleIdentifier`, `extra.eas.projectId`, `package.json` `"name"`,
-`eas.json` and the DB file names intentionally stay unchanged: changing them would detach the
-EAS project, create a different store app or orphan installed users' data.
+The display name "Cardlish" (`app.json` `"name"`) and all technical identifiers match:
+`android.package` / `ios.bundleIdentifier` `com.cardlish.app`, `slug` and `scheme` `cardlish`,
+the DB file `cardlish.db`, `package.json` `"name"` `cardlish` (aligned before the first store
+publication). After the first store publication the package id / bundle identifier, the EAS
+`extra.eas.projectId` and the DB file name must never be renamed: a new package id is a new app
+in the stores, a new projectId detaches the EAS project, a new DB file name orphans installed
+users' data.
 
 `react-native-reanimated` and `react-native-worklets` are only auto-installed peers
 (react-native-drawer-layout, from expo-router). The app does not use them (built-in `Animated`

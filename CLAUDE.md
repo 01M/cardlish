@@ -2,19 +2,21 @@
 
 ## App overview
 
-"Cardlish" (`english-cards`) — an Expo/React Native English-vocabulary flashcard app
+"Cardlish" (`cardlish`) — an Expo/React Native English-vocabulary flashcard app
 with a three-state word flow (`new` → `review` → `learned`) and a simple review queue (no
 intervals or due dates yet). Users flip cards, move words through those states, manage a
 custom word list on top of a bundled FreeDict dictionary, get up to three daily study reminders, and track
 per-status statistics. UI copy is Russian; identifiers and code are English.
 
-**Name vs identifiers:** the user-visible brand is "Cardlish" — `app.json` `"name"` (launcher
-label, iOS display name) and the author of the `manual-corrections` entry in
-`src/data/sources.json`. Everything else intentionally keeps the old identifiers: `slug`
-`english-cards`, `scheme` `englishcards`, `android.package` / `ios.bundleIdentifier`,
-`extra.eas.projectId`, `package.json` `"name"`, `eas.json` and the DB file `english_cards.db`.
-Changing them would detach the EAS project, make a new app for the
-stores (another package id) or orphan installed users' data — never rename them for branding.
+**Name and identifiers:** the user-visible brand "Cardlish" (`app.json` `"name"`: launcher
+label, iOS display name; the author of the `manual-corrections` entry in
+`src/data/sources.json`) and all technical identifiers match: `android.package` /
+`ios.bundleIdentifier` `com.cardlish.app`, `slug` `cardlish`, `scheme` `cardlish`, the DB file
+`cardlish.db`, `package.json` `"name"` `cardlish`. They were aligned before the first store
+publication. **After the first store publication never rename** the package id / bundle
+identifier (a new id is a new app in the stores), the EAS `extra.eas.projectId` (it links the
+EAS project and its build history) or the DB file name (a new name orphans installed users'
+data).
 
 ## Tech stack
 
@@ -27,7 +29,7 @@ stores (another package id) or orphan installed users' data — never rename the
   files outside `src/app` — regenerate if you see them)
 - **TypeScript ~6** with `strict: true`, path alias `@/* → ./src/*`
 - **Package manager: npm** (`package-lock.json` present, no `bun.lock`)
-- **expo-sqlite ~57** for the local on-device database (`english_cards.db`)
+- **expo-sqlite ~57** for the local on-device database (`cardlish.db`)
 - **expo-notifications** for the study reminders (one-shot local notifications, see "Reminders"), **expo-speech** for pronunciation,
   **expo-constants**, **expo-font**, **expo-linking**, **expo-status-bar**
 - **expo-splash-screen ~57** — the only way to keep the native splash up until the DB is ready
@@ -200,7 +202,7 @@ scripts/.venv/Scripts/python.exe -m unittest discover -s scripts -v     # Python
   duplicates (stress ignored), an empty transcription.
 - JSON shape: array of `{ term, translation, transcription, example, rank }`, one entry per
   lowercase `term` (= `dict_key`), in the order of each group's first eligible source entry.
-  This order no longer matches pre-M3b files, so fresh-install ids differ from upgraded ones —
+  Row ids are assigned by the sync and are not stable across installs and dictionary updates —
   match dictionary rows only by `dict_key`, never by id. `translation`: items joined with ", "
   (an item may itself contain ", "); `transcription`: IPA or ""; `example`: always "";
   `rank`: 1..N unique — group 1 (`^[a-z]+$` with non-zero wordfreq `large` frequency) before
@@ -283,7 +285,7 @@ already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that 
   mod 3, so a slot always gets the same text. No emoji.
 - Adapter (`src/services/reminders.ts`): `createReminderReplanner({ notifications, loadState,
   androidChannel, now })`. One run: load state for `toLocalDay(now)` → **cancel ALL scheduled
-  notifications** (also removes the old DAILY trigger of earlier builds; done even when disabled
+  notifications** (the rolling window is re-planned from scratch; done even when disabled
   or without permission) → stop if disabled → check permission (never prompts) → plan →
   Android channel → one `DATE` trigger per item. Runs are serialised (a promise chain; calls
   made while one runs share one queued run, which reads fresh state); errors never reach the UI
@@ -403,9 +405,8 @@ are final — do not regenerate or edit them)
      touched — never delete it silently — and the error screen says to reinstall the app).
    - **Dictionary sync** (`dictionarySync.ts`, fills a fresh install too — there is no separate
      seed path): runs when `app_settings.dictionary_version` differs from
-     `src/assets/dictionary.version.json` (the data version over `dictionary.json` + `topics.json`;
-     the hash formula changed in v5, so every upgraded install syncs once and fills
-     `word_topics`). Only then are the large (~6 MB) `dictionary.json` and `topics.json` `require`d
+     `src/assets/dictionary.version.json` (the data version over `dictionary.json` + `topics.json`).
+     Only then are the large (~6 MB) `dictionary.json` and `topics.json` `require`d
      (lazily). One exclusive transaction runs `planDictionarySync()`: upsert in 500-row batches,
      matched **only by `dict_key`** (ids differ between installs) — `term`, `translation`,
      `transcription`, `example`, `rank` are updated, **`id`, `status` and `is_custom` never**;

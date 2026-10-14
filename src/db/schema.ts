@@ -29,7 +29,7 @@ const CREATE_WORDS_INDEXES = `
 `;
 
 const CREATE_APP_SETTINGS = `
-  CREATE TABLE IF NOT EXISTS app_settings (
+  CREATE TABLE app_settings (
     key TEXT PRIMARY KEY NOT NULL,
     value TEXT NOT NULL
   );

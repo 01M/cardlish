@@ -33,7 +33,7 @@ JS/TS, но не работал с React Native и Expo. Каждое неоче
 | **React Native 0.86** + **React 19.2** | UI пишется на React, но рисуется настоящими нативными элементами Android/iOS (`View`, `Text`), а не HTML. |
 | **TypeScript ~6**, `strict: true` | Статическая типизация; проверка `npx tsc --noEmit`. |
 | **expo-router ~57** | Маршрутизация по файлам: файл в `src/app/` — это экран. Включены типизированные маршруты (`experiments.typedRoutes` в `app.json`). |
-| **expo-sqlite ~57** | Встроенная база SQLite (`english_cards.db`). |
+| **expo-sqlite ~57** | Встроенная база SQLite (`cardlish.db`). |
 | **expo-notifications** | Локальные уведомления-напоминания (без push-сервера). |
 | **expo-speech** | Озвучка слова системным синтезатором речи (`FlipCard.tsx` → `speakWord()`, `language: "en-US"`). |
 | **expo-splash-screen**, **expo-haptics**, **expo-linear-gradient**, **@expo/ui** | Заставка, тактильный отклик, градиенты, нативные элементы (SegmentedControl, выбор времени). |
@@ -57,7 +57,7 @@ flowchart TD
     subgraph Data["Данные"]
         DB["src/db/database.ts — асинхронные функции доступа"]
         SQL["src/db/schema.ts, dictionarySync.ts,<br/>categoryQueries.ts, progressQueries.ts — SQL-строки"]
-        LITE[("SQLite: english_cards.db")]
+        LITE[("SQLite: cardlish.db")]
     end
     A["src/assets/ — dictionary.json, topics.json,<br/>dictionary.version.json"]
     PY["scripts/*.py — сборка данных<br/>(только при разработке)"]
@@ -137,7 +137,7 @@ sequenceDiagram
     L->>OS: SplashScreen.preventAutoHideAsync() (на уровне модуля)
     L->>L: первый рендер: isReady=false, под заставкой спиннер
     L->>D: useEffect → prepare() → initDatabase()
-    D->>Q: getDb() → openDatabaseAsync("english_cards.db")
+    D->>Q: getDb() → openDatabaseAsync("cardlish.db")
     D->>Q: PRAGMA user_version, есть ли таблица words
     D->>D: planMigration(version, hasWords)
     D->>Q: пустая база: схема v5 одной эксклюзивной транзакцией
@@ -614,8 +614,7 @@ SQLite-функцию `date('now', 'localtime')` тоже не использу�
 ### Почему скользящее окно разовых уведомлений
 
 Самое простое решение — один повторяющийся ежедневный триггер «каждый день в 20:00». Проект от
-него отказался (комментарий в `services/reminders.ts` упоминает, что старые сборки ставили
-повторяющийся триггер). Причины видны в `planReminders()` (`src/utils/reminderPlan.ts`):
+него отказался. Причины видны в `planReminders()` (`src/utils/reminderPlan.ts`):
 
 - **Текст зависит от данных.** «Пора повторить 12 слов» — число слов на повторении меняется, а у
   повторяющегося уведомления текст фиксирован в момент постановки.
@@ -909,14 +908,22 @@ AAB (Android App Bundle) — формат публикации: Google Play са
 Go, а всё, что требует нативной сборки (уведомления на Android, настоящая заставка), проверяется
 на `preview`-APK.
 
-**Что намеренно не меняется.** При переименовании приложения в Cardlish поменялись только имя
-(`"name"`) и подпись в `sources.json`. Остались прежними: `slug` (`english-cards`), `scheme`,
-`android.package` / `ios.bundleIdentifier`, `extra.eas.projectId`, имя пакета в `package.json`,
-файлы базы `english_cards.db`. Причины:
+**Что намеренно не меняется.** Сейчас имя и все технические идентификаторы совпадают с брендом:
+идентификатор пакета `android.package` / `ios.bundleIdentifier` — `com.cardlish.app`, `slug` и
+`scheme` — `cardlish`, файл базы — `cardlish.db`, имя пакета в `package.json` — `cardlish`. Так
+было не всегда: после переименования в Cardlish идентификаторы какое-то время оставались старыми
+(`english-cards`, `english_cards.db` и т. п.), и их привели к бренду перед первой публикацией в
+магазине. Это было возможно только потому, что приложение ещё нигде не опубликовано и
+единственная установка — сборка самого разработчика (её данные при смене имени файла базы
+теряются). `extra.eas.projectId` при этом убран из `app.json`: проект заново связывается с EAS
+командой `eas init`.
+
+После первой публикации идентификатор пакета, `bundleIdentifier`, `extra.eas.projectId` и имя
+файла базы менять нельзя:
 
 - идентификатор пакета для Google Play и Android — это и есть «то же самое приложение»; новый id
   означает новое приложение в магазине, без обновления у существующих пользователей;
-- `projectId` / `slug` связывают проект с EAS — смена отвяжет историю сборок;
+- `projectId` связывает проект с EAS — смена отвяжет историю сборок;
 - новое имя файла базы — и установленные пользователи «потеряют» все данные (старый файл
   останется, но приложение его не откроет).
 

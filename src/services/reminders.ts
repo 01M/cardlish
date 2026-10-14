@@ -46,8 +46,8 @@ const replan = async (deps: ReminderDeps) => {
   const now = deps.now();
   const state = await deps.loadState(toLocalDay(now));
 
-  // Сначала снимаем всё: старый план, повторяющийся триггер прежних сборок,
-  // а при выключенных напоминаниях или без разрешения — и всё остальное.
+  // Сначала снимаем всё: скользящее окно каждый раз строится заново, а при
+  // выключенных напоминаниях или без разрешения ничего не должно остаться.
   // Снятие разрешения не требует
   await notifications.cancelAllScheduledNotificationsAsync();
   if (!state.enabled) return;

@@ -261,8 +261,9 @@ scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.j
   After editing, rebuild and update the topic-decision counts in the `manual-corrections` entry
   of `src/data/sources.json` (a Python test checks them).
 - Licences: the `open-english-wordnet` entry in `src/data/sources.json` (CC BY 4.0) carries both
-  Princeton notices verbatim in `noticeText` — OEWN's `WNDB_License.txt` and omw-en's
-  `LICENSE` (WordNet 3.0) — since the licences require them on all copies.
+  Princeton notices in `noticeText` — OEWN's `WNDB_License.txt` and omw-en's
+  `LICENSE` (WordNet 3.0) — since the licences require them on all copies. The wording is
+  unchanged; only the hard wraps inside paragraphs (and the stray line numbers) are removed.
 
 `expo-notifications` needs a **native build** (the `preview` APK; there is no dev client) — Expo Go on Android crashes on import
 (Since SDK 53 push notifications are stripped from Expo Go). `src/services/notifications.ts`

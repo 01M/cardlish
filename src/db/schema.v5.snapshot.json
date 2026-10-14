@@ -1,0 +1,59 @@
+{
+  "userVersion": 5,
+  "sqliteMaster": [
+    {
+      "type": "index",
+      "name": "idx_words_is_custom_status",
+      "tbl_name": "words",
+      "sql": "CREATE INDEX idx_words_is_custom_status ON words (is_custom, status)"
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_app_settings_1",
+      "tbl_name": "app_settings",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_daily_progress_1",
+      "tbl_name": "daily_progress",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_words_1",
+      "tbl_name": "words",
+      "sql": null
+    },
+    {
+      "type": "table",
+      "name": "app_settings",
+      "tbl_name": "app_settings",
+      "sql": "CREATE TABLE app_settings (\n    key TEXT PRIMARY KEY NOT NULL,\n    value TEXT NOT NULL\n  )"
+    },
+    {
+      "type": "table",
+      "name": "daily_progress",
+      "tbl_name": "daily_progress",
+      "sql": "CREATE TABLE daily_progress (\n    local_day TEXT PRIMARY KEY NOT NULL,\n    introduced INTEGER NOT NULL DEFAULT 0 CHECK (introduced >= 0)\n  )"
+    },
+    {
+      "type": "table",
+      "name": "sqlite_sequence",
+      "tbl_name": "sqlite_sequence",
+      "sql": "CREATE TABLE sqlite_sequence(name,seq)"
+    },
+    {
+      "type": "table",
+      "name": "word_topics",
+      "tbl_name": "word_topics",
+      "sql": "CREATE TABLE word_topics (\n    topic TEXT NOT NULL,\n    dict_key TEXT NOT NULL,\n    PRIMARY KEY (topic, dict_key)\n  ) WITHOUT ROWID"
+    },
+    {
+      "type": "table",
+      "name": "words",
+      "tbl_name": "words",
+      "sql": "CREATE TABLE words (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    dict_key TEXT UNIQUE,\n    term TEXT NOT NULL,\n    translation TEXT NOT NULL,\n    transcription TEXT,\n    example TEXT,\n    is_custom INTEGER NOT NULL DEFAULT 0 CHECK (is_custom IN (0, 1)),\n    status TEXT NOT NULL DEFAULT 'new'\n      CHECK (status IN ('new', 'review', 'learned')),\n    rank INTEGER,\n    CHECK ((is_custom = 1) = (dict_key IS NULL))\n  )"
+    }
+  ]
+}

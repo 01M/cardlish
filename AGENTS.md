@@ -124,10 +124,11 @@ out of the file, and then its registry entry must go.
 `PRAGMA user_version` = 5; `words.rank` (INTEGER, NULL for custom words) defines the frequency
 sections and the order of new dictionary words (see below); `daily_progress` (v4) counts new
 words per local day (see "Daily goal"); `word_topics (topic, dict_key)` (v5, `PRIMARY KEY (topic,
-dict_key) WITHOUT ROWID`) holds topic membership of dictionary words. On start the app migrates
-the schema (`planMigration`: fresh / v1 → v5 / v2 → v5 / v3 → v5 / v4 → v5, each in one
-exclusive transaction; v4 → v5 is a plain `CREATE TABLE word_topics`; newer than 5 →
-`DatabaseTooNewError`), then syncs when `app_settings.dictionary_version` differs from
+dict_key) WITHOUT ROWID`) holds topic membership of dictionary words. On start the app checks
+the schema (`planMigration`: fresh → create v5 in one exclusive transaction; 5 → current;
+newer than 5 → `DatabaseTooNewError`; anything else — versions 1–4, an old v1 DB with version 0,
+negatives → `DatabaseUnsupportedError`, error screen asks to reinstall; the v1 → v5 upgrade chain
+was squashed before the first release), then syncs when `app_settings.dictionary_version` differs from
 `dictionary.version.json` — a fresh install is filled by the same sync, and since the version
 now covers `topics.json` too, every upgraded install syncs once. Sync rules, one exclusive
 transaction (`src/db/dictionarySync.ts`): match rows **only by `dict_key`**, update

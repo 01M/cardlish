@@ -47,8 +47,8 @@ type Row = {
   rank: number | null;
 };
 
-// База после переноса v2 → v5: строки словаря со старым содержимым и без
-// rank, свои слова, прогресс
+// База v5 до синхронизации: строки словаря со старым содержимым и без rank,
+// свои слова, прогресс
 const createSyncedBefore = (rows: Omit<Row, "rank">[]) => {
   const db = createV5();
   const insert = db.prepare(
@@ -420,12 +420,5 @@ describe("dictionary sync helpers", () => {
       "INSERT INTO app_settings",
     ]);
     expect(steps.at(-1)?.params).toEqual(["v-new"]);
-  });
-
-  it("computes the same key in JS as lower(trim(term)) in the v1 → v2 migration", () => {
-    const db = new DatabaseSync(":memory:");
-    for (const term of ["Apple", " RUN ", "o'clock", "Twenty-One"]) {
-      expect(db.prepare("SELECT lower(trim(?)) AS key;").get(term)).toEqual({ key: toDictKey(term) });
-    }
   });
 });

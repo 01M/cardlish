@@ -47,12 +47,7 @@ import {
   SET_DAILY_GOAL,
 } from "./progressQueries";
 import {
-  BACKUP_DATABASE_INTO,
   CREATE_SCHEMA_V5,
-  MIGRATE_V1_TO_V2,
-  MIGRATE_V2_TO_V3,
-  MIGRATE_V3_TO_V4,
-  MIGRATE_V4_TO_V5,
   planMigration,
   SELECT_USER_VERSION,
   SELECT_WORDS_TABLE,
@@ -100,6 +95,15 @@ export class DatabaseTooNewError extends Error {
   }
 }
 
+// База старой (v1–v4) или неизвестной версии: переносы со старых схем удалены
+// до публикации приложения, поэтому её не трогаем и просим переустановить
+export class DatabaseUnsupportedError extends Error {
+  constructor(userVersion: number) {
+    super(`Database schema version ${userVersion} is not supported`);
+    this.name = "DatabaseUnsupportedError";
+  }
+}
+
 // Синхронизация словаря и тем (правила — в dictionarySync.ts), когда версия
 // данных (по dictionary.json и topics.json) отличается от сохранённой в
 // app_settings. Так же заполняется новая установка. JSON подгружаем лениво —
@@ -128,22 +132,6 @@ const syncDictionaryIfNeeded = async (db: SQLite.SQLiteDatabase) => {
   });
 };
 
-// Копия базы v1, которая делается перед переносом на v2. Лежит рядом с
-// базой и удаляется при следующем успешном запуске на v2 или новее
-const V1_BACKUP_NAME = "english_cards.v1-backup.db";
-
-const getDbDirectory = (db: SQLite.SQLiteDatabase) =>
-  db.databasePath.slice(0, db.databasePath.lastIndexOf("/"));
-
-const deleteV1Backup = async (db: SQLite.SQLiteDatabase) => {
-  try {
-    await SQLite.deleteDatabaseAsync(V1_BACKUP_NAME, getDbDirectory(db));
-  } catch {
-    // Обычно файла просто нет; коды ошибки на iOS и Android разные,
-    // поэтому их не различаем
-  }
-};
-
 // 1. Инициализация базы данных: перенос схемы (версия в PRAGMA
 // user_version), затем синхронизация словаря. Ошибка любого шага — экран
 // ошибки БД с повтором
@@ -168,57 +156,12 @@ const migrateSchema = async (db: SQLite.SQLiteDatabase) => {
         await txn.execAsync(SET_SCHEMA_VERSION);
       });
       return;
-    case "upgrade-v1":
-      // Без копии v1 не переносим: ошибка здесь — экран ошибки БД. Копию
-      // от прошлой неудачной попытки удаляем, иначе VACUUM INTO упадёт.
-      // Пустую таблицу v1 (первое заполнение словаря прервалось) заполнит
-      // синхронизация
-      await deleteV1Backup(db);
-      await db.runAsync(BACKUP_DATABASE_INTO, [
-        `${getDbDirectory(db)}/${V1_BACKUP_NAME}`,
-      ]);
-      await db.withExclusiveTransactionAsync(async (txn) => {
-        await txn.execAsync(MIGRATE_V1_TO_V2);
-        await txn.execAsync(MIGRATE_V2_TO_V3);
-        await txn.execAsync(MIGRATE_V3_TO_V4);
-        await txn.execAsync(MIGRATE_V4_TO_V5);
-        await txn.execAsync(SET_SCHEMA_VERSION);
-      });
-      return;
-    case "upgrade-v2":
-      // Копия v1 могла остаться от переноса v1 → v2: это уже следующий запуск
-      await deleteV1Backup(db);
-      await db.withExclusiveTransactionAsync(async (txn) => {
-        await txn.execAsync(MIGRATE_V2_TO_V3);
-        await txn.execAsync(MIGRATE_V3_TO_V4);
-        await txn.execAsync(MIGRATE_V4_TO_V5);
-        await txn.execAsync(SET_SCHEMA_VERSION);
-      });
-      return;
-    case "upgrade-v3":
-      // Копия v1 могла остаться от переноса v1 → v3 предыдущей версии
-      await deleteV1Backup(db);
-      await db.withExclusiveTransactionAsync(async (txn) => {
-        await txn.execAsync(MIGRATE_V3_TO_V4);
-        await txn.execAsync(MIGRATE_V4_TO_V5);
-        await txn.execAsync(SET_SCHEMA_VERSION);
-      });
-      return;
-    case "upgrade-v4":
-      // Копия v1 могла остаться от переноса v1 → v4 предыдущей версии
-      await deleteV1Backup(db);
-      await db.withExclusiveTransactionAsync(async (txn) => {
-        await txn.execAsync(MIGRATE_V4_TO_V5);
-        await txn.execAsync(SET_SCHEMA_VERSION);
-      });
-      return;
     case "current":
-      await deleteV1Backup(db);
       return;
     case "too-new":
       throw new DatabaseTooNewError(userVersion);
     case "unknown":
-      throw new Error(`Unknown database schema version ${userVersion}`);
+      throw new DatabaseUnsupportedError(userVersion);
   }
 };
 

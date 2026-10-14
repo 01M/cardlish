@@ -12,8 +12,8 @@ per-status statistics. UI copy is Russian; identifiers and code are English.
 label, iOS display name) and the author of the `manual-corrections` entry in
 `src/data/sources.json`. Everything else intentionally keeps the old identifiers: `slug`
 `english-cards`, `scheme` `englishcards`, `android.package` / `ios.bundleIdentifier`,
-`extra.eas.projectId`, `package.json` `"name"`, `eas.json` and the DB files `english_cards.db` /
-`english_cards.v1-backup.db`. Changing them would detach the EAS project, make a new app for the
+`extra.eas.projectId`, `package.json` `"name"`, `eas.json` and the DB file `english_cards.db`.
+Changing them would detach the EAS project, make a new app for the
 stores (another package id) or orphan installed users' data — never rename them for branding.
 
 ## Tech stack
@@ -81,7 +81,7 @@ src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (u
 src/db/           SQLite access + models (database.ts), schema/migration SQL + planMigration (schema.ts),
                   dictionary + topic sync SQL + pure helpers (dictionarySync.ts), Learn section
                   SQL (categoryQueries.ts), status changes + daily progress + goal + reset SQL
-                  (progressQueries.ts)
+                  (progressQueries.ts), schema.v5.snapshot.json (fresh-schema guard for schema.test.ts)
 src/services/     Side-effectful services: notifications.ts (expo-notifications behind the Expo Go
                   guard, permission, the wired `replanReminders`), reminders.ts (replan adapter
                   factory `createReminderReplanner(deps)`, no runtime expo/DB imports, tested)
@@ -382,8 +382,9 @@ are final — do not regenerate or edit them)
    Screens/services call exported async functions — never issue queries inline.
    The DB is opened once via `getDb()` (memoized promise; a failed open clears the memo so a retry
    reopens).
-   - **Schema v5, versioned by `PRAGMA user_version` (= 5; v4 was 4, v3 was 3, v2 was 2, v1
-     was 0).** `word_topics (topic TEXT NOT NULL, dict_key TEXT NOT NULL, PRIMARY KEY (topic,
+   - **Schema v5, versioned by `PRAGMA user_version` (= 5).** The upgrade chain v1 → v5 was
+     squashed before the first release (the app was never published; the only install was the
+     developer's own, already at v5), so only a fresh install or a v5 DB is supported. `word_topics (topic TEXT NOT NULL, dict_key TEXT NOT NULL, PRIMARY KEY (topic,
      dict_key)) WITHOUT ROWID` (v5) holds topic membership of dictionary words (slug →
      `dict_key`; no foreign key, custom words never appear — their dict_key is NULL); only the
      dictionary sync writes it.
@@ -394,14 +395,12 @@ are final — do not regenerate or edit them)
      CHECKs and `rank` INTEGER (frequency rank from `dictionary.json`; NULL for custom words and
      until synced). `rank` defines the Learn sections (frequency bands) and the order of new
      dictionary words in a session; `Word` does not include it. `initDatabase()` = `migrateSchema()` then `syncDictionaryIfNeeded()`;
-     `migrateSchema()` follows `planMigration(userVersion, hasWordsTable)`: `fresh` (create the
-     v5 schema + set version, one exclusive transaction), `upgrade-v1` (v1 → v2 → v3 → v4 → v5),
-     `upgrade-v2` (`ALTER TABLE … ADD COLUMN rank`, then v3 → v4 → v5), `upgrade-v3`
-     (`CREATE TABLE daily_progress`, empty, then v4 → v5), `upgrade-v4` (`CREATE TABLE
-     word_topics`, empty — the next sync fills it; no backup), `current`, `too-new` (above 5;
-     throws `DatabaseTooNewError`; the DB is not touched and the error screen says to update the
-     app) or `unknown` (version 1 or negative; error screen). Every upgrade runs in one exclusive
-     transaction that ends with `SET_SCHEMA_VERSION`.
+     `migrateSchema()` follows `planMigration(userVersion, hasWordsTable)`: `fresh` (version 0
+     and no `words` table: create the v5 schema + set version, one exclusive transaction),
+     `current` (5), `too-new` (above 5; throws `DatabaseTooNewError`; the DB is not touched and
+     the error screen says to update the app) or `unknown` (everything else: versions 1–4, version
+     0 with a `words` table (old v1), negatives; throws `DatabaseUnsupportedError`; the DB is not
+     touched — never delete it silently — and the error screen says to reinstall the app).
    - **Dictionary sync** (`dictionarySync.ts`, fills a fresh install too — there is no separate
      seed path): runs when `app_settings.dictionary_version` differs from
      `src/assets/dictionary.version.json` (the data version over `dictionary.json` + `topics.json`;
@@ -424,14 +423,15 @@ are final — do not regenerate or edit them)
      value even for rows that end in DO UPDATE, so every sync advances the id counter by about the
      dictionary size — harmless, ids stay unique and existing ids never change. A failed sync
      rolls back and shows the DB error screen; "Повторить" retries it.
-   - v1 → v2: first `VACUUM INTO` `english_cards.v1-backup.db` next to the DB (failure aborts the
-     upgrade); then one exclusive transaction keeps ids, statuses and custom words, merges
-     duplicate dictionary keys into the lowest id with the most advanced status, keeps the
-     AUTOINCREMENT counter, adds `rank` (v2 → v3), `daily_progress` (v3 → v4) and `word_topics`
-     (v4 → v5) and sets the version. Any error rolls back to the untouched v1 DB. The backup is
-     deleted on the next launch that finds schema v2 or later.
-   - New schema changes: bump `SCHEMA_VERSION`, add a plan step + SQL in `schema.ts` with
-     `node:sqlite` tests (`@jest-environment node` docblock), applied in one transaction.
+   - The fresh schema is pinned by `src/db/schema.v5.snapshot.json` (`sqlite_master` names + SQL
+     and `user_version` of a fresh DB, generated from the pre-squash code); `schema.test.ts` fails
+     on any drift. Never edit the snapshot to make a test pass without a schema version bump.
+   - New schema changes (once the app is published, real incremental migrations again — never
+     squash): bump `SCHEMA_VERSION`, add the SQL step in `schema.ts` and a plan (`upgrade-v5` for
+     v5 → v6) in `planMigration` + a `case` in `migrateSchema()`, update the fresh schema and
+     its snapshot together, with `node:sqlite` tests (`@jest-environment node` docblock): the
+     upgraded DB keeps its data and ends with the same schema as a fresh install; the step and
+     `SET_SCHEMA_VERSION` run in one exclusive transaction.
    - Row type `Word`: `dict_key`/`transcription`/`example` are `string | null`; `status` is
      `"new" | "review" | "learned"`. `WordsStats` (`totalNew`, `review`, `learned`) is exported
      and shared by Learn and Profile; Learn's own/dictionary split comes from

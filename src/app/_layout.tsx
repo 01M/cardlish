@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   DatabaseTooNewError,
+  DatabaseUnsupportedError,
   initDatabase,
   getThemePreference,
 } from "@/db/database";
@@ -29,8 +30,12 @@ export default function RootLayout() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [isReady, setIsReady] = useState(false);
   const [initFailed, setInitFailed] = useState(false);
-  // База от более новой версии приложения: повтор не поможет, нужно обновиться
-  const [isDbTooNew, setIsDbTooNew] = useState(false);
+  // Ошибки версии базы, при которых повтор не поможет: база от более новой
+  // версии приложения (нужно обновиться) или от старой неподдерживаемой
+  // (нужно переустановить)
+  const [dbVersionError, setDbVersionError] = useState<
+    "too-new" | "unsupported" | null
+  >(null);
   useReminderReplan(isReady);
 
   // Тема навигации: фон совпадает с фоном экрана, чтобы не было белой вспышки
@@ -58,7 +63,13 @@ export default function RootLayout() {
       setIsReady(true);
     } catch (e) {
       console.error("Ошибка инициализации БД:", e);
-      setIsDbTooNew(e instanceof DatabaseTooNewError);
+      setDbVersionError(
+        e instanceof DatabaseTooNewError
+          ? "too-new"
+          : e instanceof DatabaseUnsupportedError
+            ? "unsupported"
+            : null,
+      );
       setInitFailed(true);
     }
   }, []);
@@ -85,10 +96,17 @@ export default function RootLayout() {
       <ThemeProvider value={navTheme}>
         <View style={styles.center}>
           <Text style={styles.errorText}>Не удалось открыть базу данных</Text>
-          {isDbTooNew && (
+          {dbVersionError === "too-new" && (
             <Text style={styles.errorHint}>
               Данные сохранены более новой версией приложения. Обновите
               приложение, чтобы продолжить.
+            </Text>
+          )}
+          {dbVersionError === "unsupported" && (
+            <Text style={styles.errorHint}>
+              Данные сохранены старой версией приложения, которая больше не
+              поддерживается. Удалите приложение и установите его заново —
+              сохранённые слова и прогресс при этом будут удалены.
             </Text>
           )}
           <Button

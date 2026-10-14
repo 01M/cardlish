@@ -2,98 +2,24 @@
  * @jest-environment node
  */
 /// <reference types="node" />
-// SQL схемы и переноса проверяется на настоящем SQLite из node:sqlite
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+// SQL схемы проверяется на настоящем SQLite из node:sqlite
 import { DatabaseSync } from "node:sqlite";
 import {
-  BACKUP_DATABASE_INTO,
   CREATE_SCHEMA_V5,
-  MIGRATE_V1_TO_V2,
-  MIGRATE_V2_TO_V3,
-  MIGRATE_V3_TO_V4,
-  MIGRATE_V4_TO_V5,
   planMigration,
   SCHEMA_VERSION,
   SELECT_USER_VERSION,
   SELECT_WORDS_TABLE,
   SET_SCHEMA_VERSION,
 } from "./schema";
+import expectedSchema from "./schema.v5.snapshot.json";
 
-// Схема v1 — как её создавала прошлая версия initDatabase
-const V1_SCHEMA = `
-  CREATE TABLE IF NOT EXISTS words (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    term TEXT NOT NULL,
-    translation TEXT NOT NULL,
-    transcription TEXT,
-    example TEXT,
-    is_custom INTEGER DEFAULT 0,
-    status TEXT DEFAULT 'new'
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_words_is_custom_status
-    ON words (is_custom, status);
-
-  CREATE TABLE IF NOT EXISTS app_settings (
-    key TEXT PRIMARY KEY NOT NULL,
-    value TEXT NOT NULL
-  );
-`;
-
-type V1Row = {
-  id: number;
-  term: string;
-  is_custom: number;
-  status: string;
-};
-
-const createV1 = (rows: V1Row[]) => {
-  const db = new DatabaseSync(":memory:");
-  db.exec(V1_SCHEMA);
-  const insert = db.prepare(
-    `INSERT INTO words (id, term, translation, transcription, example, is_custom, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?);`,
-  );
-  for (const row of rows) {
-    insert.run(
-      row.id,
-      row.term,
-      `перевод ${row.id}`,
-      row.id % 2 === 0 ? `[t${row.id}]` : null,
-      null,
-      row.is_custom,
-      row.status,
-    );
-  }
-  return db;
-};
-
-const dict = (id: number, term: string, status = "new"): V1Row => ({
-  id,
-  term,
-  is_custom: 0,
-  status,
-});
-
-const custom = (id: number, term: string, status = "new"): V1Row => ({
-  id,
-  term,
-  is_custom: 1,
-  status,
-});
-
-// Как initDatabase: шаги переноса и версия в одной транзакции, при ошибке —
-// откат. failBeforeCommit имитирует сбой после всех шагов переноса
-const runInTransaction = (
-  db: DatabaseSync,
-  steps: string[],
-  failBeforeCommit = false,
-) => {
-  db.exec("BEGIN");
+// Как initDatabase в плане "fresh": схема и версия в одной транзакции, при
+// ошибке — откат. failBeforeCommit имитирует сбой после создания схемы
+const createFresh = (db: DatabaseSync, failBeforeCommit = false) => {
+  db.exec("BEGIN EXCLUSIVE");
   try {
-    for (const step of steps) db.exec(step);
+    db.exec(CREATE_SCHEMA_V5);
     if (failBeforeCommit) throw new Error("forced failure");
     db.exec(SET_SCHEMA_VERSION);
     db.exec("COMMIT");
@@ -103,98 +29,26 @@ const runInTransaction = (
   }
 };
 
-// План "upgrade-v1": v1 → v2 → v3 → v4 → v5
-const upgrade = (db: DatabaseSync, failBeforeCommit = false) =>
-  runInTransaction(
-    db,
-    [MIGRATE_V1_TO_V2, MIGRATE_V2_TO_V3, MIGRATE_V3_TO_V4, MIGRATE_V4_TO_V5],
-    failBeforeCommit,
-  );
-
-// План "upgrade-v2": v2 → v3 → v4 → v5
-const upgradeV2 = (db: DatabaseSync, failBeforeCommit = false) =>
-  runInTransaction(
-    db,
-    [MIGRATE_V2_TO_V3, MIGRATE_V3_TO_V4, MIGRATE_V4_TO_V5],
-    failBeforeCommit,
-  );
-
-// План "upgrade-v3": v3 → v4 → v5
-const upgradeV3 = (db: DatabaseSync, failBeforeCommit = false) =>
-  runInTransaction(db, [MIGRATE_V3_TO_V4, MIGRATE_V4_TO_V5], failBeforeCommit);
-
-// План "upgrade-v4": v4 → v5
-const upgradeV4 = (db: DatabaseSync, failBeforeCommit = false) =>
-  runInTransaction(db, [MIGRATE_V4_TO_V5], failBeforeCommit);
-
-// База v2 — такая, какой её оставлял перенос v1 → v2 прошлой версии
-const createV2 = (rows: V1Row[]) => {
-  const db = createV1(rows);
-  db.exec(MIGRATE_V1_TO_V2);
-  db.exec("PRAGMA user_version = 2;");
-  return db;
-};
-
-// База v3 — после переноса v2 → v3 и синхронизации словаря (rank заполнен
-// у слов словаря)
-const createV3 = (rows: V1Row[]) => {
-  const db = createV2(rows);
-  db.exec(MIGRATE_V2_TO_V3);
-  db.exec("UPDATE words SET rank = id * 10 WHERE is_custom = 0;");
-  db.exec("PRAGMA user_version = 3;");
-  return db;
-};
-
-// База v4 — после переноса v3 → v4, с дневным прогрессом и настройками
-const createV4 = (rows: V1Row[]) => {
-  const db = createV3(rows);
-  db.exec(MIGRATE_V3_TO_V4);
-  db.exec(
-    `INSERT INTO daily_progress (local_day, introduced)
-     VALUES ('2026-10-12', 7), ('2026-10-13', 2);
-     INSERT INTO app_settings (key, value)
-     VALUES ('dictionary_version', 'abc'), ('learn_categories', '["band:1-500"]');`,
-  );
-  db.exec("PRAGMA user_version = 4;");
-  return db;
-};
-
-// Схема без служебной sqlite_sequence и с нормализованными пробелами (после
-// RENAME SQLite пишет имя таблицы в кавычках)
-const comparableSchemaOf = (db: DatabaseSync) =>
-  (schemaOf(db) as { name: string; sql: string | null }[])
-    .filter((item) => item.name !== "sqlite_sequence")
-    .map((item) => ({
-      ...item,
-      sql: item.sql?.replace(/\s+/g, " ").replace('"words"', "words"),
-    }));
-
 const createFreshV5 = () => {
   const db = new DatabaseSync(":memory:");
-  db.exec(CREATE_SCHEMA_V5);
+  createFresh(db);
   return db;
 };
-
-const dailyRowsOf = (db: DatabaseSync) =>
-  db.prepare("SELECT local_day, introduced FROM daily_progress;").all();
-
-const topicRowsOf = (db: DatabaseSync) =>
-  db.prepare("SELECT topic, dict_key FROM word_topics ORDER BY topic, dict_key;").all();
 
 const userVersion = (db: DatabaseSync) =>
   (db.prepare(SELECT_USER_VERSION).get() as { user_version: number })
     .user_version;
 
-const rowsOf = (db: DatabaseSync) =>
+const hasWordsTable = (db: DatabaseSync) =>
+  db.prepare(SELECT_WORDS_TABLE).get() !== undefined;
+
+const schemaOf = (db: DatabaseSync) =>
   db
     .prepare(
-      `SELECT id, term, translation, transcription, example, is_custom, status
-       FROM words ORDER BY id;`,
+      "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name;",
     )
-    .all();
-
-const keysOf = (db: DatabaseSync) =>
-  db.prepare("SELECT id, dict_key FROM words ORDER BY id;").all();
+    .all()
+    .map((row) => ({ ...row }));
 
 const countsOf = (db: DatabaseSync) =>
   db
@@ -204,40 +58,44 @@ const countsOf = (db: DatabaseSync) =>
     )
     .all();
 
-const schemaOf = (db: DatabaseSync) =>
-  db
-    .prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name;")
-    .all();
+const dailyRowsOf = (db: DatabaseSync) =>
+  db.prepare("SELECT local_day, introduced FROM daily_progress;").all();
+
+const topicRowsOf = (db: DatabaseSync) =>
+  db.prepare("SELECT topic, dict_key FROM word_topics ORDER BY topic, dict_key;").all();
+
+const settingsOf = (db: DatabaseSync) =>
+  db.prepare("SELECT key, value FROM app_settings ORDER BY key;").all();
+
+// База старой версии: таблица words (форма не важна — её не читают) и
+// заданный user_version, как оставляли прошлые сборки
+const createLegacy = (version: number) => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE words (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      term TEXT NOT NULL,
+      translation TEXT NOT NULL,
+      status TEXT DEFAULT 'new'
+    );
+    PRAGMA user_version = ${version};
+  `);
+  return db;
+};
 
 describe("planMigration", () => {
-  it("treats version 0 without a words table as a fresh install", () => {
-    expect(planMigration(0, false)).toBe("fresh");
-  });
-
-  it("treats version 0 with a words table as a v1 database", () => {
-    expect(planMigration(0, true)).toBe("upgrade-v1");
-  });
-
-  it("treats version 2 as a v2 database", () => {
-    expect(planMigration(2, true)).toBe("upgrade-v2");
-  });
-
-  it("treats version 3 as a v3 database", () => {
-    expect(planMigration(3, true)).toBe("upgrade-v3");
-  });
-
-  it("treats version 4 as a v4 database", () => {
-    expect(planMigration(4, true)).toBe("upgrade-v4");
-  });
-
   it("is at schema version 5", () => {
     expect(SCHEMA_VERSION).toBe(5);
   });
 
+  it("treats version 0 without a words table as a fresh install", () => {
+    expect(planMigration(0, false)).toBe("fresh");
+  });
+
   it.each([true, false])(
     "treats the current version as current (words table: %s)",
-    (hasWordsTable) => {
-      expect(planMigration(SCHEMA_VERSION, hasWordsTable)).toBe("current");
+    (withWordsTable) => {
+      expect(planMigration(SCHEMA_VERSION, withWordsTable)).toBe("current");
     },
   );
 
@@ -248,342 +106,69 @@ describe("planMigration", () => {
     },
   );
 
-  it.each([1, -1])("treats version %i as unknown", (version) => {
+  it("treats version 0 with a words table (a v1 database) as unknown", () => {
+    expect(planMigration(0, true)).toBe("unknown");
+  });
+
+  it.each([1, 2, 3, 4, -1])("treats version %i as unknown", (version) => {
     expect(planMigration(version, true)).toBe("unknown");
+    expect(planMigration(version, false)).toBe("unknown");
   });
 
-  it("matches what a v1 database reports", () => {
-    const db = createV1([]);
-    const hasWordsTable = db.prepare(SELECT_WORDS_TABLE).get() !== undefined;
+  it("matches what an empty database reports", () => {
+    const db = new DatabaseSync(":memory:");
 
-    expect(planMigration(userVersion(db), hasWordsTable)).toBe("upgrade-v1");
-  });
-
-  it("matches what a v2 database reports", () => {
-    const db = createV2([]);
-    const hasWordsTable = db.prepare(SELECT_WORDS_TABLE).get() !== undefined;
-
-    expect(planMigration(userVersion(db), hasWordsTable)).toBe("upgrade-v2");
-  });
-
-  it("matches what a v3 database reports", () => {
-    const db = createV3([]);
-    const hasWordsTable = db.prepare(SELECT_WORDS_TABLE).get() !== undefined;
-
-    expect(planMigration(userVersion(db), hasWordsTable)).toBe("upgrade-v3");
-  });
-
-  it("matches what a v4 database reports", () => {
-    const db = createV4([]);
-    const hasWordsTable = db.prepare(SELECT_WORDS_TABLE).get() !== undefined;
-
-    expect(planMigration(userVersion(db), hasWordsTable)).toBe("upgrade-v4");
+    expect(planMigration(userVersion(db), hasWordsTable(db))).toBe("fresh");
   });
 
   it("matches what a fresh v5 database reports", () => {
     const db = createFreshV5();
-    db.exec(SET_SCHEMA_VERSION);
-    const hasWordsTable = db.prepare(SELECT_WORDS_TABLE).get() !== undefined;
 
-    expect(planMigration(userVersion(db), hasWordsTable)).toBe("current");
+    expect(planMigration(userVersion(db), hasWordsTable(db))).toBe("current");
   });
+
+  it.each([0, 1, 2, 3, 4])(
+    "matches what a database of an old version %i reports",
+    (version) => {
+      const db = createLegacy(version);
+
+      expect(planMigration(userVersion(db), hasWordsTable(db))).toBe("unknown");
+    },
+  );
 });
 
-describe("v1 → v2 → v3 → v4 → v5 migration", () => {
-  const v1Rows = [
-    dict(1, "apple"),
-    dict(2, "Monday", "review"),
-    dict(3, "run", "learned"),
-    dict(4, "o'clock", "review"),
-    custom(7, "Serendipity"),
-    custom(9, "look after", "learned"),
-    custom(12, "bank", "review"),
-  ];
+describe("fresh install", () => {
+  // Снимок sqlite_master сделан из CREATE_SCHEMA_V5 до удаления цепочки
+  // переносов v1 → v5: схема новой установки не должна меняться без новой
+  // версии схемы
+  it("creates exactly the committed v5 schema", () => {
+    const db = createFreshV5();
 
-  it("keeps ids, statuses, custom words and counts", () => {
-    const db = createV1(v1Rows);
-    const rowsBefore = rowsOf(db);
-    const countsBefore = countsOf(db);
-
-    upgrade(db);
-
-    expect(rowsOf(db)).toEqual(rowsBefore);
-    expect(countsOf(db)).toEqual(countsBefore);
-    expect(keysOf(db)).toEqual([
-      { id: 1, dict_key: "apple" },
-      { id: 2, dict_key: "monday" },
-      { id: 3, dict_key: "run" },
-      { id: 4, dict_key: "o'clock" },
-      { id: 7, dict_key: null },
-      { id: 9, dict_key: null },
-      { id: 12, dict_key: null },
-    ]);
+    expect(userVersion(db)).toBe(expectedSchema.userVersion);
+    expect(schemaOf(db)).toEqual(expectedSchema.sqliteMaster);
   });
 
-  it("sets user_version to 5 and leaves the same schema as a fresh install", () => {
-    const db = createV1(v1Rows);
-    expect(userVersion(db)).toBe(0);
+  it("leaves every table empty", () => {
+    const db = createFreshV5();
 
-    upgrade(db);
-
-    expect(userVersion(db)).toBe(5);
-    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV5()));
+    expect(countsOf(db)).toEqual([]);
     expect(dailyRowsOf(db)).toEqual([]);
     expect(topicRowsOf(db)).toEqual([]);
+    expect(settingsOf(db)).toEqual([]);
   });
 
-  it("leaves rank empty until the dictionary is synced", () => {
-    const db = createV1(v1Rows);
+  it("leaves the database empty when it fails before the commit", () => {
+    const db = new DatabaseSync(":memory:");
 
-    upgrade(db);
+    expect(() => createFresh(db, true)).toThrow("forced failure");
 
-    expect(
-      db.prepare("SELECT COUNT(*) AS count FROM words WHERE rank IS NOT NULL;").get(),
-    ).toEqual({ count: 0 });
-  });
-
-  it("keeps app settings", () => {
-    const db = createV1(v1Rows);
-    db.exec("INSERT INTO app_settings (key, value) VALUES ('theme_preference', 'dark');");
-
-    upgrade(db);
-
-    expect(db.prepare("SELECT key, value FROM app_settings;").all()).toEqual([
-      { key: "theme_preference", value: "dark" },
-    ]);
-  });
-
-  it("does not conflict when a custom word repeats a dictionary term", () => {
-    const db = createV1([dict(1, "apple", "learned"), custom(2, "Apple")]);
-
-    upgrade(db);
-
-    expect(keysOf(db)).toEqual([
-      { id: 1, dict_key: "apple" },
-      { id: 2, dict_key: null },
-    ]);
-    expect(rowsOf(db).map((row) => (row as V1Row).status)).toEqual([
-      "learned",
-      "new",
-    ]);
-  });
-
-  it("merges duplicate dictionary terms into the lowest id with the most advanced status", () => {
-    const db = createV1([
-      dict(1, "Run"),
-      dict(2, "run", "learned"),
-      dict(3, " RUN ", "review"),
-      dict(4, "set", "review"),
-      dict(5, "Set"),
-      custom(6, "run"),
-    ]);
-
-    upgrade(db);
-
-    expect(
-      db
-        .prepare("SELECT id, dict_key, term, status FROM words ORDER BY id;")
-        .all(),
-    ).toEqual([
-      { id: 1, dict_key: "run", term: "Run", status: "learned" },
-      { id: 4, dict_key: "set", term: "set", status: "review" },
-      { id: 6, dict_key: null, term: "run", status: "new" },
-    ]);
-  });
-
-  it("never reuses the ids of deleted words", () => {
-    const db = createV1(v1Rows);
-    db.exec(
-      "INSERT INTO words (id, term, translation, is_custom) VALUES (30, 'gone', 'x', 1);",
-    );
-    db.exec("DELETE FROM words WHERE id = 30;");
-
-    upgrade(db);
-    db.exec(
-      `INSERT INTO words (term, translation, transcription, example, is_custom, status)
-       VALUES ('next', 'x', NULL, NULL, 1, 'new');`,
-    );
-
-    expect(
-      db.prepare("SELECT id FROM words WHERE term = 'next';").get(),
-    ).toEqual({ id: 31 });
-  });
-
-  it("leaves v1 untouched when a row breaks a constraint", () => {
-    const db = createV1([...v1Rows, dict(20, "broken", "unknown")]);
-    const rowsBefore = rowsOf(db);
-    const schemaBefore = schemaOf(db);
-
-    expect(() => upgrade(db)).toThrow(/CHECK constraint failed/);
-
-    expect(rowsOf(db)).toEqual(rowsBefore);
-    expect(schemaOf(db)).toEqual(schemaBefore);
+    expect(schemaOf(db)).toEqual([]);
     expect(userVersion(db)).toBe(0);
-  });
-
-  it("leaves v1 untouched when it fails after the table swap", () => {
-    const db = createV1(v1Rows);
-    const rowsBefore = rowsOf(db);
-    const schemaBefore = schemaOf(db);
-
-    expect(() => upgrade(db, true)).toThrow("forced failure");
-
-    expect(rowsOf(db)).toEqual(rowsBefore);
-    expect(schemaOf(db)).toEqual(schemaBefore);
-    expect(userVersion(db)).toBe(0);
+    expect(planMigration(userVersion(db), hasWordsTable(db))).toBe("fresh");
     // Повторная попытка после отката проходит
-    upgrade(db);
-    expect(userVersion(db)).toBe(5);
-  });
-});
-
-describe("v2 → v3 → v4 → v5 migration", () => {
-  const v2Rows = [
-    dict(1, "apple"),
-    dict(2, "Monday", "review"),
-    dict(3, "run", "learned"),
-    custom(7, "Serendipity"),
-    custom(12, "bank", "review"),
-  ];
-
-  it("keeps every row, id, key and status and leaves rank empty", () => {
-    const db = createV2(v2Rows);
-    const rowsBefore = rowsOf(db);
-    const keysBefore = keysOf(db);
-
-    upgradeV2(db);
-
-    expect(rowsOf(db)).toEqual(rowsBefore);
-    expect(keysOf(db)).toEqual(keysBefore);
-    expect(db.prepare("SELECT id, rank FROM words ORDER BY id;").all()).toEqual(
-      [1, 2, 3, 7, 12].map((id) => ({ id, rank: null })),
-    );
-  });
-
-  it("sets user_version to 5 and leaves the same schema as a fresh install", () => {
-    const db = createV2(v2Rows);
-    db.exec("INSERT INTO app_settings (key, value) VALUES ('theme_preference', 'dark');");
-
-    upgradeV2(db);
-
-    expect(userVersion(db)).toBe(5);
-    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV5()));
-    expect(db.prepare("SELECT key, value FROM app_settings;").all()).toEqual([
-      { key: "theme_preference", value: "dark" },
-    ]);
-  });
-
-  it("leaves v2 untouched when it fails", () => {
-    const db = createV2(v2Rows);
-    const schemaBefore = schemaOf(db);
-
-    expect(() => upgradeV2(db, true)).toThrow("forced failure");
-
-    expect(schemaOf(db)).toEqual(schemaBefore);
-    expect(userVersion(db)).toBe(2);
-  });
-});
-
-describe("v3 → v4 → v5 migration", () => {
-  const v3Rows = [
-    dict(1, "apple"),
-    dict(2, "Monday", "review"),
-    dict(3, "run", "learned"),
-    custom(7, "Serendipity"),
-    custom(12, "bank", "review"),
-  ];
-
-  const fullRowsOf = (db: DatabaseSync) =>
-    db.prepare("SELECT * FROM words ORDER BY id;").all();
-
-  it("keeps every row, key, status and rank", () => {
-    const db = createV3(v3Rows);
-    const rowsBefore = fullRowsOf(db);
-
-    upgradeV3(db);
-
-    expect(fullRowsOf(db)).toEqual(rowsBefore);
-    expect(rowsBefore).toHaveLength(5);
-  });
-
-  it("sets user_version to 5, adds an empty daily_progress and leaves the same schema as a fresh install", () => {
-    const db = createV3(v3Rows);
-    db.exec(
-      `INSERT INTO app_settings (key, value)
-       VALUES ('theme_preference', 'dark'), ('dictionary_version', 'abc');`,
-    );
-
-    upgradeV3(db);
-
-    expect(userVersion(db)).toBe(5);
-    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV5()));
-    expect(dailyRowsOf(db)).toEqual([]);
-    expect(topicRowsOf(db)).toEqual([]);
-    expect(db.prepare("SELECT key, value FROM app_settings ORDER BY key;").all()).toEqual([
-      { key: "dictionary_version", value: "abc" },
-      { key: "theme_preference", value: "dark" },
-    ]);
-  });
-
-  it("leaves v3 untouched when it fails", () => {
-    const db = createV3(v3Rows);
-    const schemaBefore = schemaOf(db);
-
-    expect(() => upgradeV3(db, true)).toThrow("forced failure");
-
-    expect(schemaOf(db)).toEqual(schemaBefore);
-    expect(userVersion(db)).toBe(3);
-  });
-});
-
-describe("v4 → v5 migration", () => {
-  const v4Rows = [
-    dict(1, "apple"),
-    dict(2, "Monday", "review"),
-    dict(3, "run", "learned"),
-    custom(7, "Serendipity"),
-    custom(12, "bank", "review"),
-  ];
-
-  const fullRowsOf = (db: DatabaseSync) =>
-    db.prepare("SELECT * FROM words ORDER BY id;").all();
-
-  const settingsOf = (db: DatabaseSync) =>
-    db.prepare("SELECT key, value FROM app_settings ORDER BY key;").all();
-
-  it("keeps every word, daily progress row and setting", () => {
-    const db = createV4(v4Rows);
-    const rowsBefore = fullRowsOf(db);
-    const dailyBefore = dailyRowsOf(db);
-    const settingsBefore = settingsOf(db);
-
-    upgradeV4(db);
-
-    expect(fullRowsOf(db)).toEqual(rowsBefore);
-    expect(rowsBefore).toHaveLength(5);
-    expect(dailyRowsOf(db)).toEqual(dailyBefore);
-    expect(dailyBefore).toHaveLength(2);
-    expect(settingsOf(db)).toEqual(settingsBefore);
-  });
-
-  it("sets user_version to 5, adds an empty word_topics and leaves the same schema as a fresh install", () => {
-    const db = createV4(v4Rows);
-
-    upgradeV4(db);
-
-    expect(userVersion(db)).toBe(5);
-    expect(comparableSchemaOf(db)).toEqual(comparableSchemaOf(createFreshV5()));
-    expect(topicRowsOf(db)).toEqual([]);
-  });
-
-  it("leaves v4 untouched when it fails", () => {
-    const db = createV4(v4Rows);
-    const schemaBefore = schemaOf(db);
-
-    expect(() => upgradeV4(db, true)).toThrow("forced failure");
-
-    expect(schemaOf(db)).toEqual(schemaBefore);
-    expect(userVersion(db)).toBe(4);
+    createFresh(db);
+    expect(userVersion(db)).toBe(SCHEMA_VERSION);
+    expect(schemaOf(db)).toEqual(expectedSchema.sqliteMaster);
   });
 });
 
@@ -678,34 +263,38 @@ describe("schema v5 constraints", () => {
   });
 });
 
-describe("v1 backup", () => {
-  let dir: string;
+describe("app_settings", () => {
+  const upsert = (db: DatabaseSync, key: string, value: string | null) =>
+    db
+      .prepare(
+        `INSERT INTO app_settings (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value;`,
+      )
+      .run(key, value);
 
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "english-cards-"));
+  it("keeps one value per key and replaces it on upsert", () => {
+    const db = createFreshV5();
+    upsert(db, "theme_preference", "dark");
+    upsert(db, "daily_goal", "15");
+    upsert(db, "theme_preference", "light");
+
+    expect(settingsOf(db)).toEqual([
+      { key: "daily_goal", value: "15" },
+      { key: "theme_preference", value: "light" },
+    ]);
+    expect(() =>
+      db.exec("INSERT INTO app_settings (key, value) VALUES ('daily_goal', '20');"),
+    ).toThrow(/UNIQUE constraint failed/);
   });
 
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
+  it("requires a key and a value", () => {
+    const db = createFreshV5();
 
-  it("copies the whole database into a new file", () => {
-    const db = createV1([dict(1, "apple", "learned"), custom(2, "Apple")]);
-    const backupPath = join(dir, "english_cards.v1-backup.db");
-
-    db.prepare(BACKUP_DATABASE_INTO).run(backupPath);
-
-    const backup = new DatabaseSync(backupPath);
-    expect(rowsOf(backup)).toEqual(rowsOf(db));
-    expect(schemaOf(backup)).toEqual(schemaOf(db));
-    backup.close();
-  });
-
-  it("fails instead of overwriting an existing file", () => {
-    const db = createV1([dict(1, "apple")]);
-    const backupPath = join(dir, "english_cards.v1-backup.db");
-    db.prepare(BACKUP_DATABASE_INTO).run(backupPath);
-
-    expect(() => db.prepare(BACKUP_DATABASE_INTO).run(backupPath)).toThrow();
+    expect(() => upsert(db, "theme_preference", null)).toThrow(
+      /NOT NULL constraint failed/,
+    );
+    expect(() =>
+      db.exec("INSERT INTO app_settings (key, value) VALUES (NULL, 'x');"),
+    ).toThrow(/NOT NULL constraint failed/);
   });
 });

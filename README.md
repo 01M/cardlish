@@ -8,7 +8,7 @@
 
 [![Скачать APK для Android](https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C-APK%20%D0%B4%D0%BB%D1%8F%20Android-D97706?style=for-the-badge&logo=android&logoColor=white)](https://github.com/01M/cardlish/releases/latest)
 
-[![Release](https://img.shields.io/github/v/release/01M/cardlish?label=release&color=D97706)](https://github.com/01M/cardlish/releases/latest)
+[![Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2F01M%2Fcardlish%2Fmaster%2Fapp.json&query=%24.expo.version&label=version&prefix=v&color=D97706)](https://github.com/01M/cardlish/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-Android%20%7C%20iOS-D97706)
 [![Expo SDK 57](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo&logoColor=white)](https://expo.dev)
 [![React Native 0.86](https://img.shields.io/badge/React%20Native-0.86-61DAFB?logo=react&logoColor=black)](https://reactnative.dev)

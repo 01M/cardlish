@@ -124,8 +124,8 @@
 Нужны [Node.js](https://nodejs.org) (сборки EAS используют 26.8.2) и npm.
 
 ```bash
-git clone https://github.com/01M/english-cards.git
-cd english-cards
+git clone https://github.com/01M/cardlish.git
+cd cardlish
 npm install
 npm start
 ```

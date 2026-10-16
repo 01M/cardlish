@@ -27,14 +27,31 @@
 
 </div>
 
-<!-- Скриншоты: положите PNG в docs/screenshots/ и раскомментируйте блок.
+<p align="center"><b>Android</b></p>
+
 <p align="center">
-  <img src="docs/screenshots/learn.png" width="200" alt="Учить">
-  <img src="docs/screenshots/review.png" width="200" alt="Повторение">
-  <img src="docs/screenshots/categories.png" width="200" alt="Разделы">
-  <img src="docs/screenshots/profile.png" width="200" alt="Профиль">
+  <img src="docs/screenshots/android/learn.png" width="190" alt="Android, экран «Учить»: статистика, цель на день, выбор разделов и план сессии">
+  &nbsp;
+  <img src="docs/screenshots/android/categories.png" width="190" alt="Android, выбор разделов: полосы частотности и темы">
+  &nbsp;
+  <img src="docs/screenshots/android/review.png" width="190" alt="Android, повторение: карточка с переводом и кнопки «Вспомнил» / «Не вспомнил»">
+  &nbsp;
+  <img src="docs/screenshots/android/profile.png" width="190" alt="Android, профиль: общий прогресс, статистика, цель на день и напоминания">
 </p>
--->
+
+<p align="center"><b>iPhone</b></p>
+
+<p align="center">
+  <img src="docs/screenshots/ios/learn.png" width="190" alt="iPhone, экран «Учить»: статистика, цель на день, выбор разделов и план сессии">
+  &nbsp;
+  <img src="docs/screenshots/ios/categories.png" width="190" alt="iPhone, выбор разделов: полосы частотности и темы">
+  &nbsp;
+  <img src="docs/screenshots/ios/review.png" width="190" alt="iPhone, повторение: карточка с переводом и кнопки «Вспомнил» / «Не вспомнил»">
+  &nbsp;
+  <img src="docs/screenshots/ios/profile.png" width="190" alt="iPhone, профиль: общий прогресс, статистика, цель на день и напоминания">
+</p>
+
+<p align="center"><sub>Версии для iOS пока нет в App Store — скачать можно только APK для Android.</sub></p>
 
 ## 📖 О проекте
 

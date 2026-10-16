@@ -6,17 +6,21 @@
 
 **Английские слова по карточкам — офлайн, без регистрации и рекламы**
 
+[![Скачать APK для Android](https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C-APK%20%D0%B4%D0%BB%D1%8F%20Android-D97706?style=for-the-badge&logo=android&logoColor=white)](https://github.com/01M/cardlish/releases/latest)
+
 [![Expo SDK 57](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo&logoColor=white)](https://expo.dev)
 [![React Native 0.86](https://img.shields.io/badge/React%20Native-0.86-61DAFB?logo=react&logoColor=black)](https://reactnative.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![SQLite](https://img.shields.io/badge/SQLite-offline-003B57?logo=sqlite&logoColor=white)](https://docs.expo.dev/versions/latest/sdk/sqlite/)
 <br>
+[![Release](https://img.shields.io/github/v/release/01M/cardlish?label=release&color=D97706)](https://github.com/01M/cardlish/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-Android%20%7C%20iOS-D97706)
 ![Dictionary](https://img.shields.io/badge/dictionary-34%20965%20words-D97706)
 [![Data licence](https://img.shields.io/badge/data-CC%20BY--SA%204.0-lightgrey)](#-источники-данных-и-лицензии)
 
 [Возможности](#-возможности) •
 [Словарь](#-встроенный-словарь) •
+[Установка](#-установка) •
 [Быстрый старт](#-быстрый-старт) •
 [Разработка](#-разработка) •
 [Лицензии](#-источники-данных-и-лицензии)
@@ -118,6 +122,18 @@
 ✈️ Путешествия
 
 </details>
+
+## 📲 Установка
+
+Скачайте `cardlish-<версия>.apk` со страницы
+[последнего релиза](https://github.com/01M/cardlish/releases/latest) и откройте его на телефоне.
+Android попросит разрешить установку из этого источника. Нужен Android 7.0 или новее.
+
+> [!WARNING]
+> Это сборка вне Google Play. Если приложение появится в Play, перейти на ту версию можно будет
+> только через удаление этой, и прогресс при этом не сохранится.
+
+Версии для iOS пока нет: код её поддерживает, но сборка в App Store не выкладывалась.
 
 ## 🚀 Быстрый старт
 

@@ -43,7 +43,6 @@ yarn-error.*
 # local tooling output
 repomix-output.xml
 .tmp-docs/
-.kilo/
 
 # Python venv for the dictionary pipeline (scripts/requirements.txt)
 scripts/.venv/

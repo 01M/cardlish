@@ -219,7 +219,7 @@ scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.j
 
 - Data: Open English WordNet 2025 (`oewn:2025`, hierarchy + sense order) and `omw-en:2.0`
   (Princeton WordNet 3.0, only its SemCor sense counts). The `wn` package downloads both into
-  the gitignored cache `scripts/.wn_data/` (also in `.claudeignore` / `.kilocodeignore`); first
+  the gitignored cache `scripts/.wn_data/` (also in `.claudeignore`); first
   run: `wn.config.data_directory = 'scripts/.wn_data'; wn.download('oewn:2025');
   wn.download('omw-en:2.0')`. A build takes ~1.5 min.
 - Output `src/assets/topics.json`: `{ "<slug>": ["<dict_key>", …] }`, slugs in `TOPICS` order,

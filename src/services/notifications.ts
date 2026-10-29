@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import Constants from "expo-constants";
+import { isRunningInExpoGo } from "expo";
 import {
   getDailyProgress,
   getReminderEnabled,
@@ -8,17 +8,25 @@ import {
 } from "../db/database";
 import { createReminderReplanner } from "./reminders";
 
-const isExpoGoAndroid =
-  Constants.executionEnvironment === "storeClient" && Platform.OS === "android";
+// isRunningInExpoGo() смотрит, есть ли нативный модуль самого Expo Go, — так
+// же Expo Go определяет и expo-notifications. Constants.executionEnvironment
+// для этого не годится: в Expo Go 58 на Android проверка по нему перестала
+// срабатывать
+const isExpoGoAndroid = isRunningInExpoGo() && Platform.OS === "android";
 
 // На Android в Expo Go сам импорт expo-notifications падает с ошибкой
-// (push-уведомления убраны из Expo Go начиная с SDK 53). Поэтому подгружаем
-// модуль лениво и только там, где это безопасно — в dev-build/production
-// сборке или на iOS.
+// (в Expo Go нет части его нативных модулей). Поэтому подгружаем модуль
+// лениво и только там, где это безопасно — в собранном приложении или на
+// iOS. Если загрузка всё же упадёт, напоминания просто недоступны: ошибка
+// импорта не должна ронять корневой layout
 let Notifications: typeof import("expo-notifications") | undefined;
 if (!isExpoGoAndroid) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- required lazy import to prevent Android Expo Go crash
-  Notifications = require("expo-notifications");
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- required lazy import to prevent Android Expo Go crash
+    Notifications = require("expo-notifications");
+  } catch (e) {
+    console.error("Не удалось загрузить expo-notifications:", e);
+  }
 }
 
 const ANDROID_CHANNEL = { id: "study-reminders", name: "Напоминания об учебе" };

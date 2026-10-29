@@ -3,6 +3,7 @@ import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native
 import { DateTimePicker } from "@expo/ui/community/datetime-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "./Button";
+import { TimeWheel } from "./TimeWheel";
 import { Theme } from "../theme/tokens";
 import { useColorSchemeName, useTheme } from "../theme/useTheme";
 
@@ -67,14 +68,11 @@ export const TimePickerModal = ({
           <Text style={styles.title} accessibilityRole="header">
             {title}
           </Text>
-          <DateTimePicker
-            mode="time"
-            display="spinner"
+          <TimeWheel
             value={draft}
-            locale="ru_RU"
-            themeVariant={scheme}
-            accentColor={theme.amberAccent}
-            onValueChange={(_, date) => setDraft(date)}
+            onChange={setDraft}
+            colorScheme={scheme}
+            tintColor={theme.amberAccent}
             style={styles.picker}
           />
           <Button label="Готово" onPress={() => onConfirm(draft)} />

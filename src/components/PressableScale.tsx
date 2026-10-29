@@ -52,10 +52,13 @@ const OUTER_LAYOUT_KEYS = [
   "zIndex",
 ] as const;
 
+// Стили в типах React Native только для чтения; здесь собираем свои копии
+type MutableViewStyle = { -readonly [K in keyof ViewStyle]: ViewStyle[K] };
+
 export const splitStyle = (style: StyleProp<ViewStyle>) => {
   const flat = StyleSheet.flatten(style) ?? {};
   const outer: ViewStyle = {};
-  const inner: ViewStyle = { ...flat };
+  const inner: MutableViewStyle = { ...flat };
   for (const key of OUTER_LAYOUT_KEYS) {
     if (key in flat) {
       (outer as Record<string, unknown>)[key] = flat[key];

@@ -20,29 +20,33 @@ data).
 
 ## Tech stack
 
-- **Expo SDK 57** (`expo ~57.0.28`) + **React Native 0.86** + **React 19.2**
-- **Expo Router ~57** (`main: "expo-router/entry"`, `experiments.typedRoutes: true`) under `src/app/`;
+- **Expo SDK 58** (`expo ~58.0.21`) + **React Native 0.88** + **React 19.3**; RN's Strict
+  TypeScript API is on (refs use instance types such as `ScrollViewInstance`, style types are
+  read-only)
+- **Expo Router ~58** (`main: "expo-router/entry"`, `experiments.typedRoutes: true`) under `src/app/`;
   hrefs are checked by tsc against the gitignored `.expo/types/router.d.ts`. After adding a
   route without running the dev server, regenerate it with Expo's own generator:
-  `EXPO_ROUTER_APP_ROOT="$(pwd -W)/src/app" node -e "require('./node_modules/expo/node_modules/@expo/cli/node_modules/@expo/router-server/build/typed-routes').regenerateDeclarations('.expo/types')"`
+  `EXPO_ROUTER_APP_ROOT="$(pwd -W)/src/app" node -e "require('./node_modules/@expo/router-server/build/typed-routes').regenerateDeclarations('.expo/types')"`
   (Git Bash; a running `expo start` also rewrites it and may add bogus `/../…` entries for
   files outside `src/app` — regenerate if you see them)
 - **TypeScript ~6** with `strict: true`, path alias `@/* → ./src/*`
 - **Package manager: npm** (`package-lock.json` present, no `bun.lock`)
-- **expo-sqlite ~57** for the local on-device database (`cardlish.db`)
+- **expo-sqlite ~58** for the local on-device database (`cardlish.db`)
 - **expo-notifications** for the study reminders (one-shot local notifications, see "Reminders"), **expo-speech** for pronunciation,
   **expo-constants**, **expo-font**, **expo-linking**, **expo-status-bar**
-- **expo-splash-screen ~57** — the only way to keep the native splash up until the DB is ready
+- **expo-splash-screen ~58** — the only way to keep the native splash up until the DB is ready
   (`preventAutoHideAsync` / `hideAsync`) and to configure it via its config plugin; see "App
   icon, notification icon and splash screen"
 - **expo-system-ui** is installed so that `userInterfaceStyle: "automatic"` works on Android —
   no imports, but do not remove it
-- **react-native-safe-area-context ~5.7** + **react-native-screens ~4.26**
+- **react-native-safe-area-context ~5.10** + **react-native-screens ~4.30**
+- **expo-symbols ~58** — no imports; since SDK 58 an optional peer of expo-router that
+  `NativeTabs.Trigger.Icon`'s `md` prop needs on Android (tab icons); do not remove it
 - **@expo/vector-icons ^15** (Ionicons), **expo-haptics**, **expo-linear-gradient** (edge fades);
   animations use the built-in `Animated` API (react-native-reanimated is NOT used)
 - **react-native-reanimated** and **react-native-worklets** are not app dependencies: npm
-  auto-installs them only as peers (react-native-drawer-layout, a dependency of expo-router),
-  and they are autolinked into the Android build. The app does not use them — never import them
+  auto-installs them only as peers (of react-native-drawer-layout, a dependency of expo-router;
+  worklets also of expo-modules-core and @expo/ui), and they are autolinked into the Android build. The app does not use them — never import them
   and do not add them to `package.json`.
 - **EAS Build/Submit** — two build profiles in `eas.json`: `preview` (APK, internal
   distribution, `autoIncrement`) and `production` (app-bundle / AAB for Google Play,
@@ -57,7 +61,7 @@ data).
   membership (`src/assets/topics.json`) from Open English WordNet — see "Topic pipeline". Both
   scripts end by rewriting the shared data version through `scripts/data_version.py`.
 - Lint: `eslint` 9 + `eslint-config-expo` (`eslint.config.js`)
-- Tests: `jest` 29 + `jest-expo` preset (`"jest"` key in `package.json`); jest types come from
+- Tests: `jest` 30 + `jest-expo` preset (`"jest"` key in `package.json`); jest types come from
   `"types": ["jest"]` in `tsconfig.json` (TS 6 no longer auto-includes `@types/*`)
 
 ## Layout
@@ -76,7 +80,7 @@ src/screens/      Screen implementations (LearnScreen, ReviewScreen, WordsScreen
                   CategoriesScreen)
 src/data/         sources.json — attribution/licences of every shipped data source
 src/components/   Shared UI (Button, PressableScale, StepperButton, FlipCard, FadeInView, WordFormModal, Confetti, TopFade, ListTopFade,
-                  TimePickerModal)
+                  TimePickerModal, TimeWheel (+ .ios))
 src/hooks/        Shared hooks (useReduceMotion, useReminderReplan)
 src/theme/        tokens.ts (Theme type, lightTheme, darkTheme) + useTheme.ts (useColorSchemeName, useTheme, applyThemePreference)
                   + tokens.test.ts (app.json splash / notification colours = tokens)
@@ -127,10 +131,11 @@ npx eas-cli@latest build --profile production --platform android   # AAB for Goo
 npx eas-cli@latest submit --profile production
 ```
 
-**EAS Node pin:** `preview` and `production` set `"node"` (currently `"26.8.2"`) to the local
+**EAS Node pin:** `preview` and `production` set `"node"` (currently `"26.12.1"`) to the local
 Node version, so EAS runs the same bundled npm as the machine that generated
-`package-lock.json`. EAS's default SDK 57 image ships npm 10.9.x, whose `npm ci` rejects our
-npm-11 lock file ("Missing: react-native-worklets@0.10.4 from lock file"). Whenever the lock
+`package-lock.json`. EAS's default image can ship an older npm (on SDK 57 it was npm 10.9.x),
+whose `npm ci` rejects our npm-11 lock file ("Missing: react-native-worklets@0.10.4 from lock
+file"). Whenever the lock
 file is regenerated or the local Node major changes: update the pin, run
 `npm ci --ignore-scripts --dry-run` under the Node version pinned in `eas.json` (it must pass),
 and check the "Install dependencies" step of the next EAS build log before relying on it.
@@ -267,7 +272,12 @@ scripts/.venv/Scripts/python.exe scripts/build_topics.py src/assets/dictionary.j
 
 `expo-notifications` needs a **native build** (the `preview` APK; there is no dev client) — Expo Go on Android crashes on import
 (Since SDK 53 push notifications are stripped from Expo Go). `src/services/notifications.ts`
-already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that guard.
+already lazy-`require`s the module behind an `isExpoGoAndroid` guard; keep that guard. The guard
+uses `isRunningInExpoGo()` from `expo` (the check expo-notifications itself uses), NOT
+`Constants.executionEnvironment === "storeClient"` — that stopped matching Expo Go 58 on Android.
+The `require` is also wrapped in try/catch (`console.error`, reminders become "unavailable"), so
+a failing native module never breaks the root layout. Nothing else may import
+expo-notifications at runtime (`reminders.ts` uses `import type` only).
 
 **Reminders** (rolling window of one-shot local notifications — NO repeating triggers anywhere)
 - Settings: `app_settings.daily_reminder_enabled` (`"true"`/`"false"`) and
@@ -470,7 +480,7 @@ are final — do not regenerate or edit them)
    no inline style objects for anything non-trivial (dynamic values like progress-bar width or
    inset-derived padding are exempt). All colors come from the theme (see "Theming"). TextInputs
    use the theme's `placeholder` + `keyboardAppearance`. Use `StyleSheet.absoluteFill`
-   (`absoluteFillObject` does not exist in RN 0.86).
+   (`absoluteFillObject` does not exist in RN 0.88).
 7. **Navigation** via Expo Router only: `Link`, `router`, `useLocalSearchParams` from
    `expo-router`. Never pass non-serializable params (functions, DB handles).
 8. **Branch switches in one synchronous block.** When a screen switches between branches
@@ -481,9 +491,14 @@ are final — do not regenerate or edit them)
 ## UI conventions
 
 **Navigation & insets**
-- Tabs use NativeTabs (`expo-router/unstable-native-tabs`) in `src/app/(tabs)/_layout.tsx`.
-- Scrolling tab screens rely on the automatic native inset: the screen's first ScrollView, or a
-  `FlatList` with `contentInsetAdjustmentBehavior="automatic"` (WordsScreen). WordsScreen wraps
+- Tabs use NativeTabs (`expo-router/native-tabs`) in `src/app/(tabs)/_layout.tsx`.
+- Scrolling tab screens get the iOS safe-area insets from `contentInsetAdjustmentBehavior=
+  "automatic"` set explicitly on their scroll view: ProfileScreen's ScrollView (status bar on
+  top, tab bar at the bottom; on Android it pads with `insets.top` instead) and WordsScreen's
+  `FlatList` (tab bar; the Words header above it pads with `insets.top`). Do not rely on
+  NativeTabs switching the screen's first ScrollView to automatic by itself — with SDK 58 that
+  stopped reaching Profile (its title slid under the status bar). Learn's setup ScrollView sets
+  its own top padding from `insets.top` on both platforms. WordsScreen wraps
   its list in a `react-native-screens/experimental` `SafeAreaView` whose bottom edge is on only
   while the list is empty, so the empty state centers above the tab bar.
 - ReviewScreen uses `SafeAreaView` from `react-native-screens/experimental` +
@@ -695,10 +710,14 @@ are final — do not regenerate or edit them)
   free whole hour around 20:00) and a muted note on the goal and the one-week stop. A picked time
   that already exists changes nothing, silently. Every change is saved first (`setReminderTimes`),
   then shown and replanned; `showErrorAlert()` and the old list on failure.
-- `TimePickerModal` (`src/components/`, `@expo/ui/community/datetime-picker`, 24 h): shown while
-  mounted. Android — the Material 3 time dialog ("Готово" / "Отмена"); iOS — a bottom sheet over
-  the `scrim` token with a wheel (`locale="ru_RU"`, `amberAccent` tint), "Готово" and "Отмена";
-  tapping the scrim cancels.
+- `TimePickerModal` (`src/components/`, 24 h): shown while mounted. Android — the Material 3
+  time dialog of `@expo/ui/community/datetime-picker` ("Готово" / "Отмена"); iOS — a bottom
+  sheet over the `scrim` token with a wheel (`TimeWheel`, `locale="ru_RU"`, `amberAccent` tint),
+  "Готово" and "Отмена"; tapping the scrim cancels. `TimeWheel.ios.tsx` builds the wheel from
+  `@expo/ui/swift-ui` (`Host alignment="center"` + `DatePicker` with `datePickerStyle("wheel")`):
+  since SDK 58 `<Host>` aligns its content `topLeading` and the community wrapper does not pass
+  `alignment`, so its wheel sat on the left. `TimeWheel.tsx` (other platforms, web) is the
+  community spinner.
 - "ОБУЧЕНИЕ" section (before "НАПОМИНАНИЯ"): "Цель на день" row with − / + `StepperButton`s
   (5–50, step 5, `stepDailyGoal`), disabled at the limits. The row is one accessible element:
   role `adjustable`, value text "N новых слов", `increment` / `decrement` actions. Each step is

@@ -340,6 +340,7 @@ export const ProfileScreen = () => {
   return (
     <ScrollView
       style={styles.container}
+      contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={[
         styles.content,
         {

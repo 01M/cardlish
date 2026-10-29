@@ -260,8 +260,9 @@ Docs: https://docs.expo.dev/eas/index.md
 This project's `eas.json` has two build profiles only: `preview` (APK, internal distribution,
 autoIncrement) and `production` (app-bundle / AAB for Google Play, autoIncrement). There is no
 `development` profile — expo-dev-client is not installed; development runs in Expo Go. Both
-profiles pin `"node"` to the local Node version: EAS's default SDK 57 image ships npm 10.9.x,
-whose `npm ci` rejects our npm-11 `package-lock.json` ("Missing: react-native-worklets@0.10.4").
+profiles pin `"node"` to the local Node version: EAS's default image can ship an older npm (on
+SDK 57 it was npm 10.9.x), whose `npm ci` rejects our npm-11 `package-lock.json` ("Missing:
+react-native-worklets@0.10.4").
 When the lock file is regenerated or the local Node major changes, update the pin, check that
 `npm ci --ignore-scripts --dry-run` passes under the pinned Node version, and check the
 "Install dependencies" step of the EAS build log before building further.

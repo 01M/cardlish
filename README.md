@@ -10,8 +10,8 @@
 
 [![Version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2F01M%2Fcardlish%2Fmaster%2Fapp.json&query=%24.expo.version&label=version&prefix=v&color=D97706)](https://github.com/01M/cardlish/releases/latest)
 ![Platforms](https://img.shields.io/badge/platforms-Android%20%7C%20iOS-D97706)
-[![Expo SDK 57](https://img.shields.io/badge/Expo-SDK%2057-000020?logo=expo&logoColor=white)](https://expo.dev)
-[![React Native 0.86](https://img.shields.io/badge/React%20Native-0.86-61DAFB?logo=react&logoColor=black)](https://reactnative.dev)
+[![Expo SDK 58](https://img.shields.io/badge/Expo-SDK%2058-000020?logo=expo&logoColor=white)](https://expo.dev)
+[![React Native 0.88](https://img.shields.io/badge/React%20Native-0.88-61DAFB?logo=react&logoColor=black)](https://reactnative.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Data licence](https://img.shields.io/badge/data-CC%20BY--SA%204.0-lightgrey)](#-источники-данных-и-лицензии)
 
@@ -191,7 +191,7 @@ npx eas-cli@latest build --profile production --platform android   # AAB для 
 
 ### Стек
 
-- **Приложение:** Expo SDK 57 · React Native 0.86 · React 19.2 · TypeScript (strict)
+- **Приложение:** Expo SDK 58 · React Native 0.88 · React 19.3 · TypeScript (strict)
 - **Навигация:** Expo Router, нативные вкладки (NativeTabs)
 - **Данные:** expo-sqlite, версия схемы в `PRAGMA user_version`
 - **Устройство:** expo-notifications · expo-speech · expo-haptics

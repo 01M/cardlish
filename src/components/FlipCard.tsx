@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
   ScrollView,
+  ScrollViewInstance,
 } from "react-native";
 import { Word } from "../db/database";
 import * as Speech from "expo-speech";
@@ -56,7 +57,7 @@ export const FlipCard: React.FC<FlipCardProps> = ({ word, onFlipChange }) => {
   const reduceMotion = useReduceMotion();
   const [isFlipped, setIsFlipped] = useState(false);
   const animatedValue = useRef(new Animated.Value(0)).current;
-  const backScrollRef = useRef<ScrollView>(null);
+  const backScrollRef = useRef<ScrollViewInstance>(null);
   const isSpeaking = useRef(false);
 
   const speakWord = () => {

@@ -20,7 +20,7 @@ data).
 
 ## Tech stack
 
-- **Expo SDK 58** (`expo ~58.0.21`) + **React Native 0.88** + **React 19.3**; RN's Strict
+- **Expo SDK 58** (`expo ~58.0.22`) + **React Native 0.88** + **React 19.3**; RN's Strict
   TypeScript API is on (refs use instance types such as `ScrollViewInstance`, style types are
   read-only)
 - **Expo Router ~58** (`main: "expo-router/entry"`, `experiments.typedRoutes: true`) under `src/app/`;

@@ -20,7 +20,7 @@ data).
 
 ## Tech stack
 
-- **Expo SDK 58** (`expo ~58.0.22`) + **React Native 0.88** + **React 19.3**; RN's Strict
+- **Expo SDK 58** (`expo ~58.0.26`) + **React Native 0.88** + **React 19.3**; RN's Strict
   TypeScript API is on (refs use instance types such as `ScrollViewInstance`, style types are
   read-only)
 - **Expo Router ~58** (`main: "expo-router/entry"`, `experiments.typedRoutes: true`) under `src/app/`;
@@ -39,7 +39,7 @@ data).
   icon, notification icon and splash screen"
 - **expo-system-ui** is installed so that `userInterfaceStyle: "automatic"` works on Android —
   no imports, but do not remove it
-- **react-native-safe-area-context ~5.10** + **react-native-screens ~4.30**
+- **react-native-safe-area-context ~5.11** + **react-native-screens ~4.30**
 - **expo-symbols ~58** — no imports; since SDK 58 an optional peer of expo-router that
   `NativeTabs.Trigger.Icon`'s `md` prop needs on Android (tab icons); do not remove it
 - **@expo/vector-icons ^15** (Ionicons), **expo-haptics**, **expo-linear-gradient** (edge fades);
